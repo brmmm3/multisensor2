@@ -7,8 +7,8 @@
  * Please contact at <mrbm74@gmail.com>
  */
 
-#ifndef _SW_SERIAL_H_
-#define _SW_SERIAL_H_
+#ifndef _YYS_H_
+#define _YYS_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,7 +18,6 @@ extern "C" {
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 
-#include "hw_serial.h"
 #include "sw_serial.h"
 
 typedef struct yys_sensor_s {
@@ -26,11 +25,16 @@ typedef struct yys_sensor_s {
     uint8_t *buffer;
     uint8_t cnt;
     QueueHandle_t queue;
-    hw_serial_t *hw_serial;
     sw_serial_t *sw_serial;
 } yys_sensor_t;
 
-void yys_init();
+typedef struct yys_sensors_s {
+    yys_sensor_t *o2_sensor;
+    yys_sensor_t *co_sensor;
+    yys_sensor_t *h2s_sensor;
+} yys_sensors_t;
+
+yys_sensors_t yys_init();
 
 #ifdef __cplusplus
 };
