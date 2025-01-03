@@ -1,14 +1,33 @@
 #include <string.h>
-#include "esp_log.h"
 #include "hal/uart_types.h"
 #include "driver/uart.h"
+#include "esp_log.h"
 
 #include "gps.h"
+
+static const char *GPS_TAG = "GPS";
 
 // UART
 #define UART_BUFFER_SIZE 256
 
 TaskHandle_t uartRxGPSHandle = NULL;
+
+hw_serial_t gps_serial = {
+    .uart_num = UART_NUM_1,
+    .rx_pin = 10,
+    .baudrate = 9600,
+    .queue = NULL
+};
+
+gps_sensor_t gps_sensor = {
+    .name = "GPS",
+    .buffer = NULL,
+    .cnt = 0,
+    .queue = NULL,
+    .serial = &gps_serial,
+    .messages = NULL,
+    .msg_size = 0
+};
 
 
 uint8_t nmea_get_checksum(const char *buf)
@@ -274,13 +293,12 @@ void rx_task_gps_sensor(void *arg)
     char *buf = (char *)sensor->buffer;
     uint8_t offset = 0;
 
-    uart_init(serial->uart_num, serial->rx_pin);
     while (1) {
-        const int rxBytes = uart_read_bytes(serial->uart_num, &buf[offset], UART_BUFFER_SIZE - offset, 1);
+        const int rxBytes = uart_read_bytes(serial->uart_num, &buf[offset], UART_BUFFER_SIZE - offset, 100);
         if (rxBytes == 0) continue;
-        ESP_LOGI(sensor->name, "#RXB=%d", rxBytes);
+        if (rxBytes < 0) break; // UART error
         //ESP_LOG_BUFFER_CHAR(sensor->name, buf, rxBytes);
-        ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, rxBytes, ESP_LOG_INFO);
+        //ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, rxBytes, ESP_LOG_INFO);
 
         char *p = buf;
 
@@ -305,14 +323,14 @@ void rx_task_gps_sensor(void *arg)
                 if (p[2] == 'P') {
                     sat = "GPS";
                 } else if (p[2] == 'N') {
-                    sat = "GPS+GLONASS";
+                    sat = "GPS+GLN";
                 } else if (p[2] == 'L') {
-                    sat = "GLONASS";
+                    sat = "GLN";
                 } else {
                     break;
                 }
             } else if (strncmp(p, "$BD", 3) == 0) {
-                sat = "BAIDOU";
+                sat = "BDU";
             } else {
                 ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, rxBytes, ESP_LOG_ERROR);
                 p = strchr(end + 1, '$');
@@ -372,29 +390,19 @@ void rx_task_gps_sensor(void *arg)
 
         if (cnt < rxBytes) {
             ESP_LOGW(sensor->name, "#OFF=%d %s", cnt, p);
-            strcpy(buf, p);
             offset = rxBytes - (uint8_t)cnt;
+            strncpy(buf, p, offset);
         }
     }
+    ESP_LOGE(GPS_TAG, "rx_task_gps_sensor EXIT");
 }
 
 gps_sensor_t gps_init()
 {
-    hw_serial_t gps_serial = {
-        .uart_num = UART_NUM_1,
-        .rx_pin = 10,
-        .baudrate = 9600,
-        .queue = xQueueCreate(128, 1)
-    };
-    gps_sensor_t gps_sensor = {
-        .name = "GPS",
-        .buffer = calloc(UART_BUFFER_SIZE, 1),
-        .cnt = 0,
-        .queue = xQueueCreate(128, 1),
-        .serial = &gps_serial,
-        .messages = NULL,
-        .msg_size = 0
-    };
+    ESP_LOGI(GPS_TAG, "Initialize GPS");
+    gps_serial.queue = xQueueCreate(128, 1);
+    gps_sensor.buffer = calloc(UART_BUFFER_SIZE + 1, 1);
+    gps_sensor.queue = xQueueCreate(128, 1);
     memset(&gps_sensor.rmc, 0, sizeof(gps_rmc_t));
     memset(&gps_sensor.gll, 0, sizeof(gps_gll_t));
     memset(&gps_sensor.gsa, 0, sizeof(gps_gsa_t));
@@ -402,7 +410,10 @@ gps_sensor_t gps_init()
     memset(&gps_sensor.gga, 0, sizeof(gps_gga_t));
     memset(&gps_sensor.vtg, 0, sizeof(gps_vtg_t));
     memset(&gps_sensor.zda, 0, sizeof(gps_zda_t));
-    ESP_LOGI("MAIN", "%p", gps_sensor.buffer);
+
+    uart_init(gps_serial.uart_num, gps_serial.rx_pin, -1);
+
     xTaskCreate(rx_task_gps_sensor, "rx_task_gps_sensor_GPS", 4096, (void *)&gps_sensor, configMAX_PRIORITIES - 1, &uartRxGPSHandle);
+    ESP_LOGI(GPS_TAG, "GPS initialized");
     return gps_sensor;
 }
