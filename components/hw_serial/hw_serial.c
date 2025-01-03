@@ -1,8 +1,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_log.h"
 #include "hal/uart_types.h"
 #include "driver/uart.h"
+#include "esp_log.h"
 
 #include "hw_serial.h"
 
@@ -12,9 +12,9 @@
 static const char *HW_SERIAL_TAG = "HWS";
 
 
-void uart_init(uint8_t uart_num, uint8_t rx_pin)
+void uart_init(uint8_t uart_num, int rx_pin, int tx_pin)
 {
-    ESP_LOGI(HW_SERIAL_TAG, "Initialize UART %d on pin %d", uart_num, rx_pin);
+    ESP_LOGI(HW_SERIAL_TAG, "Initialize UART %d on rx=%d tx=%d", uart_num, rx_pin, tx_pin);
 
     uint8_t source_clk = UART_SCLK_DEFAULT;
     if (uart_num == LP_UART_NUM_0)
@@ -30,10 +30,10 @@ void uart_init(uint8_t uart_num, uint8_t rx_pin)
         .rx_flow_ctrl_thresh = 0,
         .source_clk = source_clk,
     };
-    int intr_alloc_flags = 0;
+    int intr_alloc_flags = ESP_INTR_FLAG_IRAM;
 
     ESP_ERROR_CHECK(uart_driver_install(uart_num, UART_BUFFER_SIZE << 1, 0, 0, NULL, intr_alloc_flags));
     ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(uart_num, -1, rx_pin, -1, -1));
+    ESP_ERROR_CHECK(uart_set_pin(uart_num, tx_pin, rx_pin, -1, -1));
     ESP_LOGI(HW_SERIAL_TAG, "UART %d initialized", uart_num);
 }

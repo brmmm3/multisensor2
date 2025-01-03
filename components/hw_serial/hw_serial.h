@@ -1,5 +1,5 @@
 /**
- * GPS - GPS Driver for Esspressif ESP-32.
+ * HW Serial driver
  *
  * MIT License
  *
@@ -22,10 +22,11 @@ typedef struct hw_serial_s {
     uint32_t baudrate;
     uint8_t uart_num;
     uint8_t rx_pin;
+    uint8_t tx_pin;
     QueueHandle_t queue;
 } hw_serial_t;
 
-void uart_init(uint8_t uart_num, uint8_t rx_pin);
+void uart_init(uint8_t uart_num, int rx_pin, int tx_pin);
 
 #ifdef __cplusplus
 };
