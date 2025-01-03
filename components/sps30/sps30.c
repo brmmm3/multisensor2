@@ -163,12 +163,37 @@ esp_err_t sps30_probe(sps30_t* sps30)
 
 esp_err_t sps30_get_firmware_version(sps30_t *sps30)
 {
-    return sps30_read(sps30, cmd_get_firmware_version, (uint8_t *)&sps30->firmware_version, 2);
+    uint8_t buf[3];
+    esp_err_t err = sps30_read(sps30, cmd_get_firmware_version, buf, 3);
+    ESP_LOGI("SPS", "%02X %02X %02X", buf[0], buf[1], buf[2]);
+    sps30->firmware_version = ((uint16_t)buf[0] << 8) | (uint16_t)buf[1];
+    return err;
+}
+
+esp_err_t sps30_get_product(sps30_t *sps30)
+{
+    ESP_LOGI("SPS", "sps30_get_product");
+    uint8_t buf[12];
+    esp_err_t err = sps30_read(sps30, cmd_get_product, buf, 12);
+    ESP_LOGI("SPS", "sps30_get_product=%d", err);
+    ESP_LOGI("SPS", "%02X %02X %02X %02X", buf[0], buf[1], buf[2], buf[3]);
+    if (err == ESP_OK)
+    {
+        /* ensure a final '\0'. The firmware should always set this so this is just
+        * in case something goes wrong.
+        */
+        sps30->serial[SPS30_MAX_SERIAL_LEN - 1] = '\0';
+    }
+    return err;
 }
 
 esp_err_t sps30_get_serial(sps30_t *sps30)
 {
-    esp_err_t err = sps30_read(sps30, cmd_get_serial_number, (uint8_t *)&sps30->serial, SPS30_MAX_SERIAL_LEN);
+    ESP_LOGI("SPS", "sps30_get_serial");
+    uint8_t buf[48];
+    esp_err_t err = sps30_read(sps30, cmd_get_serial_number, buf, 48);
+    ESP_LOGI("SPS", "sps30_get_serial=%d", err);
+    ESP_LOGI("SPS", "%02X %02X %02X %02X", buf[0], buf[1], buf[2], buf[3]);
     if (err == ESP_OK)
     {
         /* ensure a final '\0'. The firmware should always set this so this is just
@@ -197,9 +222,10 @@ esp_err_t sps30_stop_measurement(sps30_t *sps30)
 
 bool sps30_read_data_ready(sps30_t *sps30)
 {
-    uint8_t response[3];
-    ESP_ERROR_CHECK(sps30_read(sps30, cmd_get_data_ready, response, 3));
-    return response[1] == 0x01;
+    uint8_t buf[3];
+    ESP_ERROR_CHECK(sps30_read(sps30, cmd_get_data_ready, buf, 3));
+    ESP_LOGI("SPS", "sps30_read_data_ready %02X %02X %02X", buf[0], buf[1], buf[2]);
+    return buf[1] == 0x01;
 }
 
 esp_err_t sps30_read_measurement(sps30_t *sps30)
@@ -207,6 +233,7 @@ esp_err_t sps30_read_measurement(sps30_t *sps30)
     uint8_t data[54];
 
     esp_err_t err = sps30_read(sps30, cmd_read_measurement, (uint8_t *)&data[0], sizeof(data));
+    ESP_LOGI("SPS", "sps30_read_measurement %d", err);
     if (err != ESP_OK)
     {
         return err;
@@ -276,13 +303,14 @@ esp_err_t sps30_wake_up(sps30_t* sps30)
 
 esp_err_t sps30_read_device_status_register(sps30_t* sps30)
 {
-    uint8_t data[6];
+    uint8_t buf[6];
 
-    esp_err_t err = sps30_read(sps30, cmd_read_measurement, (uint8_t *)&data[0], sizeof(data));
+    esp_err_t err = sps30_read(sps30, cmd_read_measurement, buf, sizeof(buf));
+    ESP_LOGI("SPS", "STATUS %02X %02X %02X %02X %02X %02X", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
     if (err != ESP_OK)
     {
         return err;
     }
-    sps30->status = bytes_to_uint32(data);
+    sps30->status = bytes_to_uint32(buf);
     return ESP_OK;
 }

@@ -2,7 +2,7 @@ menu "SPS30 Options"
     config SPS30_I2C_CLK_SPEED_HZ
         int "I2C Clock Speed (Hz)"
         default 100000
-        range 1000 400000
+        range 1000 100000
         help
             Set the I2C clock speed in Hz. Only applies to the new I2C Master driver.
 

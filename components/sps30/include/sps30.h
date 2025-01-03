@@ -117,6 +117,8 @@ esp_err_t sps30_probe(sps30_t* sps30);
  */
 esp_err_t sps30_get_firmware_version(sps30_t *sps30);
 
+esp_err_t sps30_get_product(sps30_t *sps30);
+
 /**
  * sps30_get_serial() - retrieve the serial number
  *
