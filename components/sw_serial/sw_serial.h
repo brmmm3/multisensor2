@@ -1,5 +1,5 @@
 /**
- * GPS - GPS Driver for Esspressif ESP-32.
+ * SW Serial driver
  *
  * MIT License
  *

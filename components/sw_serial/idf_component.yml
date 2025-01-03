@@ -1,0 +1,4 @@
+dependencies:
+  idf: '>=5.4'
+description: SW Serial
+version: 1.0.0
