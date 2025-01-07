@@ -24,8 +24,8 @@ typedef struct yys_sensor_s {
     char *name;
     uint8_t *buffer;
     uint8_t cnt;
-    QueueHandle_t queue;
     sw_serial_t *sw_serial;
+    uint16_t value;
 } yys_sensor_t;
 
 typedef struct yys_sensors_s {
@@ -35,6 +35,12 @@ typedef struct yys_sensors_s {
 } yys_sensors_t;
 
 yys_sensors_t yys_init();
+
+uint16_t yys_get_co(yys_sensors_t *sensor);
+
+uint16_t yys_get_o2(yys_sensors_t *sensor);
+
+uint16_t yys_get_h2s(yys_sensors_t *sensor);
 
 #ifdef __cplusplus
 };

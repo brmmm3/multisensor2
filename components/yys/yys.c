@@ -9,10 +9,6 @@
 // UART
 #define UART_BUFFER_SIZE 256
 
-TaskHandle_t uartRxO2Handle = NULL;
-TaskHandle_t uartRxCOHandle = NULL;
-TaskHandle_t uartRxH2SHandle = NULL;
-
 sw_serial_t o2_serial = {
     .rx_pin = 13,
     .baudrate = 9600,
@@ -27,7 +23,6 @@ yys_sensor_t o2_sensor = {
     .name = "O2",
     .buffer = NULL,
     .cnt = 0,
-    .queue = NULL,
     .sw_serial = &o2_serial
 };
 
@@ -45,7 +40,6 @@ yys_sensor_t co_sensor = {
     .name = "CO",
     .buffer = NULL,
     .cnt = 0,
-    .queue = NULL,
     .sw_serial = &co_serial
 };
 
@@ -63,7 +57,6 @@ yys_sensor_t h2s_sensor = {
     .name = "H2S",
     .buffer = NULL,
     .cnt = 0,
-    .queue = NULL,
     .sw_serial = &h2s_serial
 };
 
@@ -131,9 +124,7 @@ static void rx_task_yys_sensor(void *arg)
 
             //ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, 9, ESP_LOG_INFO);
             if (cksum == buf[8]) {
-                uint16_t data = (uint16_t)buf[2] << 8 | (uint16_t)buf[3];
-
-                xQueueSend(sensor->queue, &data, portMAX_DELAY);
+                sensor->value = (uint16_t)buf[2] << 8 | (uint16_t)buf[3];
             } else {
                 ESP_LOGE(sensor->name, "#CK %02X", cksum);
             }
@@ -147,18 +138,30 @@ yys_sensors_t yys_init()
     ESP_LOGI("YYS", "Initialize YYS");
     o2_serial.queue = xQueueCreate(32, 1);
     o2_sensor.buffer = malloc(16);
-    o2_sensor.queue = xQueueCreate(16, 2);
-    xTaskCreate(rx_task_yys_sensor, "rx_task_yys_sensor_O2", 4096, (void *)&o2_sensor, configMAX_PRIORITIES - 1, &uartRxO2Handle);
+    xTaskCreate(rx_task_yys_sensor, "rx_task_yys_sensor_O2", 4096, (void *)&o2_sensor, configMAX_PRIORITIES - 1, NULL);
 
     co_serial.queue = xQueueCreate(32, 1);
     co_sensor.buffer = malloc(16);
-    co_sensor.queue = xQueueCreate(16, 2);
-    xTaskCreate(rx_task_yys_sensor, "rx_task_yys_sensor_CO", 4096, (void *)&co_sensor, configMAX_PRIORITIES - 1, &uartRxCOHandle);
+    xTaskCreate(rx_task_yys_sensor, "rx_task_yys_sensor_CO", 4096, (void *)&co_sensor, configMAX_PRIORITIES - 1, NULL);
 
     h2s_serial.queue = xQueueCreate(32, 1);
     h2s_sensor.buffer = malloc(16);
-    h2s_sensor.queue = xQueueCreate(16, 2);
-    xTaskCreate(rx_task_yys_sensor, "rx_task_yys_sensor_H2S", 4096, (void *)&h2s_sensor, configMAX_PRIORITIES - 1, &uartRxH2SHandle);
+    xTaskCreate(rx_task_yys_sensor, "rx_task_yys_sensor_H2S", 4096, (void *)&h2s_sensor, configMAX_PRIORITIES - 1, NULL);
     ESP_LOGI("YYS", "YYS initialized");
     return sensors;
+}
+
+uint16_t yys_get_co(yys_sensors_t *sensor)
+{
+    return sensor->co_sensor->value;
+}
+
+uint16_t yys_get_o2(yys_sensors_t *sensor)
+{
+    return sensor->o2_sensor->value;
+}
+
+uint16_t yys_get_h2s(yys_sensors_t *sensor)
+{
+    return sensor->h2s_sensor->value;
 }
