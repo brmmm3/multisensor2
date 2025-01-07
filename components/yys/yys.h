@@ -34,7 +34,7 @@ typedef struct yys_sensors_s {
     yys_sensor_t *h2s_sensor;
 } yys_sensors_t;
 
-yys_sensors_t yys_init();
+yys_sensors_t yys_init(uint8_t o2_pin_num, uint8_t co_pin_num, uint8_t h2s_pin_num);
 
 uint16_t yys_get_co(yys_sensors_t *sensor);
 

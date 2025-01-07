@@ -133,17 +133,20 @@ static void rx_task_yys_sensor(void *arg)
     }
 }
 
-yys_sensors_t yys_init()
+yys_sensors_t yys_init(uint8_t o2_pin_num, uint8_t co_pin_num, uint8_t h2s_pin_num)
 {
     ESP_LOGI("YYS", "Initialize YYS");
+    o2_serial.rx_pin = o2_pin_num;
     o2_serial.queue = xQueueCreate(32, 1);
     o2_sensor.buffer = malloc(16);
     xTaskCreate(rx_task_yys_sensor, "rx_task_yys_sensor_O2", 4096, (void *)&o2_sensor, configMAX_PRIORITIES - 1, NULL);
 
+    co_serial.rx_pin = co_pin_num;
     co_serial.queue = xQueueCreate(32, 1);
     co_sensor.buffer = malloc(16);
     xTaskCreate(rx_task_yys_sensor, "rx_task_yys_sensor_CO", 4096, (void *)&co_sensor, configMAX_PRIORITIES - 1, NULL);
 
+    h2s_serial.rx_pin = h2s_pin_num;
     h2s_serial.queue = xQueueCreate(32, 1);
     h2s_sensor.buffer = malloc(16);
     xTaskCreate(rx_task_yys_sensor, "rx_task_yys_sensor_H2S", 4096, (void *)&h2s_sensor, configMAX_PRIORITIES - 1, NULL);
