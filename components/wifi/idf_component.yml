@@ -1,0 +1,9 @@
+## IDF Component Manager Manifest File
+description: WiFi
+version: 1.0.0
+dependencies:
+  idf: '>=5.4'
+  espressif/mdns:
+    version: "^1.0.3"
+    rules:
+      - if: "idf_version >=5.0"
