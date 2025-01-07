@@ -39,7 +39,6 @@ typedef struct mhz19_s {
     hw_serial_t *hw_serial;
     QueueHandle_t queue;
     uint8_t pending;
-    TaskHandle_t *task;
 
     bool auto_calib;
     uint16_t co2;
@@ -49,11 +48,13 @@ typedef struct mhz19_s {
     char fw_version[7];
 } mhz19_t;
 
-esp_err_t mhz19_init(mhz19_t **sensor);
+esp_err_t mhz19_init(mhz19_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin);
 
 uint8_t mhz19_pending(mhz19_t *sensor);
 
 esp_err_t mhz19_set_auto_calibration(mhz19_t *sensor, bool autocalib);
+
+esp_err_t mhz19_get_auto_calibration(mhz19_t *sensor);
 
 esp_err_t mhz19_calibrate_zero(mhz19_t *sensor);
 
@@ -63,6 +64,7 @@ enum MHZ19_RANGE mhz19_get_range(mhz19_t *sensor);
 
 esp_err_t mhz19_set_range(mhz19_t *sensor, enum MHZ19_RANGE range);
 
+esp_err_t mhz19_reset(mhz19_t *sensor);
 
 #ifdef __cplusplus
 };
