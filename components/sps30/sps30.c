@@ -219,7 +219,7 @@ esp_err_t sps30_start_measurement(sps30_t *sps30)
     uint8_t cmd_args[] = { 0x03 /* 3=float, 5=uint16 */, 0x00, 0x00 };
     esp_err_t err;
 
-    cmd_args[2] = calc_cksum(cmd_args, 2);
+    cmd_args[2] = sps30_calc_cksum(cmd_args, 2);
     ESP_LOG_BUFFER_HEXDUMP(TAG, cmd_args, 3, ESP_LOG_INFO);
     err = sps30_write(sps30, cmd_start_measurement, cmd_args, sizeof(cmd_args));
     vTaskDelay(pdMS_TO_TICKS(20));

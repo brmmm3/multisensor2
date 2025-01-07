@@ -10,7 +10,7 @@ extern "C" {
 #define CRC8_POLYNOMIAL             (0x31)
 #define CRC8_INIT                   (0xFF)
 
-uint8_t calc_cksum(const uint8_t* data, uint16_t count);
+uint8_t sps30_calc_cksum(const uint8_t* data, uint16_t count);
 
 uint8_t is_data_valid(const uint8_t *data, uint8_t size);
 
