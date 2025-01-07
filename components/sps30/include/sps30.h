@@ -38,21 +38,19 @@ extern "C" {
 
 #include "driver/i2c_master.h"
 
-#define SPS30_I2C_ADDRESS 0x69
+#define SPS30_I2C_ADDRESS       0x69
 
-#define SPS30_ADDR_SIZE             (0x02)
+#define SPS30_ADDR_SIZE         (0x02)
 
-#define SPS30_MAX_SERIAL_LEN 32
-/* 1s measurement intervals */
-#define SPS30_MEASUREMENT_DURATION_USEC 1000000
-/* 100ms delay after resetting the sensor */
-#define SPS30_RESET_DELAY_USEC 100000
+#define SPS30_DEV_INFO_MAX_LEN  8
+#define SPS30_SERIAL_MAX_LEN    32
+
 /** The fan is switched on but not running */
-#define SPS30_DEVICE_STATUS_FAN_ERROR_MASK (1 << 4)
+#define SPS30_DEVICE_FAN_ERROR(s)       ((s & (1 << 4)) != 0)
 /** The laser current is out of range */
-#define SPS30_DEVICE_STATUS_LASER_ERROR_MASK (1 << 5)
+#define SPS30_DEVICE_LASER_ERROR(s)     ((s & (1 << 5)) != 0)
 /** The fan speed is out of range */
-#define SPS30_DEVICE_STATUS_FAN_SPEED_WARNING (1 << 21)
+#define SPS30_DEVICE_FAN_SPEED_WRN(s)   ((s & (1 << 21)) != 0)
 
 typedef struct sps30_values_s {
     float mc_1p0;
@@ -74,14 +72,18 @@ typedef struct sps30_s {
     i2c_device_config_t dev_cfg;
     // I2C master handle via port
     i2c_master_bus_handle_t bus_handle;
-    uint16_t firmware_version;
     // Serial number
-    char serial[SPS30_MAX_SERIAL_LEN];
+    char device_info[SPS30_DEV_INFO_MAX_LEN + 1];
+    // Serial number
+    char serial[SPS30_SERIAL_MAX_LEN + 1];
+    uint16_t firmware_version;
     // Auto cleaning interval
     uint32_t autoclean_interval;
     uint32_t status;
     sps30_values_t values;
 } sps30_t;
+
+sps30_t *sps30_init(i2c_master_bus_handle_t bus_handle);
 
 esp_err_t sps30_device_create(sps30_t *sps30);
 
@@ -117,7 +119,7 @@ esp_err_t sps30_probe(sps30_t* sps30);
  */
 esp_err_t sps30_get_firmware_version(sps30_t *sps30);
 
-esp_err_t sps30_get_product(sps30_t *sps30);
+esp_err_t sps30_get_device_info(sps30_t *sps30);
 
 /**
  * sps30_get_serial() - retrieve the serial number
@@ -125,7 +127,7 @@ esp_err_t sps30_get_product(sps30_t *sps30);
  * Note that serial must be discarded when the return code is non-zero.
  *
  * @serial: Memory where the serial number is written into as hex string (zero
- *          terminated). Must be at least SPS30_MAX_SERIAL_LEN long.
+ *          terminated). Must be at least SPS30_SERIAL_MAX_LEN long.
  * Return:  0 on success, an error code otherwise
  */
 esp_err_t sps30_get_serial(sps30_t *sps30);
@@ -264,6 +266,8 @@ esp_err_t sps30_wake_up(sps30_t* sps30);
  *                  does not support the command)
  */
 esp_err_t sps30_read_device_status_register(sps30_t* sps30);
+
+esp_err_t sps30_clear_device_status_register(sps30_t* sps30);
 
 #ifdef __cplusplus
 }

@@ -28,6 +28,27 @@ uint8_t calc_cksum(const uint8_t* data, uint16_t count)
     return crc;
 }
 
+uint8_t is_data_valid(const uint8_t *data, uint8_t size)
+{
+    for (uint8_t i = 0; i < size; i += 3) {
+        if (calc_cksum(&data[i], 2) != data[i + 2]) return 0;
+    }
+    return 1;
+}
+
+uint8_t bytes_to_data(const uint8_t *bytes, uint8_t size, uint8_t *data)
+{
+    uint8_t cnt = 0;
+
+    for (uint8_t i = 0; i < size; i += 3) {
+        if (calc_cksum(&bytes[i], 2) != bytes[i + 2]) return cnt;
+        data[cnt] = bytes[i];
+        data[cnt + 1] = bytes[i + 1];
+        cnt += 2;
+    }
+    return cnt;
+}
+
 uint8_t *uint32_to_bytes(const uint32_t value)
 {
     uint32_data[0] = (uint8_t)(value >> 24);

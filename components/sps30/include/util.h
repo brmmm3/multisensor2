@@ -12,6 +12,10 @@ extern "C" {
 
 uint8_t calc_cksum(const uint8_t* data, uint16_t count);
 
+uint8_t is_data_valid(const uint8_t *data, uint8_t size);
+
+uint8_t bytes_to_data(const uint8_t *bytes, uint8_t size, uint8_t *data);
+
 uint8_t *uint32_to_bytes(const uint32_t value);
 
 uint32_t bytes_to_uint32(const uint8_t* bytes);
