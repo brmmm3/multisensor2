@@ -30,6 +30,7 @@
  */
 
 #include <string.h>
+#include "esp_log_level.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_err.h"
@@ -40,22 +41,22 @@
 
 static const char *TAG = "SPS30";
 
-uint8_t cmd_start_measurement[]    = {0x00, 0x10};
-uint8_t cmd_stop_measurement[]     = {0x01, 0x04};
-uint8_t cmd_get_data_ready[]       = {0x02, 0x02};
-uint8_t cmd_read_measurement[]     = {0x03, 0x00};
-uint8_t cmd_sleep[]                = {0x10, 0x01};
-uint8_t cmd_wake_up[]              = {0x11, 0x03};
-uint8_t cmd_start_fan_cleaning[]   = {0x56, 0x07};
-uint8_t cmd_autoclean_interval[]   = {0x80, 0x04};
-uint8_t cmd_get_product[]          = {0xd0, 0x02};
-uint8_t cmd_get_serial_number[]    = {0xd0, 0x33};
-uint8_t cmd_get_firmware_version[] = {0xd1, 0x00};
-uint8_t cmd_get_device_status[]    = {0xd2, 0x06};
-uint8_t cmd_clear_device_status[]  = {0xd2, 0x10};
-uint8_t cmd_reset[]                = {0xd3, 0x04};
+static uint8_t cmd_start_measurement[]    = {0x00, 0x10};
+static uint8_t cmd_stop_measurement[]     = {0x01, 0x04};
+static uint8_t cmd_get_data_ready[]       = {0x02, 0x02};
+static uint8_t cmd_read_measurement[]     = {0x03, 0x00};
+static uint8_t cmd_sleep[]                = {0x10, 0x01};
+static uint8_t cmd_wake_up[]              = {0x11, 0x03};
+static uint8_t cmd_start_fan_cleaning[]   = {0x56, 0x07};
+static uint8_t cmd_autoclean_interval[]   = {0x80, 0x04};
+static uint8_t cmd_get_product[]          = {0xd0, 0x02};
+static uint8_t cmd_get_serial_number[]    = {0xd0, 0x33};
+static uint8_t cmd_get_firmware_version[] = {0xd1, 0x00};
+static uint8_t cmd_get_device_status[]    = {0xd2, 0x06};
+static uint8_t cmd_clear_device_status[]  = {0xd2, 0x10};
+static uint8_t cmd_reset[]                = {0xd3, 0x04};
 
-uint8_t buffer[60];
+static uint8_t buffer[60];
 
 #define SPS_CMD_START_STOP_DELAY_USEC 20000
 #define SPS_CMD_DELAY_USEC 5000
@@ -219,6 +220,7 @@ esp_err_t sps30_start_measurement(sps30_t *sps30)
     esp_err_t err;
 
     cmd_args[2] = calc_cksum(cmd_args, 2);
+    ESP_LOG_BUFFER_HEXDUMP(TAG, cmd_args, 3, ESP_LOG_INFO);
     err = sps30_write(sps30, cmd_start_measurement, cmd_args, sizeof(cmd_args));
     vTaskDelay(pdMS_TO_TICKS(20));
     return err;
@@ -240,20 +242,20 @@ bool sps30_read_data_ready(sps30_t *sps30)
 
 esp_err_t sps30_read_measurement(sps30_t *sps30)
 {
-    esp_err_t err = sps30_read(sps30, cmd_read_measurement, (uint8_t *)&buffer[0], 60);
+    esp_err_t err = sps30_read(sps30, cmd_read_measurement, buffer, 60);
 
     if (err != ESP_OK) return err;
     if (!is_data_valid(buffer, 60)) return ESP_FAIL;
-    sps30->values.mc_1p0 = bytes_to_float((uint8_t *)&buffer[0]);
-    sps30->values.mc_2p5 = bytes_to_float((uint8_t *)&buffer[6]);
-    sps30->values.mc_4p0 = bytes_to_float((uint8_t *)&buffer[12]);
-    sps30->values.mc_10p0 = bytes_to_float((uint8_t *)&buffer[18]);
-    sps30->values.nc_0p5 = bytes_to_float((uint8_t *)&buffer[24]);
-    sps30->values.nc_1p0 = bytes_to_float((uint8_t *)&buffer[30]);
-    sps30->values.nc_2p5 = bytes_to_float((uint8_t *)&buffer[36]);
-    sps30->values.nc_4p0 = bytes_to_float((uint8_t *)&buffer[42]);
-    sps30->values.nc_10p0 = bytes_to_float((uint8_t *)&buffer[48]);
-    sps30->values.typical_particle_size = bytes_to_float((uint8_t *)&buffer[54]);
+    sps30->values.mc_1p0 = bytes_to_float(buffer);
+    sps30->values.mc_2p5 = bytes_to_float(&buffer[6]);
+    sps30->values.mc_4p0 = bytes_to_float(&buffer[12]);
+    sps30->values.mc_10p0 = bytes_to_float(&buffer[18]);
+    sps30->values.nc_0p5 = bytes_to_float(&buffer[24]);
+    sps30->values.nc_1p0 = bytes_to_float(&buffer[30]);
+    sps30->values.nc_2p5 = bytes_to_float(&buffer[36]);
+    sps30->values.nc_4p0 = bytes_to_float(&buffer[42]);
+    sps30->values.nc_10p0 = bytes_to_float(&buffer[48]);
+    sps30->values.typical_particle_size = bytes_to_float(&buffer[54]);
     return ESP_OK;
 }
 
@@ -338,6 +340,8 @@ sps30_t *sps30_init(i2c_master_bus_handle_t bus_handle)
     if ((err = sps30_probe(sps30)) != ESP_OK) return NULL;
     if ((err = sps30_get_device_info(sps30)) != ESP_OK) return NULL;
     if ((err = sps30_get_firmware_version(sps30)) != ESP_OK) return NULL;
+    if ((err = sps30_start_measurement(sps30)) != ESP_OK) return NULL;
+    if ((err = sps30_reset(sps30)) != ESP_OK) return NULL;
     if ((err = sps30_start_measurement(sps30)) != ESP_OK) return NULL;
     return sps30;
 }
