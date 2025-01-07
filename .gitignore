@@ -2,6 +2,7 @@
 .cache/
 
 build/
+managed_components/
 
 *.lock
 
