@@ -2,7 +2,7 @@ menu "I2C Options"
     choice I2C_DRIVER_SETTING
         prompt "I2C driver setting"
         help
-            Select I2C Driver: I2C Legacy Driver: I2C.h , I2C Master Driver i2c_master.h for ESP-IDF >= 5.3 AND Set I2C Clock Speed.
+            Select I2C Driver: I2C Legacy Driver: I2C.h, I2C Master Driver i2c_master.h for ESP-IDF >= 5.3 AND Set I2C Clock Speed.
         default USE_I2C_LEGACY_DRIVER
         config USE_I2C_LEGACY_DRIVER
             bool "I2C Legacy Driver (I2C.h)"
