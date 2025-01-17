@@ -28,7 +28,7 @@ uint8_t sps30_calc_cksum(const uint8_t* data, uint16_t count)
     return crc;
 }
 
-uint8_t is_data_valid(const uint8_t *data, uint8_t size)
+uint8_t sps30_is_data_valid(const uint8_t *data, uint8_t size)
 {
     for (uint8_t i = 0; i < size; i += 3) {
         if (sps30_calc_cksum(&data[i], 2) != data[i + 2]) return 0;
@@ -36,7 +36,7 @@ uint8_t is_data_valid(const uint8_t *data, uint8_t size)
     return 1;
 }
 
-uint8_t bytes_to_data(const uint8_t *bytes, uint8_t size, uint8_t *data)
+uint8_t sps30_bytes_to_data(const uint8_t *bytes, uint8_t size, uint8_t *data)
 {
     uint8_t cnt = 0;
 
@@ -49,7 +49,7 @@ uint8_t bytes_to_data(const uint8_t *bytes, uint8_t size, uint8_t *data)
     return cnt;
 }
 
-uint8_t *uint32_to_bytes(const uint32_t value)
+uint8_t *sps30_uint32_to_bytes(const uint32_t value)
 {
     uint32_data[0] = (uint8_t)(value >> 24);
     uint32_data[1] = (uint8_t)(value >> 16);
@@ -60,7 +60,7 @@ uint8_t *uint32_to_bytes(const uint32_t value)
     return (uint8_t *)&uint32_data[0];
 }
 
-uint32_t bytes_to_uint32(const uint8_t* bytes)
+uint32_t sps30_bytes_to_uint32(const uint8_t* bytes)
 {
     return (uint32_t)bytes[0] << 24
            | (uint32_t)bytes[1] << 16
@@ -68,12 +68,12 @@ uint32_t bytes_to_uint32(const uint8_t* bytes)
            | (uint32_t)bytes[4];
 }
 
-float bytes_to_float(const uint8_t* bytes)
+float sps30_bytes_to_float(const uint8_t* bytes)
 {
     union {
         uint32_t u32_value;
         float float32;
     } tmp;
-    tmp.u32_value = bytes_to_uint32(bytes);
+    tmp.u32_value = sps30_bytes_to_uint32(bytes);
     return tmp.float32;
 }

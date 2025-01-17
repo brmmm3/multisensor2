@@ -7,8 +7,7 @@
  * Please contact at <mrbm74@gmail.com>
  */
 
-#ifndef _GPS_H_
-#define _GPS_H_
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -122,10 +121,8 @@ typedef struct gps_sensor_s {
     gps_zda_t zda;
 } gps_sensor_t;
 
-gps_sensor_t gps_init();
+esp_err_t gps_init(gps_sensor_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin);
 
 #ifdef __cplusplus
 };
-#endif
-
 #endif

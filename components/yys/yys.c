@@ -1,3 +1,4 @@
+#include "esp_err.h"
 #include "rom/gpio.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
@@ -9,62 +10,6 @@
 // UART
 #define UART_BUFFER_SIZE 256
 
-sw_serial_t o2_serial = {
-    .rx_pin = 13,
-    .baudrate = 9600,
-    .time = 0,
-    .tmp_val = 0,
-    .bit_cnt = 0,
-    .queue = NULL,
-    .cnt = 0
-};
-
-yys_sensor_t o2_sensor = {
-    .name = "O2",
-    .buffer = NULL,
-    .cnt = 0,
-    .sw_serial = &o2_serial
-};
-
-sw_serial_t co_serial = {
-    .rx_pin = 11,
-    .baudrate = 9600,
-    .time = 0,
-    .tmp_val = 0,
-    .bit_cnt = 0,
-    .queue = NULL,
-    .cnt = 0
-};
-
-yys_sensor_t co_sensor = {
-    .name = "CO",
-    .buffer = NULL,
-    .cnt = 0,
-    .sw_serial = &co_serial
-};
-
-sw_serial_t h2s_serial = {
-    .rx_pin = 12,
-    .baudrate = 9600,
-    .time = 0,
-    .tmp_val = 0,
-    .bit_cnt = 0,
-    .queue = NULL,
-    .cnt = 0
-};
-
-yys_sensor_t h2s_sensor = {
-    .name = "H2S",
-    .buffer = NULL,
-    .cnt = 0,
-    .sw_serial = &h2s_serial
-};
-
-yys_sensors_t sensors = {
-    .co_sensor = &co_sensor,
-    .o2_sensor = &o2_sensor,
-    .h2s_sensor = &h2s_sensor
-};
 
 static void rx_task_yys_sensor(void *arg)
 {
@@ -133,38 +78,75 @@ static void rx_task_yys_sensor(void *arg)
     }
 }
 
-yys_sensors_t yys_init(uint8_t o2_pin_num, uint8_t co_pin_num, uint8_t h2s_pin_num)
+esp_err_t yys_init(yys_sensors_t **sensors, uint8_t o2_pin_num, uint8_t co_pin_num, uint8_t h2s_pin_num)
 {
+    sw_serial_t *o2_serial = calloc(sizeof(sw_serial_t), 1);
+    yys_sensor_t *o2_sensor = calloc(sizeof(yys_sensor_t), 1);
+    sw_serial_t *co_serial = calloc(sizeof(sw_serial_t), 1);
+    yys_sensor_t *co_sensor = calloc(sizeof(yys_sensor_t), 1);
+    sw_serial_t *h2s_serial = calloc(sizeof(sw_serial_t), 1);
+    yys_sensor_t *h2s_sensor = calloc(sizeof(yys_sensor_t), 1);
+
     ESP_LOGI("YYS", "Initialize YYS");
-    o2_serial.rx_pin = o2_pin_num;
-    o2_serial.queue = xQueueCreate(32, 1);
-    o2_sensor.buffer = malloc(16);
-    xTaskCreate(rx_task_yys_sensor, "rx_task_yys_sensor_O2", 4096, (void *)&o2_sensor, configMAX_PRIORITIES - 1, NULL);
-
-    co_serial.rx_pin = co_pin_num;
-    co_serial.queue = xQueueCreate(32, 1);
-    co_sensor.buffer = malloc(16);
-    xTaskCreate(rx_task_yys_sensor, "rx_task_yys_sensor_CO", 4096, (void *)&co_sensor, configMAX_PRIORITIES - 1, NULL);
-
-    h2s_serial.rx_pin = h2s_pin_num;
-    h2s_serial.queue = xQueueCreate(32, 1);
-    h2s_sensor.buffer = malloc(16);
-    xTaskCreate(rx_task_yys_sensor, "rx_task_yys_sensor_H2S", 4096, (void *)&h2s_sensor, configMAX_PRIORITIES - 1, NULL);
+    // O2 Sensor
+    o2_serial->rx_pin = o2_pin_num;
+    o2_serial->baudrate = 9600;
+    o2_serial->queue = xQueueCreate(32, 1);
+    o2_sensor->name = "O2";
+    o2_sensor->buffer = malloc(16);
+    o2_sensor->sw_serial = o2_serial;
+    // CO Sensor
+    co_serial->rx_pin = co_pin_num;
+    co_serial->baudrate = 9600;
+    co_serial->queue = xQueueCreate(32, 1);
+    co_sensor->name = "CO";
+    co_sensor->buffer = malloc(16);
+    co_sensor->sw_serial = co_serial;
+    // H2S Sensor
+    h2s_serial->rx_pin = h2s_pin_num;
+    h2s_serial->baudrate = 9600;
+    h2s_serial->queue = xQueueCreate(32, 1);
+    h2s_sensor->name = "H2S";
+    h2s_sensor->buffer = malloc(16);
+    h2s_sensor->sw_serial = h2s_serial;
+    // Sensors
+    *sensors = malloc(sizeof(yys_sensors_t));
+    (*sensors)->o2_sensor = o2_sensor;
+    (*sensors)->co_sensor = co_sensor;
+    (*sensors)->h2s_sensor = h2s_sensor;
+    xTaskCreate(rx_task_yys_sensor, "rx_task_yys_sensor_O2", 4096, (void *)o2_sensor, configMAX_PRIORITIES - 1, NULL);
+    xTaskCreate(rx_task_yys_sensor, "rx_task_yys_sensor_CO", 4096, (void *)co_sensor, configMAX_PRIORITIES - 1, NULL);
+    xTaskCreate(rx_task_yys_sensor, "rx_task_yys_sensor_H2S", 4096, (void *)h2s_sensor, configMAX_PRIORITIES - 1, NULL);
     ESP_LOGI("YYS", "YYS initialized");
-    return sensors;
+    return ESP_OK;
 }
 
-uint16_t yys_get_co(yys_sensors_t *sensor)
+uint16_t yys_get_co_raw(yys_sensors_t *sensor)
 {
     return sensor->co_sensor->value;
 }
 
-uint16_t yys_get_o2(yys_sensors_t *sensor)
+uint16_t yys_get_o2_raw(yys_sensors_t *sensor)
 {
     return sensor->o2_sensor->value;
 }
 
-uint16_t yys_get_h2s(yys_sensors_t *sensor)
+uint16_t yys_get_h2s_raw(yys_sensors_t *sensor)
 {
     return sensor->h2s_sensor->value;
+}
+
+float yys_get_co(yys_sensors_t *sensor)
+{
+    return (float)sensor->co_sensor->value;  // e.g. 6 = 6ppm
+}
+
+float yys_get_o2(yys_sensors_t *sensor)
+{
+    return (float)sensor->o2_sensor->value * 0.1;  // e.g. 209 = 20.9%
+}
+
+float yys_get_h2s(yys_sensors_t *sensor)
+{
+    return (float)sensor->h2s_sensor->value * 0.1;  // e.g. 672 = 67.2ppm
 }

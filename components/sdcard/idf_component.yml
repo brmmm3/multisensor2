@@ -1,0 +1,6 @@
+description: SD-Card
+version: 1.0.0
+dependencies:
+  idf: '>=5.4'
+  sd_card:
+    path: ${IDF_PATH}/examples/storage/sd_card/sdmmc/components/sd_card

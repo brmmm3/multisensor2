@@ -171,7 +171,7 @@ esp_err_t sps30_get_device_info(sps30_t *sps30)
         ESP_LOGE(TAG, "Failed to read I2C data for device info");
         return err;
     }
-    cnt = bytes_to_data(buffer, 12, (uint8_t *)sps30->device_info);
+    cnt = sps30_bytes_to_data(buffer, 12, (uint8_t *)sps30->device_info);
     sps30->device_info[cnt] = '\0';
     if (cnt < SPS30_DEV_INFO_MAX_LEN) {
         ESP_LOGE(TAG, "Failed to read complete device info");
@@ -189,7 +189,7 @@ esp_err_t sps30_get_serial(sps30_t *sps30)
         ESP_LOGE(TAG, "Failed to read I2C data for serial number");
         return err;
     }
-    cnt = bytes_to_data(buffer, 48, (uint8_t *)sps30->serial);
+    cnt = sps30_bytes_to_data(buffer, 48, (uint8_t *)sps30->serial);
     sps30->serial[cnt] = '\0';
     if (cnt < SPS30_SERIAL_MAX_LEN) {
         ESP_LOGE(TAG, "Failed to read complete serial number");
@@ -206,7 +206,7 @@ esp_err_t sps30_get_firmware_version(sps30_t *sps30)
         ESP_LOGE(TAG, "Failed to read I2C data for firmware version");
         return err;
     }
-    if (!is_data_valid(buffer, 3)) {
+    if (!sps30_is_data_valid(buffer, 3)) {
         ESP_LOGE(TAG, "Checksum error of received I2C data for firmware version");
         return ESP_FAIL;
     }
@@ -245,17 +245,17 @@ esp_err_t sps30_read_measurement(sps30_t *sps30)
     esp_err_t err = sps30_read(sps30, cmd_read_measurement, buffer, 60);
 
     if (err != ESP_OK) return err;
-    if (!is_data_valid(buffer, 60)) return ESP_FAIL;
-    sps30->values.mc_1p0 = bytes_to_float(buffer);
-    sps30->values.mc_2p5 = bytes_to_float(&buffer[6]);
-    sps30->values.mc_4p0 = bytes_to_float(&buffer[12]);
-    sps30->values.mc_10p0 = bytes_to_float(&buffer[18]);
-    sps30->values.nc_0p5 = bytes_to_float(&buffer[24]);
-    sps30->values.nc_1p0 = bytes_to_float(&buffer[30]);
-    sps30->values.nc_2p5 = bytes_to_float(&buffer[36]);
-    sps30->values.nc_4p0 = bytes_to_float(&buffer[42]);
-    sps30->values.nc_10p0 = bytes_to_float(&buffer[48]);
-    sps30->values.typical_particle_size = bytes_to_float(&buffer[54]);
+    if (!sps30_is_data_valid(buffer, 60)) return ESP_FAIL;
+    sps30->values.mc_1p0 = sps30_bytes_to_float(buffer);
+    sps30->values.mc_2p5 = sps30_bytes_to_float(&buffer[6]);
+    sps30->values.mc_4p0 = sps30_bytes_to_float(&buffer[12]);
+    sps30->values.mc_10p0 = sps30_bytes_to_float(&buffer[18]);
+    sps30->values.nc_0p5 = sps30_bytes_to_float(&buffer[24]);
+    sps30->values.nc_1p0 = sps30_bytes_to_float(&buffer[30]);
+    sps30->values.nc_2p5 = sps30_bytes_to_float(&buffer[36]);
+    sps30->values.nc_4p0 = sps30_bytes_to_float(&buffer[42]);
+    sps30->values.nc_10p0 = sps30_bytes_to_float(&buffer[48]);
+    sps30->values.typical_particle_size = sps30_bytes_to_float(&buffer[54]);
     return ESP_OK;
 }
 
@@ -264,14 +264,14 @@ esp_err_t sps30_get_fan_auto_cleaning_interval(sps30_t *sps30)
     esp_err_t err = sps30_read(sps30, cmd_autoclean_interval, buffer, 6);
 
     if (err != ESP_OK) return err;
-    if (!is_data_valid(buffer, 6)) return ESP_FAIL;
-    sps30->autoclean_interval = bytes_to_uint32(buffer);
+    if (!sps30_is_data_valid(buffer, 6)) return ESP_FAIL;
+    sps30->autoclean_interval = sps30_bytes_to_uint32(buffer);
     return ESP_OK;
 }
 
 esp_err_t sps30_set_fan_auto_cleaning_interval(sps30_t *sps30, uint32_t autoclean_interval)
 {
-    uint8_t *data = uint32_to_bytes(autoclean_interval);
+    uint8_t *data = sps30_uint32_to_bytes(autoclean_interval);
     esp_err_t err = sps30_write(sps30, cmd_stop_measurement, data, 6);
 
     vTaskDelay(pdMS_TO_TICKS(20));
@@ -318,8 +318,8 @@ esp_err_t sps30_read_device_status_register(sps30_t* sps30)
     esp_err_t err = sps30_read(sps30, cmd_get_device_status, buffer, 6);
 
     if (err != ESP_OK) return err;
-    if (!is_data_valid(buffer, 6)) return ESP_FAIL;
-    sps30->status = bytes_to_uint32(buffer);
+    if (!sps30_is_data_valid(buffer, 6)) return ESP_FAIL;
+    sps30->status = sps30_bytes_to_uint32(buffer);
     return ESP_OK;
 }
 
@@ -331,17 +331,20 @@ esp_err_t sps30_clear_device_status_register(sps30_t* sps30)
     return err;
 }
 
-sps30_t *sps30_init(i2c_master_bus_handle_t bus_handle)
+esp_err_t sps30_init(sps30_t **sensor, i2c_master_bus_handle_t bus_handle)
 {
-    sps30_t *sps30 = NULL;
     esp_err_t err;
+    sps30_t *sps30 = NULL;
 
-    if ((err = sps30_device_init(&sps30, bus_handle)) != ESP_OK) return NULL;
-    if ((err = sps30_probe(sps30)) != ESP_OK) return NULL;
-    if ((err = sps30_get_device_info(sps30)) != ESP_OK) return NULL;
-    if ((err = sps30_get_firmware_version(sps30)) != ESP_OK) return NULL;
-    if ((err = sps30_start_measurement(sps30)) != ESP_OK) return NULL;
-    if ((err = sps30_reset(sps30)) != ESP_OK) return NULL;
-    if ((err = sps30_start_measurement(sps30)) != ESP_OK) return NULL;
-    return sps30;
+    ESP_LOGI(TAG, "Initialize SPS30");
+    if ((err = sps30_device_init(&sps30, bus_handle)) != ESP_OK) return err;
+    if ((err = sps30_probe(sps30)) != ESP_OK) return err;
+    if ((err = sps30_get_device_info(sps30)) != ESP_OK) return err;
+    if ((err = sps30_get_firmware_version(sps30)) != ESP_OK) return err;
+    if ((err = sps30_start_measurement(sps30)) != ESP_OK) return err;
+    if ((err = sps30_reset(sps30)) != ESP_OK) return err;
+    if ((err = sps30_start_measurement(sps30)) != ESP_OK) return err;
+    *sensor = sps30;
+    ESP_LOGI(TAG, "SPS30 initialized");
+    return ESP_OK;
 }

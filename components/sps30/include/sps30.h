@@ -29,8 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef SPS30_H
-#define SPS30_H
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -83,7 +82,7 @@ typedef struct sps30_s {
     sps30_values_t values;
 } sps30_t;
 
-sps30_t *sps30_init(i2c_master_bus_handle_t bus_handle);
+esp_err_t sps30_init(sps30_t **sensor, i2c_master_bus_handle_t bus_handle);
 
 esp_err_t sps30_device_create(sps30_t *sps30);
 
@@ -272,5 +271,3 @@ esp_err_t sps30_clear_device_status_register(sps30_t* sps30);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* SPS30_H */

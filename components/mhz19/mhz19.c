@@ -12,7 +12,7 @@
 
 #include "mhz19.h"
 
-static const char *MHZ19_TAG = "MHZ19";
+static const char *TAG = "MHZ19";
 
 // [MHZ19] Changes operation mode and performs MCU reset
 #define MHZ19_RESET          0x78
@@ -88,9 +88,9 @@ esp_err_t mhz19_write_command(hw_serial_t *serial, uint8_t *cmd, uint8_t cmd_siz
     return ESP_OK;
 }
 
-static void rx_task_co2_sensor(void *arg)
+static void rx_task_mhz19_sensor(void *arg)
 {
-    ESP_LOGI(MHZ19_TAG, "rx_task_co2_sensor STARTED on UART %p", arg);
+    ESP_LOGI(TAG, "rx_task_co2_sensor STARTED on UART %p", arg);
     mhz19_t *sensor = (mhz19_t *)arg;
 
     hw_serial_t *serial = sensor->hw_serial;
@@ -100,7 +100,7 @@ static void rx_task_co2_sensor(void *arg)
     uint8_t response_cnt;
     bool ready = false;
 
-    ESP_LOGI(MHZ19_TAG, "rx_task_co2_sensor STARTED on UART %d", serial->uart_num);
+    ESP_LOGI(TAG, "rx_task_co2_sensor STARTED on UART %d", serial->uart_num);
     while (1) {
         if (ready) {
             buf[0] = 0xff;
@@ -116,21 +116,21 @@ static void rx_task_co2_sensor(void *arg)
             if (buf[0] == 0xff && buf[1] == cmd_byte && mhz19_checksum(buf, RESPONSE_SIZE - 1) == buf[RESPONSE_SIZE - 1]) {
                 switch (cmd_byte) {
                     case MHZ19_SET_ABC:
-                    ESP_LOGI(MHZ19_TAG, "MHZ19 SET ABC=%d", buf[2]);
+                    ESP_LOGI(TAG, "MHZ19 SET ABC=%d", buf[2]);
                     break;
                     case MHZ19_GET_TEMP_INT:
                     sensor->co2 = buf[2] * 256 + buf[3];
                     sensor->temp = buf[4] - 40;
                     sensor->status = buf[5];
-                    ESP_LOGI(MHZ19_TAG, "MHZ19 CO2=%d temp=%d status=%d", sensor->co2, sensor->temp, sensor->status);
+                    ESP_LOGI(TAG, "MHZ19 CO2=%d temp=%d status=%d", sensor->co2, sensor->temp, sensor->status);
                     break;
                     case MHZ19_GET_FW_VERSION:
                     memcpy(sensor->fw_version, &buf[2], 6);
                     sensor->fw_version[6] = 0;
-                    ESP_LOGI(MHZ19_TAG, "MHZ19 FW: %s", sensor->fw_version);
+                    ESP_LOGI(TAG, "MHZ19 FW: %s", sensor->fw_version);
                     break;
                     case MHZ19_SET_RANGE:
-                    ESP_LOGI(MHZ19_TAG, "MHZ19 SET RANGE=%d", buf[2]);
+                    ESP_LOGI(TAG, "MHZ19 SET RANGE=%d", buf[2]);
                     break;
                     case MHZ19_GET_RANGE:
                     if (buf[4] == 0x03 && buf[5] == 0xe8) sensor->range = MHZ19_RANGE_1000;
@@ -139,7 +139,7 @@ static void rx_task_co2_sensor(void *arg)
                     else if (buf[4] == 0x13 && buf[5] == 0x88) sensor->range = MHZ19_RANGE_5000;
                     else if (buf[4] == 0x27 && buf[5] == 0x10) sensor->range = MHZ19_RANGE_5000;
                     else sensor->range = MHZ19_RANGE_INVALID;
-                    ESP_LOGI(MHZ19_TAG, "MHZ19 RANGE: %d", sensor->range);
+                    ESP_LOGI(TAG, "MHZ19 RANGE: %d", sensor->range);
                     break;
                     default:
                     ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, response_cnt, ESP_LOG_INFO);
@@ -222,38 +222,38 @@ esp_err_t mhz19_reset(mhz19_t *sensor)
 
 esp_err_t mhz19_init(mhz19_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin)
 {
-    ESP_LOGI(MHZ19_TAG, "Initialize MHZ19");
+    hw_serial_t *mhz19_serial = malloc(sizeof(hw_serial_t));
+    mhz19_t *mhz19_sensor = malloc(sizeof(mhz19_t));
 
-    hw_serial_t *co2_serial = malloc(sizeof(hw_serial_t));
+    ESP_LOGI(TAG, "Initialize MHZ19");
+    // Serial
+    mhz19_serial->uart_num = uart_num;
+    mhz19_serial->rx_pin = rx_pin;
+    mhz19_serial->tx_pin = tx_pin;
+    mhz19_serial->baudrate = 9600;
+    mhz19_serial->queue = NULL;
+    // Sensor
+    mhz19_sensor->name = "CO2";
+    mhz19_sensor->queue = xQueueCreate(6, 6);
+    mhz19_sensor->pending = 0;
+    mhz19_sensor->hw_serial = mhz19_serial;
+    mhz19_sensor->co2 = 0xffff;
+    mhz19_sensor->temp = 0xff;
+    mhz19_sensor->status = 0xff;
+    mhz19_sensor->range = MHZ19_RANGE_INVALID;
+    mhz19_sensor->fw_version[0] = 0;
+    *sensor = mhz19_sensor;
 
-    co2_serial->uart_num = uart_num;
-    co2_serial->rx_pin = rx_pin;
-    co2_serial->tx_pin = tx_pin;
-    co2_serial->baudrate = 9600;
-    co2_serial->queue = NULL;
-
-    mhz19_t *co2_sensor = malloc(sizeof(mhz19_t));
-
-    co2_sensor->name = "CO2";
-    co2_sensor->queue = xQueueCreate(6, 6);
-    co2_sensor->pending = 0;
-    co2_sensor->hw_serial = co2_serial;
-    co2_sensor->co2 = 0xffff;
-    co2_sensor->temp = 0xff;
-    co2_sensor->status = 0xff;
-    co2_sensor->range = MHZ19_RANGE_INVALID;
-    co2_sensor->fw_version[0] = 0;
-
-    uart_init(co2_serial->uart_num, co2_serial->rx_pin, co2_serial->tx_pin);
+    uart_init(mhz19_serial->uart_num, mhz19_serial->rx_pin, mhz19_serial->tx_pin);
 
     // Send initialization sequence
-    mhz19_set_auto_calibration(co2_sensor, false);
-    xQueueSend(co2_sensor->queue, &cmd_get_fw_version, 1);
-    mhz19_set_range(co2_sensor, MHZ19_RANGE_5000);
-    xQueueSend(co2_sensor->queue, &cmd_get_range, 1);
+    mhz19_set_auto_calibration(mhz19_sensor, false);
+    xQueueSend(mhz19_sensor->queue, &cmd_get_fw_version, 1);
+    mhz19_set_range(mhz19_sensor, MHZ19_RANGE_5000);
+    xQueueSend(mhz19_sensor->queue, &cmd_get_range, 1);
 
-    xTaskCreate(rx_task_co2_sensor, "rx_task_co2_sensor", 4096, (void *)co2_sensor, configMAX_PRIORITIES - 1, NULL);
-    *sensor = co2_sensor;
-    ESP_LOGI(MHZ19_TAG, "MHZ19 initialized");
+    xTaskCreate(rx_task_mhz19_sensor, "rx_task_mhz19_sensor", 4096, (void *)mhz19_sensor, configMAX_PRIORITIES - 1, NULL);
+
+    ESP_LOGI(TAG, "MHZ19 initialized");
     return ESP_OK;
 }

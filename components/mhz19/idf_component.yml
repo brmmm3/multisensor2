@@ -1,4 +1,4 @@
-description: SW Serial
+description: MHZ19 Sensor
 version: 1.0.0
 dependencies:
   idf: '>=5.4'

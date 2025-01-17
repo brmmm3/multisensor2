@@ -7,8 +7,7 @@
  * Please contact at <mrbm74@gmail.com>
  */
 
-#ifndef _YYS_H_
-#define _YYS_H_
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,16 +33,20 @@ typedef struct yys_sensors_s {
     yys_sensor_t *h2s_sensor;
 } yys_sensors_t;
 
-yys_sensors_t yys_init(uint8_t o2_pin_num, uint8_t co_pin_num, uint8_t h2s_pin_num);
+esp_err_t yys_init(yys_sensors_t **sensor, uint8_t o2_pin_num, uint8_t co_pin_num, uint8_t h2s_pin_num);
 
-uint16_t yys_get_co(yys_sensors_t *sensor);
+uint16_t yys_get_co_raw(yys_sensors_t *sensor);
 
-uint16_t yys_get_o2(yys_sensors_t *sensor);
+uint16_t yys_get_o2_raw(yys_sensors_t *sensor);
 
-uint16_t yys_get_h2s(yys_sensors_t *sensor);
+uint16_t yys_get_h2s_raw(yys_sensors_t *sensor);
+
+float yys_get_co(yys_sensors_t *sensor);
+
+float yys_get_o2(yys_sensors_t *sensor);
+
+float yys_get_h2s(yys_sensors_t *sensor);
 
 #ifdef __cplusplus
 };
-#endif
-
 #endif

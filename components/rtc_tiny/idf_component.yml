@@ -1,4 +1,4 @@
-description: WiFi
+description: RTC
 version: 1.0.0
 dependencies:
   idf: '>=5.4'
@@ -6,3 +6,4 @@ dependencies:
     version: "^1.0.3"
     rules:
       - if: "idf_version >=5.0"
+  zorxx/rtci2c: "^1.3.0"

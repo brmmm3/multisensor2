@@ -7,8 +7,7 @@
  * Please contact at <mrbm74@gmail.com>
  */
 
-#ifndef _WIFI_H_
-#define _WIFI_H_
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,6 +24,4 @@ esp_err_t wifi_init(esp_netif_ip_info_t *ip_info);
 
 #ifdef __cplusplus
 };
-#endif
-
 #endif

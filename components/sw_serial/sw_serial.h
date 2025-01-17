@@ -7,8 +7,7 @@
  * Please contact at <mrbm74@gmail.com>
  */
 
-#ifndef _SW_SERIAL_H_
-#define _SW_SERIAL_H_
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,6 +31,4 @@ void IRAM_ATTR sw_serial_irq_handler(void *args);
 
 #ifdef __cplusplus
 };
-#endif
-
 #endif
