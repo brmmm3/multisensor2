@@ -15,7 +15,7 @@
 
 static const char *TAG = "SD";
 
-#define SDCARD_MAX_FREQ_KHZ 10000
+#define SDCARD_MAX_FREQ_KHZ 8000
 
 #define MOUNT_POINT "/sdcard"
 

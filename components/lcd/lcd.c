@@ -203,6 +203,8 @@ lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t 
     ESP_ERROR_CHECK(esp_lcd_new_panel_ili9341(io_handle, &panel_config, &panel_handle));
     ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_handle));
     ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
+    // Rotate LCD display by 90°
+    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel_handle, false));
     ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, false, false));
     // user can flush pre-defined pattern to the screen before we turn on the screen or backlight
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, true));
@@ -241,6 +243,9 @@ lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t 
     lv_indev_set_display(indev, display);
     lv_indev_set_user_data(indev, tp);
     lv_indev_set_read_cb(indev, lvgl_touch_cb);
+
+    lv_disp_set_rotation(display, LV_DISPLAY_ROTATION_270);
+
     ESP_LOGI(TAG, "Create LVGL task");
     xTaskCreate(lvgl_port_task, "LVGL", LVGL_TASK_STACK_SIZE, NULL, LVGL_TASK_PRIORITY, NULL);
     return display;

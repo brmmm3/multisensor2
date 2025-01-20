@@ -37,10 +37,6 @@ extern "C" {
 
 #include "driver/i2c_master.h"
 
-#define SPS30_I2C_ADDRESS       0x69
-
-#define SPS30_ADDR_SIZE         (0x02)
-
 #define SPS30_DEV_INFO_MAX_LEN  8
 #define SPS30_SERIAL_MAX_LEN    32
 
@@ -82,15 +78,15 @@ typedef struct sps30_s {
     sps30_values_t values;
 } sps30_t;
 
-esp_err_t sps30_init(sps30_t **sensor, i2c_master_bus_handle_t bus_handle);
+esp_err_t sps30_init(sps30_t **sensor_ptr, i2c_master_bus_handle_t bus_handle);
 
-esp_err_t sps30_device_create(sps30_t *sps30);
+esp_err_t sps30_device_create(sps30_t *sensor);
 
-sps30_t* sps30_create_master(i2c_master_bus_handle_t bus_handle);
+sps30_t *sps30_create_master(i2c_master_bus_handle_t bus_handle);
 
-esp_err_t sps30_device_init(sps30_t** sps30, i2c_master_bus_handle_t bus_handle);
+esp_err_t sps30_device_init(sps30_t** sensor_ptr, i2c_master_bus_handle_t bus_handle);
 
-void sps30_close(sps30_t *sps30);
+void sps30_close(sps30_t *sensor);
 
 /**
  * sps30_get_driver_version() - Return the driver version
@@ -107,7 +103,7 @@ const char* sps30_get_driver_version(void);
  *
  * Return:  0 on success, an error code otherwise
  */
-esp_err_t sps30_probe(sps30_t* sps30);
+esp_err_t sps30_probe(sps30_t *sensor);
 
 /**
  * sps30_get_firmware_version - read the firmware version
@@ -116,9 +112,9 @@ esp_err_t sps30_probe(sps30_t* sps30);
  *
  * Return:  0 on success, an error code otherwise
  */
-esp_err_t sps30_get_firmware_version(sps30_t *sps30);
+esp_err_t sps30_get_firmware_version(sps30_t *sensor);
 
-esp_err_t sps30_get_device_info(sps30_t *sps30);
+esp_err_t sps30_get_device_info(sps30_t *sensor);
 
 /**
  * sps30_get_serial() - retrieve the serial number
@@ -129,7 +125,7 @@ esp_err_t sps30_get_device_info(sps30_t *sps30);
  *          terminated). Must be at least SPS30_SERIAL_MAX_LEN long.
  * Return:  0 on success, an error code otherwise
  */
-esp_err_t sps30_get_serial(sps30_t *sps30);
+esp_err_t sps30_get_serial(sps30_t *sensor);
 
 /**
  * sps30_start_measurement() - start measuring
@@ -139,7 +135,7 @@ esp_err_t sps30_get_serial(sps30_t *sps30);
  *
  * Return:  0 on success, an error code otherwise
  */
-esp_err_t sps30_start_measurement(sps30_t *sps30);
+esp_err_t sps30_start_measurement(sps30_t *sensor);
 
 /**
  * sps30_stop_measurement() - stop measuring
@@ -148,7 +144,7 @@ esp_err_t sps30_start_measurement(sps30_t *sps30);
  *
  * Return:  0 on success, an error code otherwise
  */
-esp_err_t sps30_stop_measurement(sps30_t *sps30);
+esp_err_t sps30_stop_measurement(sps30_t *sensor);
 
 /**
  * sps30_read_datda_ready() - reads the current data-ready flag
@@ -159,7 +155,7 @@ esp_err_t sps30_stop_measurement(sps30_t *sps30);
  * @data_ready: Memory where the data-ready flag (0|1) is stored.
  * Return:      0 on success, an error code otherwise
  */
-bool sps30_read_data_ready(sps30_t *sps30);
+bool sps30_read_data_ready(sps30_t *sensor);
 
 /**
  * sps30_read_measurement() - read a measurement
@@ -168,7 +164,7 @@ bool sps30_read_data_ready(sps30_t *sps30);
  *
  * Return:  0 on success, an error code otherwise
  */
-esp_err_t sps30_read_measurement(sps30_t *sps30);
+esp_err_t sps30_read_measurement(sps30_t *sensor);
 
 /**
  * sps30_get_fan_auto_cleaning_interval() - read the current(*) auto-cleaning
@@ -185,7 +181,7 @@ esp_err_t sps30_read_measurement(sps30_t *sps30);
  * @interval_seconds:   Memory where the interval in seconds is stored
  * Return:              0 on success, an error code otherwise
  */
-esp_err_t sps30_get_fan_auto_cleaning_interval(sps30_t *sps30);
+esp_err_t sps30_get_fan_auto_cleaning_interval(sps30_t *sensor);
 
 /**
  * sps30_set_fan_auto_cleaning_interval() - set the current auto-cleaning
@@ -195,7 +191,7 @@ esp_err_t sps30_get_fan_auto_cleaning_interval(sps30_t *sps30);
  *                      interval, 0 to disable auto cleaning
  * Return:              0 on success, an error code otherwise
  */
-esp_err_t sps30_set_fan_auto_cleaning_interval(sps30_t *sps30, uint32_t interval_seconds);
+esp_err_t sps30_set_fan_auto_cleaning_interval(sps30_t *sensor, uint32_t interval_seconds);
 
 /**
  * sps30_start_manual_fan_cleaning() - Immediately trigger the fan cleaning
@@ -206,7 +202,7 @@ esp_err_t sps30_set_fan_auto_cleaning_interval(sps30_t *sps30, uint32_t interval
  *
  * Return:          0 on success, an error code otherwise
  */
-esp_err_t sps30_start_manual_fan_cleaning(sps30_t *sps30);
+esp_err_t sps30_start_manual_fan_cleaning(sps30_t *sensor);
 
 /**
  * sps30_reset() - reset the SGP30
@@ -224,7 +220,7 @@ esp_err_t sps30_start_manual_fan_cleaning(sps30_t *sps30);
  *
  * Return:          0 on success, an error code otherwise
  */
-esp_err_t sps30_reset(sps30_t* sps30);
+esp_err_t sps30_reset(sps30_t *sensor);
 
 /**
  * sps30_sleep() - Send the (idle) sensor to sleep
@@ -237,7 +233,7 @@ esp_err_t sps30_reset(sps30_t* sps30);
  * Return:          0 on success, an error code otherwise (e.g. if the firmware
  *                  does not support the command)
  */
-esp_err_t sps30_sleep(sps30_t* sps30);
+esp_err_t sps30_sleep(sps30_t *sensor);
 
 /**
  * sps30_wake_up() - Wake up the sensor from sleep
@@ -248,7 +244,7 @@ esp_err_t sps30_sleep(sps30_t* sps30);
  * Return:          0 on success, an error code otherwise (e.g. if the firmware
  *                  does not support the command)
  */
-esp_err_t sps30_wake_up(sps30_t* sps30);
+esp_err_t sps30_wake_up(sps30_t *sensor);
 
 /**
  * sps30_read_device_status_register() - Read the Device Status Register
@@ -264,9 +260,9 @@ esp_err_t sps30_wake_up(sps30_t* sps30);
  * Return:          0 on success, an error code otherwise (e.g. if the firmware
  *                  does not support the command)
  */
-esp_err_t sps30_read_device_status_register(sps30_t* sps30);
+esp_err_t sps30_read_device_status_register(sps30_t *sensor);
 
-esp_err_t sps30_clear_device_status_register(sps30_t* sps30);
+esp_err_t sps30_clear_device_status_register(sps30_t *sensor);
 
 #ifdef __cplusplus
 }

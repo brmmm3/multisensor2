@@ -7,13 +7,20 @@
 // This demo UI is adapted from LVGL official example: https://docs.lvgl.io/master/examples.html#loader-with-arc
 
 #include "core/lv_obj_event.h"
+#include "core/lv_obj_style.h"
 #include "esp_log.h"
 
 #include "lvgl.h"
 #include "misc/lv_area.h"
+#include "misc/lv_color.h"
 #include "misc/lv_event.h"
+#include "misc/lv_palette.h"
+
+#include "ui.h"
 
 static const char *TAG = "LCD";
+
+static lv_style_t style_section;
 
 static lv_display_rotation_t rotation = LV_DISP_ROTATION_0;
 
@@ -124,11 +131,132 @@ void create_animated_arc(lv_obj_t *scr)
     lv_anim_start(&a);
 }
 
-void ui_init(lv_display_t *disp)
+lv_obj_t *add_label(lv_obj_t *scr, int32_t x, int32_t y)
 {
-    lv_obj_t *scr = lv_display_get_screen_active(disp);
-    lv_obj_t *btn1 = create_button(scr, 30, 30, 0, 0, "Button 1", btn_cb, disp);
-    lv_obj_t *btn2 = create_button(scr, 130, 30, 0, 0, "Button 2", btn_cb, disp);
+    lv_obj_t *obj = lv_label_create(scr);
 
-    create_animated_arc(scr);
+    lv_obj_set_pos(obj, x, y);
+    return obj;
+}
+
+lv_obj_t *add_label_text(lv_obj_t *scr, int32_t x, int32_t y, const char *text, lv_color_t color)
+{
+    lv_obj_t *obj = add_label(scr, 0, 0);
+
+    lv_obj_set_pos(obj, x, y);
+    lv_label_set_text(obj, text);
+    lv_obj_set_style_text_color(obj, color, LV_PART_MAIN);
+    return obj;
+}
+
+lv_obj_t *add_rectangle(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, int32_t h)
+{
+    lv_obj_t *obj = lv_obj_create(scr);
+
+    lv_obj_set_style_pad_all(obj, 0, LV_PART_MAIN);
+    lv_obj_set_pos(obj , x, y);
+    lv_obj_set_size(obj , w, h);
+    return obj;
+}
+
+lv_obj_t *add_filled_rectangle(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, int32_t h, lv_color_t color)
+{
+    lv_obj_t *obj = lv_obj_create(scr);
+
+    lv_obj_set_style_pad_all(obj, 0, LV_PART_MAIN);
+    lv_obj_set_pos(obj , x, y);
+    lv_obj_set_size(obj , w, h);
+    lv_obj_set_style_bg_color(obj , color, LV_PART_MAIN);
+    return obj;
+}
+
+lv_obj_t *add_section(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, int32_t h, int32_t w0, const char *text)
+{
+    lv_obj_t *obj1 = add_rectangle(scr, x, y, w, h);
+    lv_obj_t *obj2 = add_filled_rectangle(obj1, w0, 1, w - w0 - 6, h - 6, lv_color_white());
+
+    lv_obj_add_style(obj1, &style_section, LV_PART_MAIN);
+    add_label_text(obj1, 2, h / 2 - 8, text, lv_color_white());
+    return obj1;
+}
+
+lv_obj_t *add_tab(lv_obj_t *tab, const char *title)
+{
+    lv_obj_t *obj = lv_tabview_add_tab(tab, title);
+
+    lv_obj_set_style_pad_all(obj, 0, LV_PART_MAIN);
+    return obj;
+}
+
+ui_t ui_init(lv_display_t *disp)
+{
+    /*BMX280: T=26.17 °C  H=45.29 %  P=1006.15 hPa  A=59.25 m
+I (1596874) SCD: READY
+I (1596904) SCD: VAL 0: CO2=2107 ppm  HUM=53.308918 %  Temp=24.807735
+I (1596904) SCD: START_MEAS 0
+I (1596904) YYS: O2=209  CO=0  H2S=2
+I (1596904) MHZ19: CO2=2157 ppm  Temp=26
+I (1596914) SPS30: PM0.5 =135.072144 #/cm3
+I (1596914) SPS30: PM1.0 =19.911182 ug/cm3 P1.0 =157.326385 #/cm3
+I (1596914) SPS30: PM2.5 =22.172405 ug/cm3 P2.5 =158.754913 #/cm3
+I (1596924) SPS30: PM4.0 =23.095533 ug/cm3 P4.0 =158.922577 #/cm3
+I (1596924) SPS30: PM10.0=23.556963 ug/cm3 P10.0=158.965668 #/cm3*/
+
+    lv_obj_t *scr = lv_display_get_screen_active(disp);
+    lv_obj_t *tab_buttons;
+    ui_t ui;
+
+    lv_style_init(&style_section);
+    lv_style_set_bg_opa(&style_section, LV_OPA_COVER);
+    lv_style_set_bg_color(&style_section, lv_palette_main(LV_PALETTE_LIGHT_GREEN));
+    lv_style_set_bg_grad_color(&style_section, lv_palette_main(LV_PALETTE_GREEN));
+    lv_style_set_bg_grad_dir(&style_section, LV_GRAD_DIR_VER);
+
+    ui.lbl_status = add_label(lv_obj_get_child(scr, 0), 0, 0);
+
+    ui.tbv_main = lv_tabview_create(scr);
+    lv_tabview_set_tab_bar_size(ui.tbv_main, 24);
+    tab_buttons = lv_tabview_get_tab_bar(ui.tbv_main);
+    lv_obj_set_style_bg_color(tab_buttons, lv_palette_darken(LV_PALETTE_GREY, 3), 0);
+    lv_obj_set_style_text_color(tab_buttons, lv_palette_lighten(LV_PALETTE_GREY, 5), 0);
+    lv_obj_align(ui.tbv_main, LV_ALIGN_TOP_LEFT, 0, 20);
+
+    lv_obj_t *tab_air = add_tab(ui.tbv_main, "Air");
+    lv_obj_t *sec_bme280 = add_section(tab_air, 0, 0, 320, 40, 64, "BME280");
+    lv_obj_t *sec_mhz19 = add_section(tab_air, 0, 40, 320, 40, 64, "MHZ19");
+    lv_obj_t *sec_scd41 = add_section(tab_air, 0, 80, 320, 40, 64, "SCD41");
+    lv_obj_t *sec_yys = add_section(tab_air, 0, 120, 320, 40, 64, "YYS");
+
+    ui.lbl_bmx280 = add_label(lv_obj_get_child(sec_bme280, 0), 0, 0);
+    ui.lbl_mhz19 = add_label(lv_obj_get_child(sec_mhz19, 0), 0, 0);
+    ui.lbl_scd4x = add_label(lv_obj_get_child(sec_scd41, 0), 0, 0);
+    ui.lbl_yys = add_label(lv_obj_get_child(sec_yys, 0), 0, 0);
+
+    lv_obj_t *tab_dust = add_tab(ui.tbv_main, "Dust");
+    lv_obj_t *sec_sps30_1 = add_section(tab_dust, 0, 0, 320, 30, 72, "PM0.5");
+    lv_obj_t *sec_sps30_2 = add_section(tab_dust, 0, 32, 320, 30, 72, "PM1.0");
+    lv_obj_t *sec_sps30_3 = add_section(tab_dust, 0, 64, 320, 30, 72, "PM2.5");
+    lv_obj_t *sec_sps30_4 = add_section(tab_dust, 0, 96, 320, 30, 72, "PM4.0");
+    lv_obj_t *sec_sps30_5 = add_section(tab_dust, 0, 128, 320, 30, 72, "PM1.0");
+    lv_obj_t *sec_sps30_6 = add_section(tab_dust, 0, 160, 320, 30, 72, "TypPartSz");
+
+    ui.lbl_sps30_1 = add_label(lv_obj_get_child(sec_sps30_1, 0), 0, 0);
+    ui.lbl_sps30_2 = add_label(lv_obj_get_child(sec_sps30_2, 0), 0, 0);
+    ui.lbl_sps30_3 = add_label(lv_obj_get_child(sec_sps30_3, 0), 0, 0);
+    ui.lbl_sps30_4 = add_label(lv_obj_get_child(sec_sps30_4, 0), 0, 0);
+    ui.lbl_sps30_5 = add_label(lv_obj_get_child(sec_sps30_5, 0), 0, 0);
+    ui.lbl_sps30_6 = add_label(lv_obj_get_child(sec_sps30_6, 0), 0, 0);
+
+    lv_obj_t *tab_sd = add_tab(ui.tbv_main, "SD");
+
+    lv_obj_t *tab_cfg = add_tab(ui.tbv_main, "Cfg");
+    lv_obj_t *sec_adxl345 = add_section(tab_cfg, 0, 0, 320, 30, 72, "ADXL345");
+
+    ui.lbl_adxl345 = add_label(lv_obj_get_child(sec_adxl345, 0), 0, 0);
+    //ui.led1 = lv_led_create(tab_cfg);
+    //lv_obj_align(ui.led1, LV_ALIGN_TOP_LEFT, 100, 100);
+    //lv_obj_t *btn1 = create_button(scr, 30, 30, 0, 0, "Button 1", btn_cb, disp);
+    //lv_obj_t *btn2 = create_button(scr, 130, 30, 0, 0, "Button 2", btn_cb, disp);
+    //create_animated_arc(scr);
+    return ui;
 }

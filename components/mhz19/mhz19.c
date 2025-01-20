@@ -122,7 +122,7 @@ static void rx_task_mhz19_sensor(void *arg)
                     sensor->co2 = buf[2] * 256 + buf[3];
                     sensor->temp = buf[4] - 40;
                     sensor->status = buf[5];
-                    ESP_LOGI(TAG, "MHZ19 CO2=%d temp=%d status=%d", sensor->co2, sensor->temp, sensor->status);
+                    //ESP_LOGI(TAG, "MHZ19 CO2=%d temp=%d status=%d", sensor->co2, sensor->temp, sensor->status);
                     break;
                     case MHZ19_GET_FW_VERSION:
                     memcpy(sensor->fw_version, &buf[2], 6);
