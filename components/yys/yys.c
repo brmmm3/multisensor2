@@ -1,3 +1,4 @@
+#include <string.h>
 #include "esp_err.h"
 #include "rom/gpio.h"
 #include "driver/gpio.h"
@@ -6,6 +7,8 @@
 #include "esp_log.h"
 
 #include "yys.h"
+
+static const char *TAG = "YYS";
 
 // UART
 #define UART_BUFFER_SIZE 256
@@ -18,6 +21,8 @@ static void rx_task_yys_sensor(void *arg)
     sw_serial_t *serial = sensor->sw_serial;
     uint8_t rx_pin = serial->rx_pin;
     uint8_t *buf = sensor->buffer;
+    uint8_t rx_byte;
+    static uint8_t last_byte = 0;
 
     // Sensor is connected to a SW serial interface
     gpio_pad_select_gpio(rx_pin);
@@ -25,16 +30,19 @@ static void rx_task_yys_sensor(void *arg)
     gpio_pulldown_dis(rx_pin);
     gpio_pullup_en(rx_pin);
     gpio_set_intr_type(rx_pin, GPIO_INTR_ANYEDGE);
-
     ESP_ERROR_CHECK(gpio_isr_handler_add(sensor->sw_serial->rx_pin, sw_serial_irq_handler, (void *)sensor->sw_serial));
-
-    uint8_t rxByte;
-
     while (1) {
-        if (xQueueReceive(serial->queue, &rxByte, 1)) {
+        if (xQueueReceive(serial->queue, &rx_byte, 1)) {
             // A complete byte has been received
             //ESP_LOGI(sensor->name, "#%d RXB=%02X", sensor->cnt, rxByte);
-            buf[sensor->cnt++] = rxByte;
+            if (last_byte == 0xff && rx_byte == 0x86) {
+                buf[0] = 0xff;
+                sensor->cnt = 1;
+            }
+            last_byte = rx_byte;
+            if (sensor->cnt > 0 || rx_byte == 0xff) {
+                buf[sensor->cnt++] = rx_byte;
+            }
         } else if (serial->bit_cnt > 0) {
             uint32_t time = (uint32_t)esp_timer_get_time();
             uint32_t dt;
@@ -44,6 +52,7 @@ static void rx_task_yys_sensor(void *arg)
             } else {
                 dt = serial->time - time;
             }
+            serial->time = time;
 
             if (dt > 950) {
                 // An incomplete byte has been received. Make it complete.
@@ -67,10 +76,11 @@ static void rx_task_yys_sensor(void *arg)
         if (sensor->cnt == 9) {
             uint8_t cksum = ~(buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7]);
 
-            //ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, 9, ESP_LOG_INFO);
             if (cksum == buf[8]) {
                 sensor->value = (uint16_t)buf[2] << 8 | (uint16_t)buf[3];
-            } else {
+                sensor->data_cnt++;
+            } else if (sensor->debug) {
+                ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, 9, ESP_LOG_ERROR);
                 ESP_LOGE(sensor->name, "#CK %02X", cksum);
             }
             sensor->cnt = 0;
@@ -121,6 +131,23 @@ esp_err_t yys_init(yys_sensors_t **sensors, uint8_t o2_pin_num, uint8_t co_pin_n
     return ESP_OK;
 }
 
+bool yys_data_ready(yys_sensors_t *sensor)
+{
+    if (sensor->co_sensor->data_cnt > 0) {
+        sensor->co_sensor->data_cnt = 0;
+        return true;
+    }
+    if (sensor->o2_sensor->data_cnt > 0) {
+        sensor->o2_sensor->data_cnt = 0;
+        return true;
+    }
+    if (sensor->h2s_sensor->data_cnt > 0) {
+        sensor->h2s_sensor->data_cnt = 0;
+        return true;
+    }
+    return false;
+}
+
 uint16_t yys_get_co_raw(yys_sensors_t *sensor)
 {
     return sensor->co_sensor->value;
@@ -149,4 +176,14 @@ float yys_get_o2(yys_sensors_t *sensor)
 float yys_get_h2s(yys_sensors_t *sensor)
 {
     return (float)sensor->h2s_sensor->value * 0.1;  // e.g. 672 = 67.2ppm
+}
+
+void yys_dump(yys_sensors_t *sensors)
+{
+    if (sensors->o2_sensor->debug & 1) {
+        ESP_LOGI(TAG, "O2(err=%d)=%f %%  CO(err=%d)=%f ppm  H2S(err=%d)=%f ppm",
+                 sensors->o2_sensor->error_cnt, yys_get_o2(sensors),
+                 sensors->co_sensor->error_cnt, yys_get_co(sensors),
+                 sensors->h2s_sensor->error_cnt, yys_get_h2s(sensors));
+    }
 }

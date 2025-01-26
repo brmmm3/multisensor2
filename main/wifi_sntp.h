@@ -1,5 +1,5 @@
 /**
- * LCD
+ * SNTP
  *
  * MIT License
  *
@@ -14,14 +14,17 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <time.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/projdefs.h"
 
-#include "lvgl.h"
+typedef struct sntp_s {
+    struct tm timeinfo;
+} sntp_t;
 
-void lv_lock_acquire();
+struct tm *sntp_get_timeinfo();
 
-void lv_lock_release();
-
-lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t reset_pin, uint8_t led_pin, uint8_t t_cs_pin);
+esp_err_t sntp_obtain_time(void);
 
 #ifdef __cplusplus
 };

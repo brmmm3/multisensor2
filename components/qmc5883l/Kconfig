@@ -1,12 +1,12 @@
-menu "HMC5883L/QMC5883L Options"
-    config XMC5883L_I2C_CLK_SPEED_HZ
+menu "QMC5883L Options"
+    config QMC5883L_I2C_CLK_SPEED_HZ
         int "I2C Clock Speed (Hz)"
         default 100000
         range 1000 100000
         help
             Set the I2C clock speed in Hz. Only applies to the new I2C Master driver.
 
-    config XMC5883L_TIMEOUT
+    config QMC5883L_TIMEOUT
         int "Read/Write Timeout"
         default 50
         help

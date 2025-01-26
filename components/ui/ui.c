@@ -25,6 +25,15 @@ static lv_style_t style_section;
 static lv_display_rotation_t rotation = LV_DISP_ROTATION_0;
 
 
+void init_styles()
+{
+    lv_style_init(&style_section);
+    lv_style_set_bg_opa(&style_section, LV_OPA_COVER);
+    lv_style_set_bg_color(&style_section, lv_palette_main(LV_PALETTE_LIGHT_GREEN));
+    lv_style_set_bg_grad_color(&style_section, lv_palette_main(LV_PALETTE_GREEN));
+    lv_style_set_bg_grad_dir(&style_section, LV_GRAD_DIR_VER);
+}
+
 static void btn_cb(lv_event_t *e)
 {
     lv_display_t *disp = lv_event_get_user_data(e);
@@ -180,80 +189,133 @@ lv_obj_t *add_section(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, int32_t h,
     return obj1;
 }
 
+lv_obj_t *add_tabiew(lv_obj_t *scr, int32_t x, int32_t y)
+{
+    lv_obj_t *obj = lv_tabview_create(scr);
+    lv_obj_t *tab_buttons;
+
+    lv_obj_set_pos(obj, x, y);
+    lv_tabview_set_tab_bar_size(obj, 32);
+    tab_buttons = lv_tabview_get_tab_bar(obj);
+    lv_obj_set_style_bg_color(tab_buttons, lv_palette_darken(LV_PALETTE_GREY, 3), 0);
+    lv_obj_set_style_text_color(tab_buttons, lv_palette_lighten(LV_PALETTE_GREY, 5), 0);
+    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
+    return obj;
+}
+
 lv_obj_t *add_tab(lv_obj_t *tab, const char *title)
 {
     lv_obj_t *obj = lv_tabview_add_tab(tab, title);
 
     lv_obj_set_style_pad_all(obj, 0, LV_PART_MAIN);
+    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
     return obj;
 }
 
-ui_t ui_init(lv_display_t *disp)
+lv_obj_t *add_page_air(ui_t *ui)
 {
-    /*BMX280: T=26.17 °C  H=45.29 %  P=1006.15 hPa  A=59.25 m
-I (1596874) SCD: READY
-I (1596904) SCD: VAL 0: CO2=2107 ppm  HUM=53.308918 %  Temp=24.807735
-I (1596904) SCD: START_MEAS 0
-I (1596904) YYS: O2=209  CO=0  H2S=2
-I (1596904) MHZ19: CO2=2157 ppm  Temp=26
-I (1596914) SPS30: PM0.5 =135.072144 #/cm3
-I (1596914) SPS30: PM1.0 =19.911182 ug/cm3 P1.0 =157.326385 #/cm3
-I (1596914) SPS30: PM2.5 =22.172405 ug/cm3 P2.5 =158.754913 #/cm3
-I (1596924) SPS30: PM4.0 =23.095533 ug/cm3 P4.0 =158.922577 #/cm3
-I (1596924) SPS30: PM10.0=23.556963 ug/cm3 P10.0=158.965668 #/cm3*/
+    lv_obj_t *tab = add_tab(ui->tbv_main, "Air");
+    lv_obj_t *sec_bme280lo = add_section(tab, 0, 0, 320, 42, 72, "BME280L");
+    lv_obj_t *sec_bme280hi = add_section(tab, 0, 40, 320, 42, 72, "BME280H");
+    lv_obj_t *sec_scd41 = add_section(tab, 0, 80, 320, 42, 72, "SCD41");
+    lv_obj_t *sec_mhz19 = add_section(tab, 0, 120, 320, 42, 72, "MHZ19");
+    lv_obj_t *sec_yys = add_section(tab, 0, 160, 320, 42, 72, "YYS");
 
+    ui->lbl_bmx280lo = add_label(lv_obj_get_child(sec_bme280lo, 0), 8, 0);
+    ui->lbl_bmx280hi = add_label(lv_obj_get_child(sec_bme280hi, 0), 8, 0);
+    ui->lbl_scd4x = add_label(lv_obj_get_child(sec_scd41, 0), 8, 0);
+    ui->lbl_mhz19 = add_label(lv_obj_get_child(sec_mhz19, 0), 8, 0);
+    ui->lbl_yys = add_label(lv_obj_get_child(sec_yys, 0), 8, 0);
+    return tab;
+}
+
+lv_obj_t *add_page_dust(ui_t *ui)
+{
+    lv_obj_t *tab = add_tab(ui->tbv_main, "Dust");
+    lv_obj_t *sec_sps30_1 = add_section(tab, 0, 0, 320, 30, 72, "PM0.5");
+    lv_obj_t *sec_sps30_2 = add_section(tab, 0, 28, 320, 30, 72, "PM1.0");
+    lv_obj_t *sec_sps30_3 = add_section(tab, 0, 56, 320, 30, 72, "PM2.5");
+    lv_obj_t *sec_sps30_4 = add_section(tab, 0, 84, 320, 30, 72, "PM4.0");
+    lv_obj_t *sec_sps30_5 = add_section(tab, 0, 112, 320, 30, 72, "PM1.0");
+    lv_obj_t *sec_sps30_6 = add_section(tab, 0, 140, 320, 30, 72, "TypPartSz");
+
+    ui->lbl_sps30_1 = add_label(lv_obj_get_child(sec_sps30_1, 0), 8, 0);
+    ui->lbl_sps30_2 = add_label(lv_obj_get_child(sec_sps30_2, 0), 8, 0);
+    ui->lbl_sps30_3 = add_label(lv_obj_get_child(sec_sps30_3, 0), 8, 0);
+    ui->lbl_sps30_4 = add_label(lv_obj_get_child(sec_sps30_4, 0), 8, 0);
+    ui->lbl_sps30_5 = add_label(lv_obj_get_child(sec_sps30_5, 0), 8, 0);
+    ui->lbl_sps30_6 = add_label(lv_obj_get_child(sec_sps30_6, 0), 8, 0);
+    return tab;
+}
+
+lv_obj_t *add_page_gps(ui_t *ui)
+{
+    lv_obj_t *tab = add_tab(ui->tbv_main, "GPS");
+    lv_obj_t *sec_date = add_section(tab, 0, 0, 320, 30, 64, "Date");
+    lv_obj_t *sec_time = add_section(tab, 0, 28, 320, 30, 64, "Time");
+    lv_obj_t *sec_lat = add_section(tab, 0, 56, 320, 30, 64, "Lat");
+    lv_obj_t *sec_lng = add_section(tab, 0, 84, 320, 30, 64, "Lng");
+    lv_obj_t *sec_alt = add_section(tab, 0, 112, 320, 30, 64, "Alt");
+    lv_obj_t *sec_speed = add_section(tab, 0, 140, 320, 30, 64, "Speed");
+    lv_obj_t *sec_sats = add_section(tab, 0, 168, 320, 30, 64, "Sats");
+
+    ui->lbl_gps_date = add_label(lv_obj_get_child(sec_date, 0), 8, 0);
+    ui->lbl_gps_time = add_label(lv_obj_get_child(sec_time, 0), 8, 0);
+    ui->lbl_gps_lat = add_label(lv_obj_get_child(sec_lat, 0), 8, 0);
+    ui->lbl_gps_lng = add_label(lv_obj_get_child(sec_lng, 0), 8, 0);
+    ui->lbl_gps_alt = add_label(lv_obj_get_child(sec_alt, 0), 8, 0);
+    ui->lbl_gps_speed = add_label(lv_obj_get_child(sec_speed, 0), 8, 0);
+    ui->lbl_gps_sats = add_label(lv_obj_get_child(sec_sats, 0), 8, 0);
+    return tab;
+}
+
+lv_obj_t *add_page_wifi(ui_t *ui)
+{
+    lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_WIFI);
+    lv_obj_t *lbl = add_label_text(tab, 0, 0, "Enable", lv_color_black());
+
+    ui->sw_wifi_enable = lv_switch_create(tab);
+    lv_obj_set_style_bg_color(ui->sw_wifi_enable, lv_palette_darken(LV_PALETTE_GREY, 3), 0);
+    //lv_obj_align_to(ui->sw_wifi_enable, lbl, LV_ALIGN_TOP_RIGHT, 60, 0);
+    lv_obj_set_pos(ui->sw_wifi_enable, 260, 0);
+    lv_obj_set_size(ui->sw_wifi_enable, 60, 30);
+    return tab;
+}
+
+lv_obj_t *add_page_sd(ui_t *ui)
+{
+    lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_SD_CARD);
+
+    return tab;
+}
+
+lv_obj_t *add_page_cfg(ui_t *ui, void(*btn_pressed)(lv_event_t *))
+{
+    lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_SETTINGS);
+    lv_obj_t *sec_qmc5883L = add_section(tab, 0, 0, 320, 30, 72, "QMC5883L");
+    lv_obj_t *sec_adxl345 = add_section(tab, 0, 30, 320, 30, 72, "ADXL345");
+
+    ui->lbl_qmc5883L = add_label(lv_obj_get_child(sec_qmc5883L, 0), 8, 0);
+    ui->lbl_adxl345 = add_label(lv_obj_get_child(sec_adxl345, 0), 8, 0);
+    ui->btn_calibrate = create_button(tab, 0, 160, 0, 0, "Calibrate Sensors", btn_pressed, "CAL");
+    return tab;
+}
+
+ui_t *ui_init(lv_display_t *disp, void(*btn_pressed)(lv_event_t *))
+{
     lv_obj_t *scr = lv_display_get_screen_active(disp);
-    lv_obj_t *tab_buttons;
-    ui_t ui;
+    ui_t *ui = malloc(sizeof(ui_t));
 
-    lv_style_init(&style_section);
-    lv_style_set_bg_opa(&style_section, LV_OPA_COVER);
-    lv_style_set_bg_color(&style_section, lv_palette_main(LV_PALETTE_LIGHT_GREEN));
-    lv_style_set_bg_grad_color(&style_section, lv_palette_main(LV_PALETTE_GREEN));
-    lv_style_set_bg_grad_dir(&style_section, LV_GRAD_DIR_VER);
+    init_styles();
+    ui->tbv_main = add_tabiew(scr, 0, 0);
+    ui->tab_air = add_page_air(ui);
+    ui->tab_dust = add_page_dust(ui);
+    ui->tab_dust = add_page_gps(ui);
+    ui->tab_wifi = add_page_wifi(ui);
+    ui->tab_sd = add_page_sd(ui);
+    ui->tab_cfg = add_page_cfg(ui, btn_pressed);
 
-    ui.lbl_status = add_label(lv_obj_get_child(scr, 0), 0, 0);
-
-    ui.tbv_main = lv_tabview_create(scr);
-    lv_tabview_set_tab_bar_size(ui.tbv_main, 24);
-    tab_buttons = lv_tabview_get_tab_bar(ui.tbv_main);
-    lv_obj_set_style_bg_color(tab_buttons, lv_palette_darken(LV_PALETTE_GREY, 3), 0);
-    lv_obj_set_style_text_color(tab_buttons, lv_palette_lighten(LV_PALETTE_GREY, 5), 0);
-    lv_obj_align(ui.tbv_main, LV_ALIGN_TOP_LEFT, 0, 20);
-
-    lv_obj_t *tab_air = add_tab(ui.tbv_main, "Air");
-    lv_obj_t *sec_bme280 = add_section(tab_air, 0, 0, 320, 40, 64, "BME280");
-    lv_obj_t *sec_mhz19 = add_section(tab_air, 0, 40, 320, 40, 64, "MHZ19");
-    lv_obj_t *sec_scd41 = add_section(tab_air, 0, 80, 320, 40, 64, "SCD41");
-    lv_obj_t *sec_yys = add_section(tab_air, 0, 120, 320, 40, 64, "YYS");
-
-    ui.lbl_bmx280 = add_label(lv_obj_get_child(sec_bme280, 0), 0, 0);
-    ui.lbl_mhz19 = add_label(lv_obj_get_child(sec_mhz19, 0), 0, 0);
-    ui.lbl_scd4x = add_label(lv_obj_get_child(sec_scd41, 0), 0, 0);
-    ui.lbl_yys = add_label(lv_obj_get_child(sec_yys, 0), 0, 0);
-
-    lv_obj_t *tab_dust = add_tab(ui.tbv_main, "Dust");
-    lv_obj_t *sec_sps30_1 = add_section(tab_dust, 0, 0, 320, 30, 72, "PM0.5");
-    lv_obj_t *sec_sps30_2 = add_section(tab_dust, 0, 32, 320, 30, 72, "PM1.0");
-    lv_obj_t *sec_sps30_3 = add_section(tab_dust, 0, 64, 320, 30, 72, "PM2.5");
-    lv_obj_t *sec_sps30_4 = add_section(tab_dust, 0, 96, 320, 30, 72, "PM4.0");
-    lv_obj_t *sec_sps30_5 = add_section(tab_dust, 0, 128, 320, 30, 72, "PM1.0");
-    lv_obj_t *sec_sps30_6 = add_section(tab_dust, 0, 160, 320, 30, 72, "TypPartSz");
-
-    ui.lbl_sps30_1 = add_label(lv_obj_get_child(sec_sps30_1, 0), 0, 0);
-    ui.lbl_sps30_2 = add_label(lv_obj_get_child(sec_sps30_2, 0), 0, 0);
-    ui.lbl_sps30_3 = add_label(lv_obj_get_child(sec_sps30_3, 0), 0, 0);
-    ui.lbl_sps30_4 = add_label(lv_obj_get_child(sec_sps30_4, 0), 0, 0);
-    ui.lbl_sps30_5 = add_label(lv_obj_get_child(sec_sps30_5, 0), 0, 0);
-    ui.lbl_sps30_6 = add_label(lv_obj_get_child(sec_sps30_6, 0), 0, 0);
-
-    lv_obj_t *tab_sd = add_tab(ui.tbv_main, "SD");
-
-    lv_obj_t *tab_cfg = add_tab(ui.tbv_main, "Cfg");
-    lv_obj_t *sec_adxl345 = add_section(tab_cfg, 0, 0, 320, 30, 72, "ADXL345");
-
-    ui.lbl_adxl345 = add_label(lv_obj_get_child(sec_adxl345, 0), 0, 0);
-    //ui.led1 = lv_led_create(tab_cfg);
+    //ui.led1 = lv_led_create(tab);
     //lv_obj_align(ui.led1, LV_ALIGN_TOP_LEFT, 100, 100);
     //lv_obj_t *btn1 = create_button(scr, 30, 30, 0, 0, "Button 1", btn_cb, disp);
     //lv_obj_t *btn2 = create_button(scr, 130, 30, 0, 0, "Button 2", btn_cb, disp);

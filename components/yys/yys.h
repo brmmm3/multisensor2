@@ -25,6 +25,9 @@ typedef struct yys_sensor_s {
     uint8_t cnt;
     sw_serial_t *sw_serial;
     uint16_t value;
+    uint16_t error_cnt;
+    uint8_t data_cnt;
+    uint8_t debug;
 } yys_sensor_t;
 
 typedef struct yys_sensors_s {
@@ -34,6 +37,8 @@ typedef struct yys_sensors_s {
 } yys_sensors_t;
 
 esp_err_t yys_init(yys_sensors_t **sensor, uint8_t o2_pin_num, uint8_t co_pin_num, uint8_t h2s_pin_num);
+
+bool yys_data_ready(yys_sensors_t *sensor);
 
 uint16_t yys_get_co_raw(yys_sensors_t *sensor);
 
@@ -46,6 +51,8 @@ float yys_get_co(yys_sensors_t *sensor);
 float yys_get_o2(yys_sensors_t *sensor);
 
 float yys_get_h2s(yys_sensors_t *sensor);
+
+void yys_dump(yys_sensors_t *sensors);
 
 #ifdef __cplusplus
 };

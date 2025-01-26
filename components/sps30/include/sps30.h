@@ -76,6 +76,7 @@ typedef struct sps30_s {
     uint32_t autoclean_interval;
     uint32_t status;
     sps30_values_t values;
+    uint8_t debug;
 } sps30_t;
 
 esp_err_t sps30_init(sps30_t **sensor_ptr, i2c_master_bus_handle_t bus_handle);
@@ -87,6 +88,8 @@ sps30_t *sps30_create_master(i2c_master_bus_handle_t bus_handle);
 esp_err_t sps30_device_init(sps30_t** sensor_ptr, i2c_master_bus_handle_t bus_handle);
 
 void sps30_close(sps30_t *sensor);
+
+void sps30_dump(sps30_t *sensor);
 
 /**
  * sps30_get_driver_version() - Return the driver version

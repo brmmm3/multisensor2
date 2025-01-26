@@ -26,7 +26,7 @@ static const char *TAG = "LCD";
 #define LCD_V_RES               320
 #define LCD_PCLK_HZ             10000000
 
-#define LVGL_DRAW_BUF_LINES     20 // number of display lines in each draw buffer
+#define LVGL_DRAW_BUF_LINES     24 // number of display lines in each draw buffer
 #define LVGL_TICK_PERIOD_MS     2
 #define LVGL_TASK_MAX_DELAY_MS  500
 #define LVGL_TASK_MIN_DELAY_MS  1
@@ -34,7 +34,7 @@ static const char *TAG = "LCD";
 #define LVGL_TASK_PRIORITY      2
 
 // LVGL library is not thread-safe, this example will call LVGL APIs from different tasks, so use a mutex to protect it
-static _lock_t lvgl_api_lock;
+_lock_t lvgl_api_lock;
 
 
 void lv_lock_acquire()
@@ -111,15 +111,20 @@ static void lvgl_touch_cb(lv_indev_t * indev, lv_indev_data_t * data)
     uint16_t touchpad_x[1] = {0};
     uint16_t touchpad_y[1] = {0};
     uint8_t touchpad_cnt = 0;
-
     esp_lcd_touch_handle_t touch_pad = lv_indev_get_user_data(indev);
+    bool touchpad_pressed;
+
     esp_lcd_touch_read_data(touch_pad);
     /* Get coordinates */
-    bool touchpad_pressed = esp_lcd_touch_get_coordinates(touch_pad, touchpad_x, touchpad_y, NULL, &touchpad_cnt, 1);
-
+    touchpad_pressed = esp_lcd_touch_get_coordinates(touch_pad, touchpad_x, touchpad_y, NULL, &touchpad_cnt, 1);
     if (touchpad_pressed && touchpad_cnt > 0) {
-        data->point.x = touchpad_x[0];
-        data->point.y = touchpad_y[0];
+        // X: touchpad_y: 20 (left) - 285 (right)
+        // Y: touchpad_x: 25 (bottom) - 223 (top)
+        // Calibrate Touchscreen points with map function to the correct width and height
+        int32_t x = touchpad_x[0]; //25, 223, 1, LCD_H_RES);
+        int32_t y = touchpad_y[0]; //20, 285, 1, LCD_V_RES);
+        data->point.x = x < 25 ? 0 : (x - 25) * LCD_H_RES / (223 - 25);
+        data->point.y = y < 20 ? 0 : (y - 20) * LCD_V_RES / (285 - 20);
         data->state = LV_INDEV_STATE_PRESSED;
     } else {
         data->state = LV_INDEV_STATE_RELEASED;
@@ -128,9 +133,11 @@ static void lvgl_touch_cb(lv_indev_t * indev, lv_indev_data_t * data)
 
 static void lvgl_port_task(void *arg)
 {
-    ESP_LOGI(TAG, "Starting LVGL task");
     uint32_t time_till_next_ms = 0;
     uint32_t time_threshold_ms = 1000 / CONFIG_FREERTOS_HZ;
+
+    ESP_LOGI(TAG, "Starting LVGL task");
+    usleep(100000);
     while (1) {
         _lock_acquire(&lvgl_api_lock);
         time_till_next_ms = lv_timer_handler();
@@ -166,7 +173,7 @@ lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t 
     lv_display_t *display;
     // alloc draw buffers used by LVGL
     // it's recommended to choose the size of the draw buffer(s) to be at least 1/10 screen sized
-    size_t draw_buffer_sz = LCD_H_RES * LVGL_DRAW_BUF_LINES * sizeof(lv_color16_t);
+    size_t draw_buffer_sz = LCD_V_RES * LVGL_DRAW_BUF_LINES * sizeof(lv_color16_t);
     // Tick interface for LVGL (using esp_timer to generate 2ms periodic event)
     const esp_timer_create_args_t lvgl_tick_timer_args = {
         .callback = &increase_lvgl_tick,
@@ -233,7 +240,6 @@ lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t 
     ESP_LOGI(TAG, "Register io panel event callback for LVGL flush ready notification");
     /* Register done callback */
     ESP_ERROR_CHECK(esp_lcd_panel_io_register_event_callbacks(io_handle, &cbs, display));
-
     // Attach the TOUCH to the SPI bus
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)spi_host_id, &tp_io_config, &tp_io_handle));
     ESP_LOGI(TAG, "Initialize touch controller XPT2046");
@@ -243,9 +249,7 @@ lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t 
     lv_indev_set_display(indev, display);
     lv_indev_set_user_data(indev, tp);
     lv_indev_set_read_cb(indev, lvgl_touch_cb);
-
     lv_disp_set_rotation(display, LV_DISPLAY_ROTATION_270);
-
     ESP_LOGI(TAG, "Create LVGL task");
     xTaskCreate(lvgl_port_task, "LVGL", LVGL_TASK_STACK_SIZE, NULL, LVGL_TASK_PRIORITY, NULL);
     return display;

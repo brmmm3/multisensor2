@@ -122,7 +122,7 @@ static void rx_task_mhz19_sensor(void *arg)
                     sensor->co2 = buf[2] * 256 + buf[3];
                     sensor->temp = buf[4] - 40;
                     sensor->status = buf[5];
-                    //ESP_LOGI(TAG, "MHZ19 CO2=%d temp=%d status=%d", sensor->co2, sensor->temp, sensor->status);
+                    sensor->data_cnt++;
                     break;
                     case MHZ19_GET_FW_VERSION:
                     memcpy(sensor->fw_version, &buf[2], 6);
@@ -137,7 +137,7 @@ static void rx_task_mhz19_sensor(void *arg)
                     else if (buf[4] == 0x07 && buf[5] == 0xd0) sensor->range = MHZ19_RANGE_2000;
                     else if (buf[4] == 0x0b && buf[5] == 0xb8) sensor->range = MHZ19_RANGE_3000;
                     else if (buf[4] == 0x13 && buf[5] == 0x88) sensor->range = MHZ19_RANGE_5000;
-                    else if (buf[4] == 0x27 && buf[5] == 0x10) sensor->range = MHZ19_RANGE_5000;
+                    else if (buf[4] == 0x27 && buf[5] == 0x10) sensor->range = MHZ19_RANGE_10000;
                     else sensor->range = MHZ19_RANGE_INVALID;
                     ESP_LOGI(TAG, "MHZ19 RANGE: %d", sensor->range);
                     break;
@@ -165,6 +165,15 @@ static void rx_task_mhz19_sensor(void *arg)
 uint8_t mhz19_pending(mhz19_t *sensor)
 {
     return sensor->pending;
+}
+
+bool mhz19_data_ready(mhz19_t *sensor)
+{
+    if (sensor->data_cnt > 0) {
+        sensor->data_cnt = 0;
+        return true;
+    }
+    return false;
 }
 
 esp_err_t mhz19_set_auto_calibration(mhz19_t *sensor, bool auto_calib)
@@ -239,9 +248,11 @@ esp_err_t mhz19_init(mhz19_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint8_t
     mhz19_sensor->hw_serial = mhz19_serial;
     mhz19_sensor->co2 = 0xffff;
     mhz19_sensor->temp = 0xff;
+    mhz19_sensor->data_cnt = 0;
     mhz19_sensor->status = 0xff;
     mhz19_sensor->range = MHZ19_RANGE_INVALID;
     mhz19_sensor->fw_version[0] = 0;
+    mhz19_sensor->debug = 0;
     *sensor = mhz19_sensor;
 
     uart_init(mhz19_serial->uart_num, mhz19_serial->rx_pin, mhz19_serial->tx_pin);
@@ -256,4 +267,11 @@ esp_err_t mhz19_init(mhz19_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint8_t
 
     ESP_LOGI(TAG, "MHZ19 initialized");
     return ESP_OK;
+}
+
+void mhz19_dump(mhz19_t *sensor)
+{
+    if (sensor->debug & 1) {
+        ESP_LOGI(TAG, "co2=%d ppm  temp=%d °C", sensor->co2, sensor->temp);
+    }
 }

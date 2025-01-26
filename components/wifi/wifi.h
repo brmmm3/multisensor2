@@ -20,7 +20,7 @@ extern "C" {
 #include "esp_system.h"
 #include "esp_wifi.h"
 
-esp_err_t wifi_init(esp_netif_ip_info_t *ip_info);
+esp_err_t wifi_init();
 
 #ifdef __cplusplus
 };

@@ -16,7 +16,11 @@ extern "C" {
 #include <stdint.h>
 #include "driver/i2c_types.h"
 
-void rtc_init(i2c_master_bus_handle_t *bus_handle);
+typedef struct rtc_s {
+    void *rtc;
+} rtc_t;
+
+esp_err_t rtc_init(rtc_t **rtc_ptr, i2c_master_bus_handle_t *bus_handle);
 
 #ifdef __cplusplus
 };

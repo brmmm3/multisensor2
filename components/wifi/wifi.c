@@ -1,6 +1,7 @@
 #include "wifi.h"
 
 #include <string.h>
+#include "esp_err.h"
 #include "freertos/event_groups.h"
 #include "esp_event.h"
 #include "esp_log.h"
@@ -94,11 +95,12 @@ void wifi_init_sta(void)
                                                         &event_handler,
                                                         NULL,
                                                         &instance_got_ip));
+}
 
+void wifi_connect(const char *ssid, const char *password)
+{
     wifi_config_t wifi_config = {
         .sta = {
-            .ssid = ESP_WIFI_SSID,
-            .password = ESP_WIFI_PASS,
             /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (password len => 8).
              * If you want to connect the device to deprecated WEP/WPA networks, Please set the threshold value
              * to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format matching to
@@ -109,9 +111,11 @@ void wifi_init_sta(void)
             .sae_h2e_identifier = EXAMPLE_H2E_IDENTIFIER,
         },
     };
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
-    ESP_ERROR_CHECK(esp_wifi_start() );
+    strncpy((char *)wifi_config.sta.ssid, ssid, 32);
+    strncpy((char *)wifi_config.sta.password, password, 64);
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_start());
 
     ESP_LOGI(TAG, "wifi_init_sta finished.");
 
@@ -136,7 +140,23 @@ void wifi_init_sta(void)
     }
 }
 
-esp_err_t wifi_init(esp_netif_ip_info_t *ip_info)
+static void connect_task(void *arg)
+{
+    esp_err_t err;
+    esp_netif_ip_info_t ip_info;
+
+    wifi_connect(ESP_WIFI_SSID, ESP_WIFI_PASS);
+    if ((err = esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info)) == ESP_OK) {
+        if (ip_info.ip.addr != 0) {
+            /* Print the local IP address */
+            ESP_LOGI(TAG, "IP Address : " IPSTR, IP2STR(&ip_info.ip));
+            ESP_LOGI(TAG, "Subnet mask: " IPSTR, IP2STR(&ip_info.netmask));
+            ESP_LOGI(TAG, "Gateway    : " IPSTR, IP2STR(&ip_info.gw));
+        }
+    }
+}
+
+esp_err_t wifi_init()
 {
     esp_err_t err = nvs_flash_init();
 
@@ -149,12 +169,6 @@ esp_err_t wifi_init(esp_netif_ip_info_t *ip_info)
         return err;
     }
     wifi_init_sta();
-
-	ESP_ERROR_CHECK(esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), ip_info));
-
-	/* Print the local IP address */
-	ESP_LOGI(TAG, "IP Address : " IPSTR, IP2STR(&ip_info->ip));
-	ESP_LOGI(TAG, "Subnet mask: " IPSTR, IP2STR(&ip_info->netmask));
-	ESP_LOGI(TAG, "Gateway    : " IPSTR, IP2STR(&ip_info->gw));
+    //xTaskCreate(connect_task, "connect_task", 4096, NULL, configMAX_PRIORITIES - 1, NULL);
     return ESP_OK;
 }

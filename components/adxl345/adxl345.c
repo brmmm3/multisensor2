@@ -242,3 +242,13 @@ esp_err_t adxl345_init(adxl345_t **sensor, i2c_master_bus_handle_t bus_handle)
     ESP_LOGI(TAG, "ADXL345 offsets calibrated");
     return ESP_OK;
 }
+
+void adxl345_dump(adxl345_t *sensor)
+{
+    if (sensor->debug & 1) {
+        ESP_LOGI(TAG, "x=%f g  y=%f g  z=%f g  abs=%f g  offsets=%f %f %f  moving_cnt=%d",
+                 sensor->accel_x, sensor->accel_y, sensor->accel_z, sensor->accel_abs,
+                 sensor->accel_offset_x, sensor->accel_offset_y, sensor->accel_offset_z,
+                 sensor->moving_cnt);
+    }
+}

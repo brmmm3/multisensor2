@@ -360,10 +360,31 @@ esp_err_t sps30_init(sps30_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
     if ((err = sps30_device_init(&sensor, bus_handle)) != ESP_OK) return err;
     for (int i = 0; i < 5; i++) {
         if ((err = sps30_init_do(sensor)) == ESP_OK) break;
-        vTaskDelay(pdMS_TO_TICKS(20));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
     if (err != ESP_OK) return err;
+    ESP_LOGI(TAG, "DevInfo = %s", sensor->device_info);
+    ESP_LOGI(TAG, "Serial = %s", sensor->serial);
+    ESP_LOGI(TAG, "Firmware Version = %d.%d", sensor->firmware_version >> 8, sensor->firmware_version & 0xff);
+    if (strncmp(sensor->device_info, "00080000", 8)) {
+        ESP_LOGE("SPS30", "returned invalid DevInfo");
+    }
     *sensor_ptr = sensor;
     ESP_LOGI(TAG, "SPS30 initialized");
     return ESP_OK;
+}
+
+void sps30_dump(sps30_t *sensor)
+{
+    sps30_values_t *values = &sensor->values;
+
+    if (sensor->debug & 1) {
+        ESP_LOGI(TAG, "STATUS=%08X", (unsigned int)sensor->status);
+        ESP_LOGI(TAG, "PM0.5 =%.1f #/cm3", values->nc_0p5);
+        ESP_LOGI(TAG, "PM1.0 =%.1f ug/cm3 P1.0 =%.1f #/cm3", values->mc_1p0, values->nc_1p0);
+        ESP_LOGI(TAG, "PM2.5 =%.1f ug/cm3 P2.5 =%.1f #/cm3", values->mc_2p5, values->nc_2p5);
+        ESP_LOGI(TAG, "PM4.0 =%.1f ug/cm3 P4.0 =%.1f #/cm3", values->mc_4p0, values->nc_4p0);
+        ESP_LOGI(TAG, "PM10.0=%.1f ug/cm3 P10.0=%.1f #/cm3", values->mc_10p0, values->nc_10p0);
+        ESP_LOGI(TAG, "TypPartSz=%.3f um", values->typical_particle_size);
+    }
 }

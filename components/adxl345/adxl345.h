@@ -34,6 +34,7 @@ typedef struct adxl345_s {
     uint8_t moving_cnt;
     uint8_t accel_range;
     uint8_t device_id;
+    uint8_t debug;
 } adxl345_t;
 
 esp_err_t adxl345_get_device_id(adxl345_t *sensor);
@@ -45,6 +46,8 @@ esp_err_t adxl345_read_data(adxl345_t *sensor);
 esp_err_t adxl345_calibrate_offset(adxl345_t *sensor);
 
 esp_err_t adxl345_init(adxl345_t **sensor, i2c_master_bus_handle_t bus_handle);
+
+void adxl345_dump(adxl345_t *sensor);
 
 #ifdef __cplusplus
 };

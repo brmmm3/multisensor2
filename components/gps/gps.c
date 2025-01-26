@@ -145,7 +145,7 @@ void gps_cmd_rmc(gps_sensor_t *sensor, char *p, char *end)
 {
     gps_rmc_t *rmc = &sensor->rmc;
 
-    p = gps_parse_float_unit(p, &rmc->utc_pos, &rmc->status);
+    p = gps_parse_float_unit(p, &rmc->time, &rmc->status);
     p = gps_parse_lat(p, &rmc->lat, &rmc->ns);
     p = gps_parse_lng(p, &rmc->lng, &rmc->ew);
     p = gps_parse_float(p, &rmc->speed);
@@ -153,8 +153,7 @@ void gps_cmd_rmc(gps_sensor_t *sensor, char *p, char *end)
     rmc->date = strtol(p, &p, 10);
     p += 1;
     p = gps_parse_float_unit(p, &rmc->mv, &rmc->mv_ew);
-    //ESP_LOGI(sensor->name, "#RMC utc_pos=%f status=%c lat=%f %c lng=%f %c speed=%f course=%f date=%lu mv=%f %c",
-    //         rmc->utc_pos, rmc->status, rmc->lat, rmc->ns, rmc->lng, rmc->ew, rmc->speed, rmc->course, rmc->date, rmc->mv, rmc->mv_ew);
+    rmc->cnt++;
 }
 
 // GLL-Geographic Position-Latitude/Longitude
@@ -165,9 +164,8 @@ void gps_cmd_gll(gps_sensor_t *sensor, char *p, char *end)
 
     p = gps_parse_lat(p, &gll->lat, &gll->ns);
     p = gps_parse_lng(p, &gll->lng, &gll->ew);
-    p = gps_parse_float_unit(p, &gll->utc_pos, &gll->status);
-    //ESP_LOGI(sensor->name, "#GLL lat=%f %c lng=%f %c utc_pos=%f status=%c",
-    //         gll->lat, gll->ns, gll->lng, gll->ew, gll->utc_pos, gll->status);
+    p = gps_parse_float_unit(p, &gll->time, &gll->status);
+    gll->cnt++;
 }
 
 // GSA-GNSS DOP and Active Satallites
@@ -185,10 +183,7 @@ void gps_cmd_gsa(gps_sensor_t *sensor, char *p, char *end)
     p = gps_parse_float(p, &gsa->pdop);
     p = gps_parse_float(p, &gsa->hdop);
     p = gps_parse_float(p, &gsa->vdop);
-    //ESP_LOGI(sensor->name, "#GSA mode_auto=%c mode_3d=%c sats=%d %d %d %d %d %d %d %d %d %d %d %d pdop=%f hdop=%f vdop=%f",
-    //         gsa->mode_auto, gsa->mode_3d,
-    //         sats[0], sats[1], sats[2], sats[3], sats[4], sats[5], sats[6], sats[7], sats[8], sats[9], sats[10], sats[11],
-    //         gsa->pdop, gsa->hdop, gsa->vdop);
+    gsa->cnt++;
 }
 
 // GSV-GNSS Satallites in View
@@ -209,8 +204,7 @@ void gps_cmd_gsv(gps_sensor_t *sensor, char *p, char *end)
     p = gps_parse_uint8(p, &sat->elv);
     p = gps_parse_uint16(p, &sat->az);
     p = gps_parse_uint8(p, &sat->snr);
-    //ESP_LOGI(sensor->name, "#GSV msg_cnt=%d msg_num=%d num_sv=%d svid=%d elv=%d az=%d snr=%d",
-    //         msg_cnt, msg_num, sensor->gsv.num_sv, sat->svid, sat->elv, sat->az, sat->snr);
+    sensor->gsv.cnt++;
 }
 
 // GGA-Global Postioning System Fixed Data
@@ -219,7 +213,7 @@ void gps_cmd_gga(gps_sensor_t *sensor, char *p, char *end)
 {
     gps_gga_t *gga = &sensor->gga;
 
-    p = gps_parse_float(p, &gga->utc_pos);
+    p = gps_parse_float(p, &gga->time);
     p = gps_parse_lat(p, &gga->lat, &gga->ns);
     p = gps_parse_lng(p, &gga->lng, &gga->ew);
     p = gps_parse_uint8(p, &gga->pos_fix);
@@ -229,9 +223,7 @@ void gps_cmd_gga(gps_sensor_t *sensor, char *p, char *end)
     p = gps_parse_float_unit(p, &gga->goid, &gga->goid_unit);
     p = gps_parse_float(p, &gga->age);
     gga->diff_stat_id = strtol(p, &p, 10);
-    //ESP_LOGI(sensor->name, "#GGA utc_pos=%f lat=%f %c lng=%f %c pos_fix=%d sat_used=%d hdop=%f alt=%f %c goid=%f %c age=%f diff_stat_id=%d",
-    //         gga->utc_pos, gga->lat, gga->ns, gga->lng, gga->ew, gga->pos_fix, gga->sat_used, gga->hdop, gga->altitude, gga->alt_unit,
-    //         gga->goid, gga->goid_unit, gga->age, gga->diff_stat_id);
+    gga->cnt++;
 }
 
 // VTG-Course Over Ground and Ground Speed
@@ -244,40 +236,50 @@ void gps_cmd_vtg(gps_sensor_t *sensor, char *p, char *end)
     p = gps_parse_float_unit(p, &vtg->magnetic_track, &vtg->magnetic_unit);
     p = gps_parse_float_unit(p, &vtg->speed_knots, &vtg->knot_unit);
     p = gps_parse_float_unit(p, &vtg->speed_kmh, &vtg->kmh_unit);
-    //ESP_LOGI(sensor->name, "#VTG track=%f %c mag=%f %c knots=%f %c kmh=%f %c",
-    //         vtg->true_track, vtg->true_unit, vtg->magnetic_track, vtg->magnetic_unit, vtg->speed_knots, vtg->knot_unit, vtg->speed_kmh, vtg->kmh_unit);
+    vtg->cnt++;
 }
 
-// Date & Time
+// ZDA Date & Time
 // $GPZDA,hhmmss.ss,xx,xx,xxxx,xx,xx*56
 void gps_cmd_zda(gps_sensor_t *sensor, char *p, char *end)
 {
     gps_zda_t *zda = &sensor->zda;
 
-    p = gps_parse_float(p, &zda->utc_pos);
+    p = gps_parse_float(p, &zda->time);
     p = gps_parse_uint8(p, &zda->day);
     p = gps_parse_uint8(p, &zda->month);
     p = gps_parse_uint8(p, &zda->year);
     zda->zone_hours = strtol(p, &p, 10);
-    p += 1;
+    p++;
     zda->zone_minutes = strtol(p, &p, 10);
-    p += 1;
-    //ESP_LOGI(sensor->name, "#ZDA utc_pos=%f date=%04d.%02d.%02d zone: h=%d m=%d",
-    //         zda->utc_pos, zda->year, zda->month, zda->day, zda->zone_hours, zda->zone_minutes);
+    zda->cnt++;
 }
 
 void rx_task_gps_sensor(void *arg)
 {
     gps_sensor_t *sensor = (gps_sensor_t *)arg;
-
+    gps_rmc_t *rmc = &sensor->rmc;
+    gps_gll_t *gll = &sensor->gll;
+    gps_gsa_t *gsa = &sensor->gsa;
+    uint8_t *gsa_sats = gsa->sats;
+    gps_gsv_t *gsv = &sensor->gsv;
+    gps_gga_t *gga = &sensor->gga;
+    gps_vtg_t *vtg = &sensor->vtg;
+    gps_zda_t *zda = &sensor->zda;
+    gps_status_t *status = &sensor->status;
     hw_serial_t *serial = sensor->serial;
     char *buf = (char *)sensor->buffer;
     uint8_t offset = 0;
 
     while (true) {
         const int rxBytes = uart_read_bytes(serial->uart_num, &buf[offset], UART_BUFFER_SIZE - offset, 100);
+
         if (rxBytes == 0) continue;
-        if (rxBytes < 0) break; // UART error
+        if (rxBytes < 0) {
+            status->error_cnt++;
+            continue; // UART error
+        }
+        status->status++;
         //ESP_LOG_BUFFER_CHAR(sensor->name, buf, rxBytes);
         //ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, rxBytes, ESP_LOG_INFO);
 
@@ -286,7 +288,10 @@ void rx_task_gps_sensor(void *arg)
         if (*p != '$') {
             p = strchr(p, '$');
             if (p == NULL) {
-                ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, rxBytes, ESP_LOG_ERROR);
+                status->error_cnt++;
+                if (sensor->debug & 8) {
+                    ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, rxBytes, ESP_LOG_ERROR);
+                }
                 continue;
             }
         }
@@ -299,19 +304,18 @@ void rx_task_gps_sensor(void *arg)
             p = p2;
         }
         while (end != NULL) {
-            char *sat;
             if (strncmp(p, "$G", 2) == 0) {
                 if (p[2] == 'P') {
-                    sat = "GPS";
+                    status->sat = "GPS";
                 } else if (p[2] == 'N') {
-                    sat = "GPS+GLN";
+                    status->sat = "GPS+GLN";
                 } else if (p[2] == 'L') {
-                    sat = "GLN";
+                    status->sat = "GLN";
                 } else {
                     break;
                 }
             } else if (strncmp(p, "$BD", 3) == 0) {
-                sat = "BDU";
+                status->sat = "BDU";
             } else {
                 //ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, rxBytes, ESP_LOG_ERROR);
                 p = strchr(end + 1, '$');
@@ -333,18 +337,67 @@ void rx_task_gps_sensor(void *arg)
                 gps_cmd_txt(sensor, p + 4, end);
             } else if (strncmp(p, "RMC,", 4) == 0) {
                 gps_cmd_rmc(sensor, p + 4, end);
+                if (rmc->status == 'A') {
+                    if (rmc->date > 10125) {
+                        status->date = rmc->date;
+                    }
+                    status->time = (uint32_t)rmc->time;
+                    status->lat = rmc->lat;
+                    status->ns = rmc->ns;
+                    status->lng = rmc->lng;
+                    status->ew = rmc->ew;
+                    status->speed = rmc->speed * 1.852;
+                    status->status = 0;
+                }
             } else if (strncmp(p, "GLL,", 4) == 0) {
                 gps_cmd_gll(sensor, p + 4, end);
+                if (gll->status == 'A') {
+                    status->time = (uint32_t)gll->time;
+                    status->lat = gll->lat;
+                    status->ns = gll->ns;
+                    status->lng = gll->lng;
+                    status->ew = gll->ew;
+                    status->status = 0;
+                }
             } else if (strncmp(p, "GSA,", 4) == 0) {
                 gps_cmd_gsa(sensor, p + 4, end);
+                for (int i = 0; i < 12; i++) {
+                    if (gsa->sats[i] == 0) {
+                        status->sats = i;
+                        break;
+                    } else if (i == 11) {
+                        status->sats = 12;
+                    }
+                }
+                status->mode_3d = gsa->mode_3d;
+                status->status = 0;
             } else if (strncmp(p, "GSV,", 4) == 0) {
                 gps_cmd_gsv(sensor, p + 4, end);
             } else if (strncmp(p, "GGA,", 4) == 0) {
                 gps_cmd_gga(sensor, p + 4, end);
+                if (gga->alt_unit == 'M') {
+                    status->time = (uint32_t)gga->time;
+                    status->lat = gga->lat;
+                    status->ns = gga->ns;
+                    status->lng = gga->lng;
+                    status->ew = gga->ew;
+                    status->sats = gga->sat_used;
+                    status->altitude = gga->altitude;
+                    status->status = 0;
+                }
             } else if (strncmp(p, "VTG,", 4) == 0) {
                 gps_cmd_vtg(sensor, p + 4, end);
+                if (vtg->kmh_unit == 'K') {
+                    status->speed = vtg->speed_kmh;
+                    status->status = 0;
+                }
             } else if (strncmp(p, "ZDA,", 4) == 0) {
                 gps_cmd_zda(sensor, p + 4, end);
+                if (zda->year > 24) {
+                    status->date = (uint32_t)zda->year * 10000 + (uint32_t)zda->month * 100 + (uint32_t)zda->day;
+                    status->time = (uint32_t)zda->time;
+                    status->status = 0;
+                }
             } else {
                 //ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, rxBytes, ESP_LOG_INFO);
                 //ESP_LOGE(sensor->name, "#UNK=%s", p);
@@ -375,7 +428,11 @@ void rx_task_gps_sensor(void *arg)
             strncpy(buf, p, offset);
         }
     }
-    ESP_LOGE(TAG, "rx_task_gps_sensor EXIT");
+}
+
+bool gps_data_ready(gps_sensor_t *sensor)
+{
+    return sensor->status.status == 0;
 }
 
 esp_err_t gps_init(gps_sensor_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin)
@@ -398,6 +455,7 @@ esp_err_t gps_init(gps_sensor_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint
     gps_sensor->serial = gps_serial;
     gps_sensor->messages = NULL;
     gps_sensor->msg_size = 0;
+    gps_sensor->status.sat = "?";
     *sensor = gps_sensor;
 
     uart_init(gps_serial->uart_num, gps_serial->rx_pin, gps_serial->tx_pin);
@@ -406,4 +464,56 @@ esp_err_t gps_init(gps_sensor_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint
 
     ESP_LOGI(TAG, "GPS initialized");
     return ESP_OK;
+}
+
+void gps_dump(gps_sensor_t *sensor)
+{
+    gps_rmc_t *rmc = &sensor->rmc;
+    gps_gll_t *gll = &sensor->gll;
+    gps_gsa_t *gsa = &sensor->gsa;
+    uint8_t *gsa_sats = gsa->sats;
+    gps_gsv_t *gsv = &sensor->gsv;
+    gps_gga_t *gga = &sensor->gga;
+    gps_vtg_t *vtg = &sensor->vtg;
+    gps_zda_t *zda = &sensor->zda;
+    gps_status_t *status = &sensor->status;
+
+    if (sensor->debug & 1) {
+        ESP_LOGI(TAG, "%s date=%lu time=%lu lat=%f %c lng=%f %c altitude=%f speed=%f mode_3d=%c sats=%d status=%d errors=%d",
+                 status->sat, status->date, status->time, status->lat, status->ns, status->lng, status->ew, status->altitude,
+                 status->speed, status->mode_3d, status->sats, status->status, status->error_cnt);
+    } else if (sensor->debug & 2) {
+        // RMC - Recommended Minimum Navigation Information
+        ESP_LOGI(TAG, "RMC: %d date=%lu time=%lu status=%c lat=%f %c lng=%f %c speed=%f course=%f mv=%f %c",
+                rmc->cnt, rmc->date, (uint32_t)rmc->time, rmc->status, rmc->lat, rmc->ns, rmc->lng, rmc->ew, rmc->speed, rmc->course, rmc->mv, rmc->mv_ew);
+        // GLL-Geographic Position-Latitude/Longitude
+        ESP_LOGI(TAG, "GLL: %d lat=%f %c lng=%f %c time=%lu status=%c",
+                gll->cnt, gll->lat, gll->ns, gll->lng, gll->ew, (uint32_t)gll->time, gll->status);
+        // GSA-GNSS DOP and Active Satallites
+        ESP_LOGI(TAG, "GSA: %d auto=%c 3d=%c sats=%d %d %d %d %d %d %d %d %d %d %d %d pdop=%f hdop=%f vdop=%f",
+                gsa->cnt, gsa->mode_auto, gsa->mode_3d,
+                gsa_sats[0], gsa_sats[1], gsa_sats[2], gsa_sats[3], gsa_sats[4], gsa_sats[5], gsa_sats[6], gsa_sats[7],
+                gsa_sats[8], gsa_sats[9], gsa_sats[10], gsa_sats[11],
+                gsa->pdop, gsa->hdop, gsa->vdop);
+        // GSV-GNSS Satallites in View
+        ESP_LOGI(TAG, "GSV: %d num_sv=%d", gsv->cnt, gsv->num_sv);
+        for (int i = 0; i < 9; i++) {
+            gps_gsv_sat_t *sat = &gsv->sats[i];
+
+            if (sat->svid == 0) break;
+            ESP_LOGI(TAG, "GSV-SAT%d: svid=%d elv=%d az=%d snr=%d",
+                    i, sat->svid, sat->elv, sat->az, sat->snr);
+        }
+        // GGA-Global Postioning System Fixed Data
+        ESP_LOGI(TAG, "GGA: %d time=%lu lat=%f %c lng=%f %c pos_fix=%d sat_used=%d hdop=%f alt=%f %c goid=%f %c age=%f diff_stat_id=%d",
+                gga->cnt, (uint32_t)gga->time, gga->lat, gga->ns, gga->lng, gga->ew, gga->pos_fix, gga->sat_used, gga->hdop, gga->altitude,
+                gga->alt_unit, gga->goid, gga->goid_unit, gga->age, gga->diff_stat_id);
+        // VTG-Course Over Ground and Ground Speed
+        ESP_LOGI(TAG, "VTG: %d track=%f %c mag=%f %c knots=%f %c kmh=%f %c",
+                vtg->cnt, vtg->true_track, vtg->true_unit, vtg->magnetic_track, vtg->magnetic_unit, vtg->speed_knots, vtg->knot_unit,
+                vtg->speed_kmh, vtg->kmh_unit);
+        // ZDA Date & Time
+        ESP_LOGI(TAG, "ZDA: %d time=%lu date=%02d.%02d.%02d zone: h=%d m=%d",
+                zda->cnt, (uint32_t)zda->time, zda->year, zda->month, zda->day, zda->zone_hours, zda->zone_minutes);
+    }
 }
