@@ -36,6 +36,9 @@ static const char *TAG = "LCD";
 // LVGL library is not thread-safe, this example will call LVGL APIs from different tasks, so use a mutex to protect it
 _lock_t lvgl_api_lock;
 
+gpio_config_t bk_gpio_config;
+uint8_t bk_led_pin = 0;
+
 
 void lv_lock_acquire()
 {
@@ -148,12 +151,26 @@ static void lvgl_port_task(void *arg)
     }
 }
 
+void lcd_set_bg_pwr(uint8_t mode)
+{
+    gpio_config_t config = {
+        .mode = mode < 3 ? GPIO_MODE_INPUT : GPIO_MODE_OUTPUT,
+        .pull_up_en = mode > 0 && mode < 3 ? GPIO_PULLUP_ENABLE : GPIO_PULLUP_DISABLE,
+        .pull_down_en = mode == 1 ? GPIO_PULLDOWN_ENABLE : GPIO_PULLDOWN_DISABLE,
+        .pin_bit_mask = bk_gpio_config.pin_bit_mask,
+    };
+
+    ESP_LOGI(TAG, "lcd_set_bg_pwr %d", mode);
+    gpio_config(&config);
+    gpio_set_level(bk_led_pin, mode > 2);
+}
+
 lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t reset_pin, uint8_t led_pin, uint8_t t_cs_pin)
 {
-    gpio_config_t bk_gpio_config = {
-        .mode = GPIO_MODE_OUTPUT,
-        .pin_bit_mask = 1ULL << led_pin
-    };
+    bk_gpio_config.mode = GPIO_MODE_OUTPUT;
+    bk_gpio_config.pin_bit_mask = 1ULL << led_pin;
+    bk_led_pin = led_pin;
+
     esp_lcd_panel_io_handle_t io_handle = NULL;
     esp_lcd_panel_io_spi_config_t io_config = {
         .dc_gpio_num = dc_pin,

@@ -169,6 +169,10 @@ esp_err_t gps_init(gps_sensor_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint
 
 bool gps_data_ready(gps_sensor_t *sensor);
 
+int gps_set_power_mode(gps_sensor_t *sensor, uint8_t mode);
+
+int gps_power_off(gps_sensor_t *sensor);
+
 void gps_dump(gps_sensor_t *sensor);
 
 #ifdef __cplusplus

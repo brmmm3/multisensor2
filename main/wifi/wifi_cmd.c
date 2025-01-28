@@ -259,7 +259,7 @@ static void register_light_sleep(void)
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
 }
 
-extern void register_wifi_cmd(void)
+void register_wifi_cmd(void)
 {
     register_wifi_init();
     register_ap_set();

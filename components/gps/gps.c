@@ -10,6 +10,12 @@ static const char *TAG = "GPS";
 // UART
 #define UART_BUFFER_SIZE 256
 
+//Power save modes
+const unsigned char ubxPSM[] = { 0x06,0x11,0x02,0x08,0x01 }; // Power Save Mode
+const unsigned char ubxEM[] =  { 0x06,0x11,0x02,0x08,0x04 }; // Eco Mode
+const unsigned char ubxMPM[] = { 0x06,0x11,0x02,0x08,0x00 }; // Max Performance Mode
+const unsigned char ubxSleep[] = {0xB5, 0x62, 0x02, 0x41, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x4D, 0x3B}; // Sleep mode
+
 
 uint8_t nmea_get_checksum(const char *buf)
 {
@@ -134,7 +140,7 @@ void gps_cmd_txt(gps_sensor_t *sensor, char *p, char *end)
         p = n + 1;
     }
     *msg = 0;
-    //ESP_LOGI(sensor->name, "#TXT %d %d MSG=%s", msg_size, sensor->msg_size, sensor->messages);
+    ESP_LOGI(TAG, "TXT msg_size=%d %d\nMSG=%s", msg_size, sensor->msg_size, sensor->messages);
 }
 
 // RMC-Recommended Minimum Specific GNSS Data
@@ -261,8 +267,6 @@ void rx_task_gps_sensor(void *arg)
     gps_rmc_t *rmc = &sensor->rmc;
     gps_gll_t *gll = &sensor->gll;
     gps_gsa_t *gsa = &sensor->gsa;
-    uint8_t *gsa_sats = gsa->sats;
-    gps_gsv_t *gsv = &sensor->gsv;
     gps_gga_t *gga = &sensor->gga;
     gps_vtg_t *vtg = &sensor->vtg;
     gps_zda_t *zda = &sensor->zda;
@@ -464,6 +468,31 @@ esp_err_t gps_init(gps_sensor_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint
 
     ESP_LOGI(TAG, "GPS initialized");
     return ESP_OK;
+}
+
+int gps_set_power_mode(gps_sensor_t *sensor, uint8_t mode)
+{
+    uint8_t a = 0, b = 0;
+    char buf[sizeof(ubxPSM) + 4];
+
+    ESP_LOGI(TAG, "gps_set_power_mode %d", mode);
+    if (mode == 0) return gps_power_off(sensor);
+    buf[0] = 0xB5;
+    buf[1] = 0x62;
+    if (mode == 1) memcpy(&buf[2], ubxEM, sizeof(ubxEM));
+    else memcpy(&buf[2], ubxPSM, sizeof(ubxPSM));
+    for (int i = 0; i < sizeof(ubxPSM); i++) {
+        a += buf[i + 2];
+        b += a;
+    }
+    buf[sizeof(ubxPSM) + 2] = a;
+    buf[sizeof(ubxPSM) + 3] = b;
+    return uart_write_bytes(sensor->serial->uart_num, buf, sizeof(buf));
+}
+
+int gps_power_off(gps_sensor_t *sensor)
+{
+    return uart_write_bytes(sensor->serial->uart_num, ubxSleep, sizeof(ubxSleep));
 }
 
 void gps_dump(gps_sensor_t *sensor)

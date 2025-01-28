@@ -76,6 +76,7 @@ typedef struct sps30_s {
     uint32_t autoclean_interval;
     uint32_t status;
     sps30_values_t values;
+    bool enabled;
     uint8_t debug;
 } sps30_t;
 

@@ -70,17 +70,18 @@ static uint8_t buffer[60];
 
 sps30_t *sps30_create_master(i2c_master_bus_handle_t bus_handle)
 {
-    sps30_t *sensor = malloc(sizeof(sps30_t));
+    sps30_t *sensor = calloc(sizeof(sps30_t), 1);
+
     if (sensor == NULL) {
         sps30_close(sensor);
         return NULL;
     }
-    memset(sensor, 0, sizeof(sps30_t));
     sensor->bus_handle = bus_handle;
     sensor->dev_cfg.dev_addr_length = I2C_ADDR_BIT_LEN_7;
     sensor->dev_cfg.device_address = SPS30_I2C_ADDRESS;
     sensor->dev_cfg.scl_speed_hz = CONFIG_SPS30_I2C_CLK_SPEED_HZ;
     sensor->dev_handle = NULL;
+    sensor->enabled = true;
     return sensor;
 }
 

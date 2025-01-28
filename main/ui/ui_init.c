@@ -15,14 +15,13 @@
 #include "misc/lv_color.h"
 #include "misc/lv_event.h"
 #include "misc/lv_palette.h"
+#include "widgets/label/lv_label.h"
 
 #include "ui.h"
 
 static const char *TAG = "LCD";
 
 static lv_style_t style_section;
-
-static lv_display_rotation_t rotation = LV_DISP_ROTATION_0;
 
 
 void init_styles()
@@ -145,6 +144,7 @@ lv_obj_t *add_label(lv_obj_t *scr, int32_t x, int32_t y)
     lv_obj_t *obj = lv_label_create(scr);
 
     lv_obj_set_pos(obj, x, y);
+    lv_label_set_text(obj, "-");
     return obj;
 }
 
@@ -176,6 +176,16 @@ lv_obj_t *add_filled_rectangle(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, i
     lv_obj_set_pos(obj , x, y);
     lv_obj_set_size(obj , w, h);
     lv_obj_set_style_bg_color(obj , color, LV_PART_MAIN);
+    return obj;
+}
+
+lv_obj_t *add_switch(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, int32_t h)
+{
+    lv_obj_t *obj = lv_switch_create(scr);
+
+    lv_obj_set_style_bg_color(obj, lv_palette_darken(LV_PALETTE_GREY, 1), 0);
+    lv_obj_set_pos(obj, x, y);
+    lv_obj_set_size(obj, w, h);
     return obj;
 }
 
@@ -274,11 +284,7 @@ lv_obj_t *add_page_wifi(ui_t *ui)
     lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_WIFI);
     lv_obj_t *lbl = add_label_text(tab, 0, 0, "Enable", lv_color_black());
 
-    ui->sw_wifi_enable = lv_switch_create(tab);
-    lv_obj_set_style_bg_color(ui->sw_wifi_enable, lv_palette_darken(LV_PALETTE_GREY, 3), 0);
-    //lv_obj_align_to(ui->sw_wifi_enable, lbl, LV_ALIGN_TOP_RIGHT, 60, 0);
-    lv_obj_set_pos(ui->sw_wifi_enable, 260, 0);
-    lv_obj_set_size(ui->sw_wifi_enable, 60, 30);
+    ui->sw_wifi_enable = add_switch(tab, 260, 00, 60, 30);
     return tab;
 }
 
@@ -294,14 +300,22 @@ lv_obj_t *add_page_cfg(ui_t *ui, void(*btn_pressed)(lv_event_t *))
     lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_SETTINGS);
     lv_obj_t *sec_qmc5883L = add_section(tab, 0, 0, 320, 30, 72, "QMC5883L");
     lv_obj_t *sec_adxl345 = add_section(tab, 0, 30, 320, 30, 72, "ADXL345");
+    lv_obj_t *lbl1 = add_label_text(tab, 0, 60, "LCD Backlight", lv_color_black());
+    lv_obj_t *lbl2 = add_label_text(tab, 0, 90, "GPS Low Power", lv_color_black());
+    lv_obj_t *lbl3 = add_label_text(tab, 0, 120, "SPS30 Idle", lv_color_black());
+    lv_obj_t *lbl4 = add_label_text(tab, 0, 140, "SCD4x Idle", lv_color_black());
 
     ui->lbl_qmc5883L = add_label(lv_obj_get_child(sec_qmc5883L, 0), 8, 0);
     ui->lbl_adxl345 = add_label(lv_obj_get_child(sec_adxl345, 0), 8, 0);
+    ui->sw_lcd_pwr = add_switch(tab, 260, 60, 60, 30);
+    ui->sw_gps_pwr = add_switch(tab, 260, 90, 60, 30);
+    ui->sw_sps30_pwr = add_switch(tab, 260, 120, 60, 30);
+    ui->sw_scd4x_pwr = add_switch(tab, 260, 150, 60, 30);
     ui->btn_calibrate = create_button(tab, 0, 160, 0, 0, "Calibrate Sensors", btn_pressed, "CAL");
     return tab;
 }
 
-ui_t *ui_init(lv_display_t *disp, void(*btn_pressed)(lv_event_t *))
+ui_t *ui_init(lv_display_t *disp)
 {
     lv_obj_t *scr = lv_display_get_screen_active(disp);
     ui_t *ui = malloc(sizeof(ui_t));
@@ -313,7 +327,7 @@ ui_t *ui_init(lv_display_t *disp, void(*btn_pressed)(lv_event_t *))
     ui->tab_dust = add_page_gps(ui);
     ui->tab_wifi = add_page_wifi(ui);
     ui->tab_sd = add_page_sd(ui);
-    ui->tab_cfg = add_page_cfg(ui, btn_pressed);
+    ui->tab_cfg = add_page_cfg(ui, btn_calibrate_pressed);
 
     //ui.led1 = lv_led_create(tab);
     //lv_obj_align(ui.led1, LV_ALIGN_TOP_LEFT, 100, 100);

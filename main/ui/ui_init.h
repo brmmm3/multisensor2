@@ -51,10 +51,14 @@ typedef struct ui_s {
     lv_obj_t *tab_cfg;
     lv_obj_t *lbl_adxl345;
     lv_obj_t *lbl_qmc5883L;
+    lv_obj_t *sw_lcd_pwr;
+    lv_obj_t *sw_gps_pwr;
+    lv_obj_t *sw_sps30_pwr;
+    lv_obj_t *sw_scd4x_pwr;
     lv_obj_t *btn_calibrate;
 } ui_t;
 
-ui_t *ui_init(lv_display_t *disp, void(*btn_pressed)(lv_event_t *));
+ui_t *ui_init(lv_display_t *disp);  //, void(*btn_pressed)(lv_event_t *));
 
 void label_set_text(lv_obj_t *lbl, const char *text);
 

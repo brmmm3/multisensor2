@@ -39,12 +39,14 @@ extern "C" {
 #include "hal/uart_types.h"
 #include "driver/i2c_master.h"
 
+#include "config.h"
+
 #include "wifi.h"
 #include "rtc_tiny.h"
 #include "ftp.h"
 #include "gps.h"
 #include "lcd.h"
-#include "ui.h"
+#include "ui/ui.h"
 #include "sdcard.h"
 #include "bmx280.h"
 #include "scd4x.h"
@@ -54,26 +56,36 @@ extern "C" {
 #include "adxl345.h"
 #include "qmc5883l.h"
 
-#include "wifi_sntp.h"
+#include "wifi/wifi_sntp.h"
 
 
-rtc_t *rtc = NULL;
-gps_sensor_t *gps = NULL;
-gps_status_t *gps_status = NULL;
-bmx280_t *bmx280lo = NULL;
-bmx280_t *bmx280hi = NULL;
-adxl345_t *adxl345 = NULL;
-mhz19_t *mhz19 = NULL;
-scd4x_t *scd4x = NULL;
-sps30_t *sps30 = NULL;
-qmc5883l_t *qmc5883l = NULL;
-yys_sensors_t *yys_sensors = NULL;
-wdt_hal_context_t rtc_wdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
-i2c_master_bus_handle_t bus_handle;
-int spi_host_id;
-lv_display_t *lcd;
-ui_t *ui;
-led_strip_handle_t led_strip;
+extern rtc_t *rtc;
+extern gps_sensor_t *gps;
+extern gps_status_t *gps_status;
+extern bmx280_t *bmx280lo;
+extern bmx280_t *bmx280hi;
+extern adxl345_t *adxl345;
+extern mhz19_t *mhz19;
+extern scd4x_t *scd4x;
+extern sps30_t *sps30;
+extern qmc5883l_t *qmc5883l;
+extern yys_sensors_t *yys_sensors;
+extern wdt_hal_context_t rtc_wdt_ctx;
+extern i2c_master_bus_handle_t bus_handle;
+extern int spi_host_id;
+extern lv_display_t *lcd;
+extern ui_t *ui;
+extern led_strip_handle_t led_strip;
+
+extern bool gps_update;
+extern bool sps30_update;
+extern bool bmx280lo_update;
+extern bool bmx280hi_update;
+extern bool scd4x_update;
+extern bool mhz19_update;
+extern bool yys_update;
+extern bool qmc5883l_update;
+extern bool adxl345_update;
 
 #ifdef __cplusplus
 };
