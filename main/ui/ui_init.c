@@ -317,6 +317,8 @@ lv_obj_t *add_page_cfg(ui_t *ui, void(*btn_pressed)(lv_event_t *))
 
 ui_t *ui_init(lv_display_t *disp)
 {
+    ESP_LOGI(TAG, "Initialize UI");
+
     lv_obj_t *scr = lv_display_get_screen_active(disp);
     ui_t *ui = malloc(sizeof(ui_t));
 
@@ -329,10 +331,10 @@ ui_t *ui_init(lv_display_t *disp)
     ui->tab_sd = add_page_sd(ui);
     ui->tab_cfg = add_page_cfg(ui, btn_calibrate_pressed);
 
-    //ui.led1 = lv_led_create(tab);
-    //lv_obj_align(ui.led1, LV_ALIGN_TOP_LEFT, 100, 100);
-    //lv_obj_t *btn1 = create_button(scr, 30, 30, 0, 0, "Button 1", btn_cb, disp);
-    //lv_obj_t *btn2 = create_button(scr, 130, 30, 0, 0, "Button 2", btn_cb, disp);
-    //create_animated_arc(scr);
+    /*ui.led1 = lv_led_create(tab);
+    lv_obj_align(ui.led1, LV_ALIGN_TOP_LEFT, 100, 100);
+    lv_obj_t *btn1 = create_button(scr, 30, 30, 0, 0, "Button 1", btn_cb, disp);
+    lv_obj_t *btn2 = create_button(scr, 130, 30, 0, 0, "Button 2", btn_cb, disp);
+    create_animated_arc(scr);*/
     return ui;
 }

@@ -4,4 +4,4 @@ idf_component_register(
     SRCS sw_serial.c
     INCLUDE_DIRS "."
     PRIV_REQUIRES "esp_timer"
-    REQUIRES driver)
+    REQUIRES driver esp_driver_gpio)

@@ -70,7 +70,7 @@ static uint8_t buffer[60];
 
 sps30_t *sps30_create_master(i2c_master_bus_handle_t bus_handle)
 {
-    sps30_t *sensor = calloc(sizeof(sps30_t), 1);
+    sps30_t *sensor = calloc(1, sizeof(sps30_t));
 
     if (sensor == NULL) {
         sps30_close(sensor);

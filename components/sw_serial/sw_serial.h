@@ -17,6 +17,9 @@ extern "C" {
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 
+#undef IRAM_ATTR
+#define IRAM_ATTR __attribute__((section(".iram")))
+
 typedef struct sw_serial_s {
     uint32_t baudrate;
     uint32_t time;      // Time of last level change (edge)

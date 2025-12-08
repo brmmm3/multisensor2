@@ -3,4 +3,4 @@ set(CMAKE_C_STANDARD 11)
 idf_component_register(
     SRCS hw_serial.c
     INCLUDE_DIRS "."
-    REQUIRES driver)
+    REQUIRES driver esp_driver_uart)

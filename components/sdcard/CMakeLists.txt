@@ -4,4 +4,4 @@ idf_component_register(
     SRCS sdcard.c
     INCLUDE_DIRS "."
     PRIV_REQUIRES esp_timer fatfs sd_card
-    REQUIRES driver)
+    REQUIRES driver vfs)

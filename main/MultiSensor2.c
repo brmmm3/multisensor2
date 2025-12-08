@@ -121,16 +121,18 @@ i2c_master_bus_handle_t i2c_bus_init(uint8_t sda_io, uint8_t scl_io)
 
 void led_init(void)
 {
+    ESP_LOGI(TAG, "Initialize LED");
+
     // LED strip general initialization, according to your led board design
     led_strip_config_t strip_config = {
         // Set the GPIO that the LED is connected
         .strip_gpio_num = LED_PIN_NUM,
         // Set the number of connected LEDs in the strip
         .max_leds = 1,
-        // Set the pixel format of your LED strip
-        .led_pixel_format = LED_PIXEL_FORMAT_GRB,
         // LED strip model
         .led_model = LED_MODEL_WS2812,
+        // Set the pixel format of your LED strip
+        .color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB,
         // In some cases, the logic is inverted
         .flags.invert_out = false,
     };
@@ -162,22 +164,10 @@ void dump_data()
     adxl345_dump(adxl345);
 }
 
-static void sensors_update()
+static void update_scd4x()
 {
     esp_err_t err;
-    uint16_t v16;
 
-    // Update/Read data
-    if ((err = bmx280_readout(bmx280lo)) == ESP_OK) {
-        bmx280lo_update = true;
-    } else {
-        ESP_LOGE("BME280LO", "Error=%d", err);
-    }
-    if ((err = bmx280_readout(bmx280hi)) == ESP_OK) {
-        bmx280hi_update = true;
-    } else {
-        ESP_LOGE("BME280HI", "Error=%d", err);
-    }
     if (scd4x->auto_adjust > 0 && scd4x->auto_adjust-- == 1) {
         bmx280_t *bmx280;
 
@@ -201,40 +191,85 @@ static void sensors_update()
     } else if (scd4x->enabled) {
         err = scd4x_start_periodic_measurement(scd4x);
     }
-    mhz19_update = mhz19_data_ready(mhz19);
-    yys_update = yys_data_ready(yys_sensors);
-    if (sps30->enabled) {
-        if ((err = sps30_read_device_status_register(sps30)) == ESP_OK) {
-            if (sps30->status != 0) {
-                ESP_LOGW("SPS30", "STATUS=%08X", (unsigned int)sps30->status);
-            }
-        } else {
-            ESP_LOGE("SPS30", "Failed to read status");
+}
+
+static void update_sps30()
+{
+    esp_err_t err;
+
+    if (!sps30->enabled) {
+        return;
+    }
+    if ((err = sps30_read_device_status_register(sps30)) == ESP_OK) {
+        if (sps30->status != 0) {
+            ESP_LOGW("SPS30", "STATUS=%08X", (unsigned int)sps30->status);
         }
-        if (sps30_read_data_ready(sps30)) {
-            if ((err = sps30_read_measurement(sps30)) == ESP_OK) {
-                sps30_update = true;
-            } else {
-                ESP_LOGE("SPS30", "Failed to read measurement values with error %d", err);
-            }
+    } else {
+        ESP_LOGE("SPS30", "Failed to read status");
+    }
+    if (sps30_read_data_ready(sps30)) {
+        if ((err = sps30_read_measurement(sps30)) == ESP_OK) {
+            sps30_update = true;
         } else {
-            ESP_LOGE("SPS30", "not ready");
+            ESP_LOGE("SPS30", "Failed to read measurement values with error %d", err);
+        }
+    } else {
+        ESP_LOGE("SPS30", "not ready");
+    }
+}
+
+static void sensors_update()
+{
+    esp_err_t err;
+    uint16_t v16;
+
+    // Update/Read data
+    if (bmx280lo != NULL) {
+        if ((err = bmx280_readout(bmx280lo)) == ESP_OK) {
+            bmx280lo_update = true;
+        } else {
+            ESP_LOGE("BME280LO", "Error=%d", err);
         }
     }
-    if ((err = qmc5883l_read_data(qmc5883l)) == ESP_OK) {
-        qmc5883l_update = true;
-    } else {
-        ESP_LOGE("QMC5883L", "Error=%d", err);
+    if (bmx280hi != NULL) {
+        if ((err = bmx280_readout(bmx280hi)) == ESP_OK) {
+            bmx280hi_update = true;
+        } else {
+            ESP_LOGE("BME280HI", "Error=%d", err);
+        }
     }
-    if ((err = adxl345_read_data(adxl345)) == ESP_OK) {
-        adxl345_update = true;
-    } else {
-        ESP_LOGE("ADXL345", "Error=%d", err);
+    if (scd4x != NULL) {
+        update_scd4x();
     }
-    gps_update = gps_data_ready(gps);
-    if (xQueueReceive(gps->queue, &v16, 1)) {
-        if (gps->debug & 1) {
-            ESP_LOGI("GPS", "%04X", v16);
+    if (mhz19 != NULL) {
+        mhz19_update = mhz19_data_ready(mhz19);
+    }
+    if (yys_sensors != NULL) {
+        yys_update = yys_data_ready(yys_sensors);
+    }
+    if (sps30 != NULL) {
+        update_sps30();
+    }
+    if (qmc5883l != NULL) {
+        if ((err = qmc5883l_read_data(qmc5883l)) == ESP_OK) {
+            qmc5883l_update = true;
+        } else {
+            ESP_LOGE("QMC5883L", "Error=%d", err);
+        }
+    }
+    if (adxl345 != NULL) {
+        if ((err = adxl345_read_data(adxl345)) == ESP_OK) {
+            adxl345_update = true;
+        } else {
+            ESP_LOGE("ADXL345", "Error=%d", err);
+        }
+    }
+    if (gps != NULL) {
+        gps_update = gps_data_ready(gps);
+        if (xQueueReceive(gps->queue, &v16, 1)) {
+            if (gps->debug & 1) {
+                ESP_LOGI("GPS", "%04X", v16);
+            }
         }
     }
 }
@@ -259,13 +294,15 @@ static void update_task(void *arg)
 
 void sensors_init()
 {
-    /*gpio_config_t config = {
+    ESP_LOGI(TAG, "Initialize Sensors");
+
+    gpio_config_t config = {
         .mode = GPIO_MODE_OUTPUT,
         .pin_bit_mask = 1ULL << SDCARD_PIN_NUM_CS | 1ULL << LCD_PIN_NUM_CS | 1ULL << LCD_PIN_NUM_T_CS | 1ULL << LCD_PIN_NUM_DC | 1ULL << LCD_PIN_NUM_RST | 1ULL << LCD_PIN_NUM_LED | 1ULL << SPI_PIN_NUM_MOSI,
     };
     gpio_config(&config);
 
-    uint8_t level = 0;
+    /*uint8_t level = 0;
 
     while (1) {
         gpio_set_level(SDCARD_PIN_NUM_CS, level);
@@ -302,7 +339,7 @@ void app_main(void)
     // Wait 100ms to give sensors time to power up.
     vTaskDelay(pdMS_TO_TICKS(100));
 
-    config = calloc(sizeof(config_t), 1);
+    config = calloc(1, sizeof(config_t));
     config_read(config);
 
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
@@ -317,8 +354,8 @@ void app_main(void)
     sensors_init();
     rtc_init(&rtc, &bus_handle);
     // WiFi
-    //ESP_ERROR_CHECK(wifi_init());
-    /*if (ip_info.ip.addr != 0) {
+    ESP_ERROR_CHECK(wifi_init());
+    {
         esp_netif_ip_info_t ip_info;
 
         ESP_ERROR_CHECK(esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info));
@@ -331,7 +368,7 @@ void app_main(void)
         setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1);
         tzset();
         ESP_ERROR_CHECK(sntp_obtain_time());
-    }*/
+    }
 
     xTaskCreate(update_task, "update_task", 4096, NULL, configMAX_PRIORITIES - 1, NULL);
 

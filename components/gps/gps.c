@@ -442,7 +442,7 @@ bool gps_data_ready(gps_sensor_t *sensor)
 esp_err_t gps_init(gps_sensor_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin)
 {
     hw_serial_t *gps_serial = malloc(sizeof(hw_serial_t));
-    gps_sensor_t *gps_sensor = calloc(sizeof(gps_sensor_t), 1);
+    gps_sensor_t *gps_sensor = calloc(1, sizeof(gps_sensor_t));
 
     ESP_LOGI(TAG, "Initialize GPS");
    // Serial

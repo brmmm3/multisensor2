@@ -40,6 +40,8 @@ esp_err_t rtc_set_datetime(rtci2c_context *rtc, struct tm *timeinfo)
 
 esp_err_t rtc_init(rtc_t **rtc_ptr, i2c_master_bus_handle_t *bus_handle)
 {
+    ESP_LOGI(TAG, "Initialize RTC");
+
     rtc_t *rtc = malloc(sizeof(rtc_t));
     i2c_lowlevel_config config = {
         .bus = bus_handle

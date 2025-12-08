@@ -1,6 +1,6 @@
 dependencies:
   idf: '>=5.4'
-  espressif/led_strip: "^2.5.3"
-  espressif/esp_lcd_ili9341: "^2.0.0"
-  atanisoft/esp_lcd_touch_xpt2046: "^1.0.5"
-  lvgl/lvgl: "9.2.2"
+  espressif/led_strip: 3.0.2
+  espressif/esp_lcd_ili9341: 2.0.1
+  atanisoft/esp_lcd_touch_xpt2046: 1.0.6
+  espressif/esp_lvgl_port: 2.7.0

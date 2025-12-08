@@ -25,7 +25,7 @@ static void rx_task_yys_sensor(void *arg)
     static uint8_t last_byte = 0;
 
     // Sensor is connected to a SW serial interface
-    gpio_pad_select_gpio(rx_pin);
+    esp_rom_gpio_pad_select_gpio(rx_pin);
     gpio_set_direction(rx_pin, GPIO_MODE_INPUT);
     gpio_pulldown_dis(rx_pin);
     gpio_pullup_en(rx_pin);
@@ -90,12 +90,12 @@ static void rx_task_yys_sensor(void *arg)
 
 esp_err_t yys_init(yys_sensors_t **sensors, uint8_t o2_pin_num, uint8_t co_pin_num, uint8_t h2s_pin_num)
 {
-    sw_serial_t *o2_serial = calloc(sizeof(sw_serial_t), 1);
-    yys_sensor_t *o2_sensor = calloc(sizeof(yys_sensor_t), 1);
-    sw_serial_t *co_serial = calloc(sizeof(sw_serial_t), 1);
-    yys_sensor_t *co_sensor = calloc(sizeof(yys_sensor_t), 1);
-    sw_serial_t *h2s_serial = calloc(sizeof(sw_serial_t), 1);
-    yys_sensor_t *h2s_sensor = calloc(sizeof(yys_sensor_t), 1);
+    sw_serial_t *o2_serial = calloc(1, sizeof(sw_serial_t));
+    yys_sensor_t *o2_sensor = calloc(1, sizeof(yys_sensor_t));
+    sw_serial_t *co_serial = calloc(1, sizeof(sw_serial_t));
+    yys_sensor_t *co_sensor = calloc(1, sizeof(yys_sensor_t));
+    sw_serial_t *h2s_serial = calloc(1, sizeof(sw_serial_t));
+    yys_sensor_t *h2s_sensor = calloc(1, sizeof(yys_sensor_t));
 
     ESP_LOGI("YYS", "Initialize YYS");
     // O2 Sensor

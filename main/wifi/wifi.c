@@ -166,7 +166,7 @@ void wifi_scan(void)
     ESP_ERROR_CHECK(esp_wifi_start());
 
 #ifdef USE_CHANNEL_BITMAP
-    wifi_scan_config_t *scan_config = (wifi_scan_config_t *)calloc(1,sizeof(wifi_scan_config_t));
+    wifi_scan_config_t *scan_config = (wifi_scan_config_t *)calloc(1, sizeof(wifi_scan_config_t));
     if (!scan_config) {
         ESP_LOGE(TAG, "Memory Allocation for scan config failed!");
         return;

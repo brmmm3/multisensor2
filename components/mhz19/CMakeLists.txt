@@ -4,4 +4,4 @@ idf_component_register(
     SRCS mhz19.c
     INCLUDE_DIRS "."
     PRIV_REQUIRES esp_timer hw_serial sw_serial
-    REQUIRES driver)
+    REQUIRES driver esp_driver_i2c)

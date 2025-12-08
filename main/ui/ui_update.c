@@ -115,16 +115,9 @@ void sw_scd4x_pwr_cb(lv_event_t *e)
 
 void ui_update()
 {
-    sps30_values_t *sps30_values = &sps30->values;
-    scd4x_values_t *scd4x_values = &scd4x->values;
-    uint32_t day;
-    uint32_t month;
-    uint32_t year;
-    uint32_t hours;
-    uint32_t minutes;
-    uint32_t seconds;
     char buf[100];
 
+    return;
     lv_lock_acquire();
     if (bmx280lo_update) {
         bmx280lo_update = false;
@@ -139,6 +132,8 @@ void ui_update()
         lv_label_set_text(ui->lbl_bmx280hi, buf);
     }
     if (scd4x_update) {
+        scd4x_values_t *scd4x_values = &scd4x->values;
+
         scd4x_update = false;
         sprintf(buf, "CO2=%d ppm\nT=%.1f °C  H=%.1f %%", scd4x_values->co2, scd4x_values->temperature, scd4x_values->humidity);
         lv_label_set_text(ui->lbl_scd4x, buf);
@@ -155,6 +150,13 @@ void ui_update()
     }
     // Update GPS
     if (gps_update) {
+        uint32_t day;
+        uint32_t month;
+        uint32_t year;
+        uint32_t hours;
+        uint32_t minutes;
+        uint32_t seconds;
+
         gps_update = false;
         day = gps_status->date / 10000;
         month = gps_status->date / 100 - day * 100;
@@ -179,6 +181,8 @@ void ui_update()
     }
     // Update SPS30
     if (sps30_update) {
+        sps30_values_t *sps30_values = &sps30->values;
+
         sps30_update = false;
         sprintf(buf, "%.1f #/cm3", sps30_values->nc_0p5);
         lv_label_set_text(ui->lbl_sps30_1, buf);
