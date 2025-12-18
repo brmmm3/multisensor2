@@ -113,12 +113,8 @@ void sw_scd4x_pwr_cb(lv_event_t *e)
     }
 }
 
-void ui_update()
-{
+void update_air_tab() {
     char buf[100];
-
-    return;
-    lv_lock_acquire();
     if (bmx280lo_update) {
         bmx280lo_update = false;
         sprintf(buf, "P=%.1f hPa  A=%.1f m\nT=%.1f °C  H=%.1f %%",
@@ -145,11 +141,39 @@ void ui_update()
     }
     if (yys_update) {
         yys_update = false;
-        sprintf(buf, "O2=%.1f %%  CO=%.1f ppm\nH2S=%.1f ppm", yys_get_o2(yys_sensors), yys_get_co(yys_sensors), yys_get_h2s(yys_sensors));
+        sprintf(buf, "O2=%.1f %%  CO=%d ppm\nH2S=%.1f ppm  CH4=%d ppm",
+            yys_get_o2(yys_sensor), yys_get_co_raw(yys_sensor),
+            yys_get_h2s(yys_sensor), yys_get_ch4_raw(yys_sensor));
         lv_label_set_text(ui->lbl_yys, buf);
     }
-    // Update GPS
+}
+
+void update_dust_tab()
+{
+    if (sps30_update) {
+        char buf[100];
+        sps30_values_t *sps30_values = &sps30->values;
+
+        sps30_update = false;
+        sprintf(buf, "%.1f #/cm3", sps30_values->nc_0p5);
+        lv_label_set_text(ui->lbl_sps30_1, buf);
+        sprintf(buf, "%.1f ug/cm3 (%.1f #/cm3)", sps30_values->mc_1p0, sps30_values->nc_1p0);
+        lv_label_set_text(ui->lbl_sps30_2, buf);
+        sprintf(buf, "%.1f ug/cm3 (%.1f #/cm3)", sps30_values->mc_2p5, sps30_values->nc_2p5);
+        lv_label_set_text(ui->lbl_sps30_3, buf);
+        sprintf(buf, "%.1f ug/cm3 (%.1f #/cm3)", sps30_values->mc_4p0, sps30_values->nc_4p0);
+        lv_label_set_text(ui->lbl_sps30_4, buf);
+        sprintf(buf, "%.1f ug/cm3 (%.1f #/cm3)", sps30_values->mc_10p0, sps30_values->nc_10p0);
+        lv_label_set_text(ui->lbl_sps30_5, buf);
+        sprintf(buf, "%.3f um", sps30_values->typical_particle_size);
+        lv_label_set_text(ui->lbl_sps30_6, buf);
+    }
+}
+
+void update_gps_tab()
+{
     if (gps_update) {
+        char buf[100];
         uint32_t day;
         uint32_t month;
         uint32_t year;
@@ -176,27 +200,17 @@ void ui_update()
         lv_label_set_text(ui->lbl_gps_alt, buf);
         sprintf(buf, "%.1f km/h", gps_status->speed);
         lv_label_set_text(ui->lbl_gps_speed, buf);
-        sprintf(buf, "%d  ST=%d 2/3D=%s", gps_status->sats, gps_status->status, gps_status->mode_3d == 2 ? "2D" : gps_status->mode_3d == 3 ? "3D": "-");
+        sprintf(buf, "%d  ST=%d  2/3D=%s  %s", gps_status->sats, gps_status->status,
+            gps_status->mode_3d == 2 ? "2D" : gps_status->mode_3d == 3 ? "3D": "-",
+            gps_status->sat);
         lv_label_set_text(ui->lbl_gps_sats, buf);
     }
-    // Update SPS30
-    if (sps30_update) {
-        sps30_values_t *sps30_values = &sps30->values;
+}
 
-        sps30_update = false;
-        sprintf(buf, "%.1f #/cm3", sps30_values->nc_0p5);
-        lv_label_set_text(ui->lbl_sps30_1, buf);
-        sprintf(buf, "%.1f ug/cm3 (%.1f #/cm3)", sps30_values->mc_1p0, sps30_values->nc_1p0);
-        lv_label_set_text(ui->lbl_sps30_2, buf);
-        sprintf(buf, "%.1f ug/cm3 (%.1f #/cm3)", sps30_values->mc_2p5, sps30_values->nc_2p5);
-        lv_label_set_text(ui->lbl_sps30_3, buf);
-        sprintf(buf, "%.1f ug/cm3 (%.1f #/cm3)", sps30_values->mc_4p0, sps30_values->nc_4p0);
-        lv_label_set_text(ui->lbl_sps30_4, buf);
-        sprintf(buf, "%.1f ug/cm3 (%.1f #/cm3)", sps30_values->mc_10p0, sps30_values->nc_10p0);
-        lv_label_set_text(ui->lbl_sps30_5, buf);
-        sprintf(buf, "%.3f um", sps30_values->typical_particle_size);
-        lv_label_set_text(ui->lbl_sps30_6, buf);
-    }
+void update_cfg_tab()
+{
+    char buf[100];
+
     // Update QMC5883L
     if (qmc5883l_update) {
         qmc5883l_update = false;
@@ -208,6 +222,23 @@ void ui_update()
         adxl345_update = false;
         sprintf(buf, "%5.2f g  Moving=%d", adxl345->accel_abs, adxl345->moving_cnt);
         lv_label_set_text(ui->lbl_adxl345, buf);
+    }
+}
+
+void ui_update()
+{
+    lv_lock_acquire();
+
+    uint32_t tab_idx = lv_tabview_get_tab_active(ui->tbv_main);
+
+    if (tab_idx == 0) {
+        update_air_tab();
+    } else if (tab_idx == 1) {
+        update_dust_tab();
+    } else if (tab_idx == 2) {
+        update_gps_tab();
+    } else if (tab_idx == 5) {
+        update_cfg_tab();
     }
     lv_lock_release();
 }

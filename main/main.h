@@ -69,7 +69,7 @@ extern mhz19_t *mhz19;
 extern scd4x_t *scd4x;
 extern sps30_t *sps30;
 extern qmc5883l_t *qmc5883l;
-extern yys_sensors_t *yys_sensors;
+extern yys_sensor_t *yys_sensor;
 extern wdt_hal_context_t rtc_wdt_ctx;
 extern i2c_master_bus_handle_t bus_handle;
 extern int spi_host_id;

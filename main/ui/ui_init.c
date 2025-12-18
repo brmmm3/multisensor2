@@ -10,7 +10,6 @@
 #include "core/lv_obj_style.h"
 #include "esp_log.h"
 
-#include "lvgl.h"
 #include "misc/lv_area.h"
 #include "misc/lv_color.h"
 #include "misc/lv_event.h"
@@ -323,18 +322,20 @@ ui_t *ui_init(lv_display_t *disp)
     ui_t *ui = malloc(sizeof(ui_t));
 
     init_styles();
+    ESP_LOGI(TAG, "Add Tab main");
     ui->tbv_main = add_tabiew(scr, 0, 0);
+    ESP_LOGI(TAG, "Add Tab air");
     ui->tab_air = add_page_air(ui);
+    ESP_LOGI(TAG, "Add Tab dust");
     ui->tab_dust = add_page_dust(ui);
-    ui->tab_dust = add_page_gps(ui);
+    ESP_LOGI(TAG, "Add Tab gps");
+    ui->tab_gps = add_page_gps(ui);
+    ESP_LOGI(TAG, "Add Tab wifi");
     ui->tab_wifi = add_page_wifi(ui);
+    ESP_LOGI(TAG, "Add Tab sd");
     ui->tab_sd = add_page_sd(ui);
+    ESP_LOGI(TAG, "Add Tab cfg");
     ui->tab_cfg = add_page_cfg(ui, btn_calibrate_pressed);
-
-    /*ui.led1 = lv_led_create(tab);
-    lv_obj_align(ui.led1, LV_ALIGN_TOP_LEFT, 100, 100);
-    lv_obj_t *btn1 = create_button(scr, 30, 30, 0, 0, "Button 1", btn_cb, disp);
-    lv_obj_t *btn2 = create_button(scr, 130, 30, 0, 0, "Button 2", btn_cb, disp);
-    create_animated_arc(scr);*/
+    ESP_LOGI(TAG, "DONE");
     return ui;
 }

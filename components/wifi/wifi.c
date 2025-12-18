@@ -154,6 +154,7 @@ static void connect_task(void *arg)
             ESP_LOGI(TAG, "Gateway    : " IPSTR, IP2STR(&ip_info.gw));
         }
     }
+    vTaskDelete(NULL);
 }
 
 esp_err_t wifi_init()
@@ -171,6 +172,6 @@ esp_err_t wifi_init()
         return err;
     }
     wifi_init_sta();
-    //xTaskCreate(connect_task, "connect_task", 4096, NULL, configMAX_PRIORITIES - 1, NULL);
+    //xTaskCreate(connect_task, "connect_task", 4096, NULL, configMAX_PRIORITIES - 3, NULL);
     return ESP_OK;
 }

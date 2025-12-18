@@ -35,6 +35,7 @@ typedef struct ui_s {
     lv_obj_t *lbl_sps30_5;
     lv_obj_t *lbl_sps30_6;
     // Tab GPS
+    lv_obj_t *tab_gps;
     lv_obj_t *lbl_gps_date;
     lv_obj_t *lbl_gps_time;
     lv_obj_t *lbl_gps_lat;

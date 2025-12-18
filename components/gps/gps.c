@@ -284,7 +284,9 @@ void rx_task_gps_sensor(void *arg)
             continue; // UART error
         }
         status->status++;
-        //ESP_LOG_BUFFER_CHAR(sensor->name, buf, rxBytes);
+        if (sensor->debug & 16) {
+            ESP_LOG_BUFFER_CHAR(sensor->name, buf, rxBytes);
+        }
         //ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, rxBytes, ESP_LOG_INFO);
 
         char *p = buf;

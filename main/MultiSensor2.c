@@ -5,9 +5,10 @@
 #include "lcd.h"
 #include "main.h"
 #include "scd4x.h"
+#include "ui/ui_update.h"
 #include "wifi.h"
 
-#include "ui/ui.h"
+#include "esp_task_wdt.h"
 #include "console/console.h"
 #include <stdlib.h>
 
@@ -56,9 +57,9 @@ static const char *TAG = "MS2";
 #define MHZ19_PIN_NUM_RX    GPIO_NUM_4
 #define MHZ19_PIN_NUM_TX    GPIO_NUM_5
 // YYS (SW-UART)
-#define YYS_PIN_NUM_H2S     GPIO_NUM_11
-#define YYS_PIN_NUM_O2      GPIO_NUM_12
-#define YYS_PIN_NUM_CO      GPIO_NUM_13
+#define YYS_PIN_NUM_NC      GPIO_NUM_11
+#define YYS_PIN_NUM_TX      GPIO_NUM_12
+#define YYS_PIN_NUM_RX      GPIO_NUM_13
 
 // Unused GPIOs: 3, 9
 
@@ -70,6 +71,8 @@ static const char *TAG = "MS2";
 #define UART_BUFFER_SIZE 256
 
 #define CONFIG_NTP_SERVER   "pool.ntp.org"
+
+#define UPDATE_TASK_PRIORITY 3
 
 config_t *config = NULL;
 
@@ -83,7 +86,7 @@ mhz19_t *mhz19 = NULL;
 scd4x_t *scd4x = NULL;
 sps30_t *sps30 = NULL;
 qmc5883l_t *qmc5883l = NULL;
-yys_sensors_t *yys_sensors = NULL;
+yys_sensor_t *yys_sensor = NULL;
 wdt_hal_context_t rtc_wdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
 i2c_master_bus_handle_t bus_handle;
 int spi_host_id;
@@ -101,6 +104,13 @@ bool yys_update = false;
 bool qmc5883l_update = false;
 bool adxl345_update = false;
 
+
+static void tabview_event_cb(lv_event_t * e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_VALUE_CHANGED) {
+        ui_update();
+    }
+}
 
 i2c_master_bus_handle_t i2c_bus_init(uint8_t sda_io, uint8_t scl_io)
 {
@@ -158,7 +168,7 @@ void dump_data()
     bmx280_dump(bmx280hi);
     scd4x_dump(scd4x);
     mhz19_dump(mhz19);
-    yys_dump(yys_sensors);
+    yys_dump(yys_sensor);
     sps30_dump(sps30);
     qmc5883l_dump(qmc5883l);
     adxl345_dump(adxl345);
@@ -244,8 +254,8 @@ static void sensors_update()
     if (mhz19 != NULL) {
         mhz19_update = mhz19_data_ready(mhz19);
     }
-    if (yys_sensors != NULL) {
-        yys_update = yys_data_ready(yys_sensors);
+    if (yys_sensor != NULL) {
+        yys_update = yys_data_ready(yys_sensor);
     }
     if (sps30 != NULL) {
         update_sps30();
@@ -277,6 +287,7 @@ static void sensors_update()
 static void update_task(void *arg)
 {
     ESP_LOGI(TAG, "Start main loop.");
+    esp_task_wdt_add(NULL);
     while (true) {
         sensors_update();
         ui_update();
@@ -284,9 +295,7 @@ static void update_task(void *arg)
         // Dump data for debugging
         dump_data();
 
-        wdt_hal_write_protect_disable(&rtc_wdt_ctx);
-        wdt_hal_feed(&rtc_wdt_ctx);
-        wdt_hal_write_protect_enable(&rtc_wdt_ctx);
+        esp_task_wdt_reset();
 
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
@@ -296,11 +305,11 @@ void sensors_init()
 {
     ESP_LOGI(TAG, "Initialize Sensors");
 
-    gpio_config_t config = {
+    /*gpio_config_t config = {
         .mode = GPIO_MODE_OUTPUT,
         .pin_bit_mask = 1ULL << SDCARD_PIN_NUM_CS | 1ULL << LCD_PIN_NUM_CS | 1ULL << LCD_PIN_NUM_T_CS | 1ULL << LCD_PIN_NUM_DC | 1ULL << LCD_PIN_NUM_RST | 1ULL << LCD_PIN_NUM_LED | 1ULL << SPI_PIN_NUM_MOSI,
     };
-    gpio_config(&config);
+    gpio_config(&config);*/
 
     /*uint8_t level = 0;
 
@@ -327,7 +336,7 @@ void sensors_init()
     ESP_ERROR_CHECK(bmx280_init(&bmx280hi, bus_handle, true));
     ESP_ERROR_CHECK(mhz19_init(&mhz19, MHZ19_UART_NUM, MHZ19_PIN_NUM_RX, MHZ19_PIN_NUM_TX));
     ESP_ERROR_CHECK(scd4x_device_init(&scd4x, bus_handle));
-    ESP_ERROR_CHECK(yys_init(&yys_sensors, YYS_PIN_NUM_O2, YYS_PIN_NUM_CO, YYS_PIN_NUM_H2S));
+    ESP_ERROR_CHECK(yys_init(&yys_sensor, YYS_PIN_NUM_RX, YYS_PIN_NUM_TX));
     ESP_ERROR_CHECK(qmc5883l_init(&qmc5883l, bus_handle));
     //ESP_ERROR_CHECK(tlv493_init(&tlv493, bus_handle));
     //ESP_LOGI("TLV493D", "ChipId = %d", tlv493->device_id);
@@ -336,8 +345,16 @@ void sensors_init()
 
 void app_main(void)
 {
-    // Wait 100ms to give sensors time to power up.
+    // Wait 500ms to give sensors time to power up.
     vTaskDelay(pdMS_TO_TICKS(100));
+
+    esp_task_wdt_config_t twdt_config = {
+        .timeout_ms     = 5000,     // 5 seconds is safe
+        .idle_core_mask = 0,        // don’t watch idle task on C6 (single core)
+        .trigger_panic  = true,
+    };
+    esp_task_wdt_reconfigure(&twdt_config);
+    //esp_task_wdt_deinit();
 
     config = calloc(1, sizeof(config_t));
     config_read(config);
@@ -346,9 +363,12 @@ void app_main(void)
     bus_handle = i2c_bus_init(I2C_PIN_NUM_SDA, I2C_PIN_NUM_SCL);
     // SD-Card (SPI Mode)
     spi_host_id = sd_card_init(SDCARD_PIN_NUM_CS, SPI_PIN_NUM_SCLK, SPI_PIN_NUM_MOSI, SPI_PIN_NUM_MISO);
+
     // LCD (SPI Mode)
     lcd = lcd_init(spi_host_id, LCD_PIN_NUM_CS, LCD_PIN_NUM_DC, LCD_PIN_NUM_RST, LCD_PIN_NUM_LED, LCD_PIN_NUM_T_CS);
     ui = ui_init(lcd);
+    lv_obj_add_event_cb(ui->tbv_main, tabview_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lcd_start();
 
     led_init();
     sensors_init();
@@ -370,7 +390,7 @@ void app_main(void)
         ESP_ERROR_CHECK(sntp_obtain_time());
     }
 
-    xTaskCreate(update_task, "update_task", 4096, NULL, configMAX_PRIORITIES - 1, NULL);
+    xTaskCreate(update_task, "update_task", 4096, NULL, UPDATE_TASK_PRIORITY, NULL);
 
     console_init();
 }

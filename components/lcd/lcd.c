@@ -6,6 +6,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_timer.h"
+#include "esp_task_wdt.h"
 #include "esp_log.h"
 
 #include "esp_lcd_panel_io.h"
@@ -111,21 +112,20 @@ static bool notify_lvgl_flush_ready(esp_lcd_panel_io_handle_t panel_io, esp_lcd_
 
 static void lvgl_touch_cb(lv_indev_t * indev, lv_indev_data_t * data)
 {
-    uint16_t touchpad_x[1] = {0};
-    uint16_t touchpad_y[1] = {0};
     uint8_t touchpad_cnt = 0;
     esp_lcd_touch_handle_t touch_pad = lv_indev_get_user_data(indev);
-    bool touchpad_pressed;
+    esp_lcd_touch_point_data_t touch_data;
+    bool rc;
 
     esp_lcd_touch_read_data(touch_pad);
     /* Get coordinates */
-    touchpad_pressed = esp_lcd_touch_get_coordinates(touch_pad, touchpad_x, touchpad_y, NULL, &touchpad_cnt, 1);
-    if (touchpad_pressed && touchpad_cnt > 0) {
+    rc = esp_lcd_touch_get_data(touch_pad, &touch_data, &touchpad_cnt, 1);
+    if ((rc == ESP_OK) && touchpad_cnt > 0) {
         // X: touchpad_y: 20 (left) - 285 (right)
         // Y: touchpad_x: 25 (bottom) - 223 (top)
         // Calibrate Touchscreen points with map function to the correct width and height
-        int32_t x = touchpad_x[0]; //25, 223, 1, LCD_H_RES);
-        int32_t y = touchpad_y[0]; //20, 285, 1, LCD_V_RES);
+        int32_t x = touch_data.x; //25, 223, 1, LCD_H_RES);
+        int32_t y = touch_data.y; //20, 285, 1, LCD_V_RES);
         data->point.x = x < 25 ? 0 : (x - 25) * LCD_H_RES / (223 - 25);
         data->point.y = y < 20 ? 0 : (y - 20) * LCD_V_RES / (285 - 20);
         data->state = LV_INDEV_STATE_PRESSED;
@@ -136,18 +136,13 @@ static void lvgl_touch_cb(lv_indev_t * indev, lv_indev_data_t * data)
 
 static void lvgl_port_task(void *arg)
 {
-    uint32_t time_till_next_ms = 0;
-    uint32_t time_threshold_ms = 1000 / CONFIG_FREERTOS_HZ;
-
     ESP_LOGI(TAG, "Starting LVGL task");
-    usleep(100000);
+    esp_task_wdt_add(NULL);
+    vTaskDelay(pdMS_TO_TICKS(10));
     while (1) {
-        _lock_acquire(&lvgl_api_lock);
-        time_till_next_ms = lv_timer_handler();
-        _lock_release(&lvgl_api_lock);
-        // in case of triggering a task watch dog time out
-        time_till_next_ms = MAX(time_till_next_ms, time_threshold_ms);
-        usleep(1000 * time_till_next_ms);
+        esp_task_wdt_reset();
+        uint32_t time_till_next =lv_timer_handler();
+        vTaskDelay(pdMS_TO_TICKS(time_till_next ? time_till_next : 10));
     }
 }
 
@@ -267,7 +262,11 @@ lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t 
     lv_indev_set_user_data(indev, tp);
     lv_indev_set_read_cb(indev, lvgl_touch_cb);
     lv_disp_set_rotation(display, LV_DISPLAY_ROTATION_270);
+    return display;
+}
+
+void lcd_start()
+{
     ESP_LOGI(TAG, "Create LVGL task");
     xTaskCreate(lvgl_port_task, "LVGL", LVGL_TASK_STACK_SIZE, NULL, LVGL_TASK_PRIORITY, NULL);
-    return display;
 }
