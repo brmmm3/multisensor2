@@ -14,7 +14,6 @@ static struct {
     struct arg_int *sps;    // Debug SPS30
     struct arg_int *qmc;    // Debug QMC5883L
     struct arg_int *adx;    // Debug ADXL345
-    struct arg_int *sws;    // Debug SW Serial
     struct arg_end *end;
 } debug_cmd_args;
 
@@ -44,8 +43,6 @@ int process_debug_cmd(int argc, char **argv)
         qmc5883l->debug = debug_cmd_args.qmc->ival[0];
     } else if (debug_cmd_args.adx->count == 1) {
         adxl345->debug = debug_cmd_args.adx->ival[0];
-    } else if (debug_cmd_args.sws->count == 1) {
-        yys_sensor->sw_serial->debug = debug_cmd_args.sws->ival[0];
     } else {
         ESP_LOGE(TAG, "no valid arguments");
         return 1;
@@ -63,8 +60,7 @@ void register_debug_cmd()
     debug_cmd_args.sps = arg_int0("p", "sps", "<0-15>", "Configure SPS30 debugging");
     debug_cmd_args.qmc = arg_int0("q", "qmc", "<0-15>", "Configure QMC5883L debugging");
     debug_cmd_args.adx = arg_int0("a", "adx", "<0-15>", "Configure ADXL345 debugging");
-    debug_cmd_args.sws = arg_int0("w", "sws", "<0-15>", "Configure SW Serial debugging");
-    debug_cmd_args.end = arg_end(9);
+    debug_cmd_args.end = arg_end(8);
 
     const esp_console_cmd_t cmd = {
         .command = "debug",

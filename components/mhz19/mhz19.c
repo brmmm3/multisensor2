@@ -101,7 +101,7 @@ static void rx_task_mhz19_sensor(void *arg)
     bool ready = false;
 
     ESP_LOGI(TAG, "rx_task_co2_sensor STARTED on UART %d", serial->uart_num);
-    while (1) {
+    while (true) {
         if (ready) {
             buf[0] = 0xff;
             buf[1] = 0x01;

@@ -150,7 +150,7 @@ void led_init(void)
     // LED strip backend configuration: RMT
     led_strip_rmt_config_t rmt_config = {
         // Set the clock source
-        .clk_src = RMT_CLK_SRC_DEFAULT,
+        .clk_src = RMT_CLK_SRC_XTAL,
         // Set the RMT counter clock
         .resolution_hz = LED_STRIP_RMT_RES_HZ,
         // Set the DMA feature (not supported on the ESP32-C6)
