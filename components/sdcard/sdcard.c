@@ -12,17 +12,18 @@
 
 #include "esp_vfs_fat.h"
 #include "sdmmc_cmd.h"
+#include "sdcard.h"
 
 static const char *TAG = "SD";
 
 #define SDCARD_MAX_FREQ_KHZ 8000
 
-#define MOUNT_POINT "/sdcard"
+static sdmmc_card_t *card = NULL;
 
 
-static esp_err_t s_example_write_file(const char *path, char *data)
+esp_err_t write_text_file(const char *path, char *data)
 {
-    ESP_LOGI(TAG, "Opening file %s", path);
+    ESP_LOGI(TAG, "Write text file %s", path);
     FILE *f = fopen(path, "w");
     if (f == NULL) {
         ESP_LOGE(TAG, "Failed to open file for writing");
@@ -30,12 +31,23 @@ static esp_err_t s_example_write_file(const char *path, char *data)
     }
     fprintf(f, data);
     fclose(f);
-    ESP_LOGI(TAG, "File written");
-
     return ESP_OK;
 }
 
-static esp_err_t s_example_write_file_bin(const char *path, uint8_t *data, uint32_t size)
+esp_err_t read_text_file(const char *path, char *buf, uint16_t size)
+{
+    ESP_LOGI(TAG, "Read text file %s", path);
+    FILE *f = fopen(path, "r");
+    if (f == NULL) {
+        ESP_LOGE(TAG, "Failed to open file for reading");
+        return ESP_FAIL;
+    }
+    fgets(buf, size, f);
+    fclose(f);
+    return ESP_OK;
+}
+
+esp_err_t write_bin_file(const char *path, void *data, uint16_t size)
 {
     ESP_LOGI(TAG, "Write binary file %s", path);
     FILE *f = fopen(path, "wb");
@@ -45,30 +57,21 @@ static esp_err_t s_example_write_file_bin(const char *path, uint8_t *data, uint3
     }
     fwrite(data, size, 1, f);
     fclose(f);
-    ESP_LOGI(TAG, "File written");
-
     return ESP_OK;
 }
 
-static esp_err_t s_example_read_file(const char *path)
+esp_err_t read_bin_file(const char *path, void *buf, uint16_t size)
 {
-    ESP_LOGI(TAG, "Reading file %s", path);
-    FILE *f = fopen(path, "r");
+    ESP_LOGI(TAG, "Read bin file %s", path);
+    FILE *f = fopen(path, "rb");
     if (f == NULL) {
         ESP_LOGE(TAG, "Failed to open file for reading");
         return ESP_FAIL;
     }
-    char line[64];
-    fgets(line, sizeof(line), f);
-    fclose(f);
-
-    // strip newline
-    char *pos = strchr(line, '\n');
-    if (pos) {
-        *pos = '\0';
+    if (buf != NULL) {
+        fread(buf, size, 1, f);
     }
-    ESP_LOGI(TAG, "Read from file: '%s'", line);
-
+    fclose(f);
     return ESP_OK;
 }
 
@@ -108,7 +111,6 @@ int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t mis
         .max_files = 5,
         .allocation_unit_size = 16 * 1024
     };
-    sdmmc_card_t *card;
     const char mount_point[] = MOUNT_POINT;
     ESP_LOGI(TAG, "Initializing SD card");
 
@@ -139,25 +141,6 @@ int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t mis
         return -1;
     }
 
-    /*spi_device_interface_config_t dev_cfg = {
-        .flags = SPI_DEVICE_HALFDUPLEX | SPI_DEVICE_TXBIT_LSBFIRST | SPI_DEVICE_3WIRE,
-        .clock_speed_hz = 1000000,
-        .mode = 0,
-        .queue_size = 10,
-    };
-
-    ESP_LOGI(TAG, "Adding fake LCD SPI device");
-    dev_cfg.spics_io_num = PIN_NUM_LCD_CS;
-    spi_device_handle_t lcd_handle;
-    lcd_handle = (spi_device_handle_t)malloc(sizeof(lcd_handle));
-    ESP_ERROR_CHECK(spi_bus_add_device(host.slot, &dev_cfg, &lcd_handle));
-
-    ESP_LOGI(TAG, "Adding fake LCD TOUCH device");
-    dev_cfg.spics_io_num = PIN_NUM_TOUCH_CS;
-    spi_device_handle_t touch_handle;
-    touch_handle = (spi_device_handle_t)malloc(sizeof(touch_handle));
-    ESP_ERROR_CHECK(spi_bus_add_device(host.slot, &dev_cfg, &touch_handle));*/
-
     sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
 
     slot_config.gpio_cs = cs_pin;
@@ -166,7 +149,6 @@ int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t mis
     ESP_LOGI(TAG, "Mounting filesystem");
     // IMPORTANT WORKAROUND: Comment out "SDMMC_INIT_STEP(is_spi, sdmmc_init_spi_crc);" in sdmmc_init.c
     err = esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_config, &card);
-
     if (err != ESP_OK) {
         if (err == ESP_FAIL) {
             ESP_LOGE(TAG, "Failed to mount filesystem. "
@@ -186,15 +168,21 @@ int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t mis
     uint64_t bytes_total, bytes_free;
     esp_vfs_fat_info(MOUNT_POINT, &bytes_total, &bytes_free);
     ESP_LOGI(TAG, "FAT FS: %" PRIu64 " kB total, %" PRIu64 " kB free", bytes_total / 1024, bytes_free / 1024);
+    return host.slot;
+}
+
+static esp_err_t example_file_actions()
+{
+    char data[64];
+
+    const char *file_hello = MOUNT_POINT"/hello.txt";
 
     // First create a file.
-    const char *file_hello = MOUNT_POINT"/hello.txt";
-    char data[64];
-    snprintf(data, 64, "%s %d %d %s!\n", "Hello", card->cid.mfg_id, card->cid.oem_id, card->cid.name);
-    err = s_example_write_file(file_hello, data);
+    /*snprintf(data, 64, "%s %d %d %s!\n", "Hello", card->cid.mfg_id, card->cid.oem_id, card->cid.name);
+    err = write_text_file(file_hello, data);
     if (err != ESP_OK) {
         return -1;
-    }
+    }*/
 
     const char *file_foo = MOUNT_POINT"/foo.txt";
 
@@ -212,18 +200,18 @@ int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t mis
         return -1;
     }
 
-    err = s_example_read_file(file_foo);
+    esp_err_t err = read_text_file(file_foo, data, sizeof(data));
     if (err != ESP_OK) {
         return -1;
     }
 
     const char *file_hello_bin = MOUNT_POINT"/hello.bin";
     snprintf(data, 64, "%s %d %d %s!\n", "Hello", card->cid.mfg_id, card->cid.oem_id, card->cid.name);
-    err = s_example_write_file_bin(file_hello_bin, (uint8_t*)data, 64);
+    err = write_bin_file(file_hello_bin, (uint8_t*)data, 64);
     if (err != ESP_OK) {
         return -1;
     }
 
     list_dir(MOUNT_POINT);
-    return host.slot;
+    return ESP_OK;
 }

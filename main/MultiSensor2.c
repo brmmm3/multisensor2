@@ -5,12 +5,12 @@
 #include "lcd.h"
 #include "main.h"
 #include "scd4x.h"
+#include "sdcard.h"
 #include "ui/ui_update.h"
 #include "wifi.h"
 
 #include "esp_task_wdt.h"
 #include "console/console.h"
-#include <stdlib.h>
 
 static const char *TAG = "MS2";
 
@@ -73,8 +73,6 @@ static const char *TAG = "MS2";
 #define CONFIG_NTP_SERVER   "pool.ntp.org"
 
 #define UPDATE_TASK_PRIORITY 3
-
-config_t *config = NULL;
 
 rtc_t *rtc = NULL;
 gps_sensor_t *gps = NULL;
@@ -304,31 +302,6 @@ static void update_task(void *arg)
 void sensors_init()
 {
     ESP_LOGI(TAG, "Initialize Sensors");
-
-    /*gpio_config_t config = {
-        .mode = GPIO_MODE_OUTPUT,
-        .pin_bit_mask = 1ULL << SDCARD_PIN_NUM_CS | 1ULL << LCD_PIN_NUM_CS | 1ULL << LCD_PIN_NUM_T_CS | 1ULL << LCD_PIN_NUM_DC | 1ULL << LCD_PIN_NUM_RST | 1ULL << LCD_PIN_NUM_LED | 1ULL << SPI_PIN_NUM_MOSI,
-    };
-    gpio_config(&config);*/
-
-    /*uint8_t level = 0;
-
-    while (1) {
-        gpio_set_level(SDCARD_PIN_NUM_CS, level);
-        gpio_set_level(LCD_PIN_NUM_CS, level);
-        gpio_set_level(LCD_PIN_NUM_T_CS, level);
-        gpio_set_level(LCD_PIN_NUM_DC, level);
-        gpio_set_level(LCD_PIN_NUM_RST, level);
-        gpio_set_level(LCD_PIN_NUM_LED, level);
-        gpio_set_level(SPI_PIN_NUM_MOSI, level);
-
-        wdt_hal_write_protect_disable(&rtc_wdt_ctx);
-        wdt_hal_feed(&rtc_wdt_ctx);
-        wdt_hal_write_protect_enable(&rtc_wdt_ctx);
-
-        vTaskDelay(10 / portTICK_PERIOD_MS);
-        level = 1 - level;
-    }*/
     ESP_ERROR_CHECK(gps_init(&gps, GPS_UART_NUM, GPS_PIN_NUM_RX, GPS_PIN_NUM_TX));
     gps_status = &gps->status;
     ESP_ERROR_CHECK(adxl345_init(&adxl345, bus_handle));
@@ -356,8 +329,7 @@ void app_main(void)
     esp_task_wdt_reconfigure(&twdt_config);
     //esp_task_wdt_deinit();
 
-    config = calloc(1, sizeof(config_t));
-    config_read(config);
+    config_read();
 
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
     bus_handle = i2c_bus_init(I2C_PIN_NUM_SDA, I2C_PIN_NUM_SCL);
@@ -373,21 +345,8 @@ void app_main(void)
     led_init();
     sensors_init();
     rtc_init(&rtc, &bus_handle);
-    // WiFi
-    ESP_ERROR_CHECK(wifi_init());
-    {
-        esp_netif_ip_info_t ip_info;
-
-        ESP_ERROR_CHECK(esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info));
-
-        // Print the local IP address
-        ESP_LOGI(TAG, "IP Address : " IPSTR, IP2STR(&ip_info.ip));
-        ESP_LOGI(TAG, "Subnet mask: " IPSTR, IP2STR(&ip_info.netmask));
-        ESP_LOGI(TAG, "Gateway    : " IPSTR, IP2STR(&ip_info.gw));
-        // Austria/Vienna: CET-1CEST,M3.5.0,M10.5.0/3
-        setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1);
-        tzset();
-        ESP_ERROR_CHECK(sntp_obtain_time());
+    if (config->auto_connect) {
+        ESP_ERROR_CHECK(wifi_init());
     }
 
     xTaskCreate(update_task, "update_task", 4096, NULL, UPDATE_TASK_PRIORITY, NULL);

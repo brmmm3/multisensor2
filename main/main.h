@@ -56,8 +56,6 @@ extern "C" {
 #include "adxl345.h"
 #include "qmc5883l.h"
 
-#include "wifi/wifi_sntp.h"
-
 
 extern rtc_t *rtc;
 extern gps_sensor_t *gps;

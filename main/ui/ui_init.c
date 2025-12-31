@@ -45,7 +45,7 @@ static void btn_cb(lv_event_t *e)
     lv_disp_set_rotation(disp, rotation);*/
 }
 
-lv_obj_t *create_button(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, int32_t h, const char *text, void(*cb)(lv_event_t *e), void *data)
+lv_obj_t *add_button(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, int32_t h, const char *text, void(*cb)(lv_event_t *e), void *data)
 {
     /*Init the style for the default state*/
     static lv_style_t style;
@@ -281,16 +281,19 @@ lv_obj_t *add_page_gps(ui_t *ui)
 lv_obj_t *add_page_wifi(ui_t *ui)
 {
     lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_WIFI);
-    lv_obj_t *lbl = add_label_text(tab, 0, 0, "Enable", lv_color_black());
+    lv_obj_t *lbl_enable = add_label_text(tab, 0, 0, "Enable", lv_color_black());
 
     ui->sw_wifi_enable = add_switch(tab, 260, 00, 60, 30);
+    ui->lbl_wifi_status = add_label_text(tab, 0, 28, "-", lv_color_black());
     return tab;
 }
 
 lv_obj_t *add_page_sd(ui_t *ui)
 {
     lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_SD_CARD);
+    lv_obj_t *lbl_record = add_label_text(tab, 0, 0, "Record", lv_color_black());
 
+    ui->sw_record_enable = add_switch(tab, 260, 00, 60, 30);
     return tab;
 }
 
@@ -310,7 +313,7 @@ lv_obj_t *add_page_cfg(ui_t *ui, void(*btn_pressed)(lv_event_t *))
     ui->sw_gps_pwr = add_switch(tab, 260, 90, 60, 30);
     ui->sw_sps30_pwr = add_switch(tab, 260, 120, 60, 30);
     ui->sw_scd4x_pwr = add_switch(tab, 260, 150, 60, 30);
-    ui->btn_calibrate = create_button(tab, 0, 160, 0, 0, "Calibrate Sensors", btn_pressed, "CAL");
+    ui->btn_calibrate = add_button(tab, 0, 160, 0, 0, "Calibrate Sensors", btn_pressed, "CAL");
     return tab;
 }
 

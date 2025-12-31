@@ -9,6 +9,7 @@
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
+#include "wifi_sntp.h"
 
 /* The examples use WiFi configuration that you can set via project configuration menu
 
@@ -146,32 +147,24 @@ static void connect_task(void *arg)
     esp_netif_ip_info_t ip_info;
 
     wifi_connect(ESP_WIFI_SSID, ESP_WIFI_PASS);
-    if ((err = esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info)) == ESP_OK) {
-        if (ip_info.ip.addr != 0) {
-            /* Print the local IP address */
-            ESP_LOGI(TAG, "IP Address : " IPSTR, IP2STR(&ip_info.ip));
-            ESP_LOGI(TAG, "Subnet mask: " IPSTR, IP2STR(&ip_info.netmask));
-            ESP_LOGI(TAG, "Gateway    : " IPSTR, IP2STR(&ip_info.gw));
-        }
-    }
+    err = esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info);
+    if (err == ESP_OK && ip_info.ip.addr != 0) {
+        /* Print the local IP address */
+        ESP_LOGI(TAG, "IP Address : " IPSTR, IP2STR(&ip_info.ip));
+        ESP_LOGI(TAG, "Subnet mask: " IPSTR, IP2STR(&ip_info.netmask));
+        ESP_LOGI(TAG, "Gateway    : " IPSTR, IP2STR(&ip_info.gw));
+         // Austria/Vienna: CET-1CEST,M3.5.0,M10.5.0/3
+        setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1);
+        tzset();
+        ESP_ERROR_CHECK(sntp_obtain_time());
+   }
     vTaskDelete(NULL);
 }
 
 esp_err_t wifi_init()
 {
     ESP_LOGI(TAG, "Initialize WiFi");
-
-    esp_err_t err = nvs_flash_init();
-
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-      ESP_ERROR_CHECK(nvs_flash_erase());
-      err = nvs_flash_init();
-    }
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize NVS");
-        return err;
-    }
     wifi_init_sta();
-    //xTaskCreate(connect_task, "connect_task", 4096, NULL, configMAX_PRIORITIES - 3, NULL);
+    xTaskCreate(connect_task, "connect_task", 4096, NULL, configMAX_PRIORITIES - 3, NULL);
     return ESP_OK;
 }

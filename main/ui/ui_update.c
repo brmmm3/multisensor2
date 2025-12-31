@@ -7,6 +7,7 @@
 // This demo UI is adapted from LVGL official example: https://docs.lvgl.io/master/examples.html#loader-with-arc
 
 #include "ui_update.h"
+#include "lcd.h"
 
 static const char *TAG = "UI";
 
@@ -78,9 +79,12 @@ void sw_wifi_pwr_cb(lv_event_t *e)
             wifi_init();
         } else {
             //esp_http_client_cleanup(client); // dismiss the TCP stack
-            esp_wifi_disconnect();            // break connection to AP
-            esp_wifi_stop();                 // shut down the wifi radio
-            esp_wifi_deinit();              // release wifi resources
+            esp_wifi_disconnect();             // break connection to AP
+            esp_wifi_stop();                   // shut down the wifi radio
+            esp_wifi_deinit();                 // release wifi resources
+            lv_lock_acquire();
+            lv_label_set_text(ui->lbl_wifi_status, "Disconnected");
+            lv_lock_release();
         }
     }
 }
@@ -207,6 +211,14 @@ void update_gps_tab()
     }
 }
 
+void update_wifi_tab()
+{
+}
+
+void update_sd_tab()
+{
+}
+
 void update_cfg_tab()
 {
     char buf[100];
@@ -237,6 +249,10 @@ void ui_update()
         update_dust_tab();
     } else if (tab_idx == 2) {
         update_gps_tab();
+    } else if (tab_idx == 3) {
+        update_wifi_tab();
+    } else if (tab_idx == 4) {
+        update_sd_tab();
     } else if (tab_idx == 5) {
         update_cfg_tab();
     }
