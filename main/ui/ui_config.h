@@ -13,7 +13,10 @@
 extern "C" {
 #endif
 
-void ui_update();
+#include <esp_lvgl_port.h>
+#include "main.h"
+
+void ui_register_callbacks(ui_t *ui);
 
 #ifdef __cplusplus
 };

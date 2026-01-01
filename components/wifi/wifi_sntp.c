@@ -1,18 +1,10 @@
-#include "wifi_sntp.h"
-
 #include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-#include "freertos/task.h"
-#include "freertos/queue.h"
-#include "hal/wdt_hal.h"
-#include "esp_timer.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_sntp.h"
-#include "esp_netif_sntp.h"
-
-#include "lwip/dns.h"
+#include "wifi_sntp.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
 
 static const char *TAG = "SNTP";
 

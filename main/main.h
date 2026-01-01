@@ -17,17 +17,11 @@ extern "C" {
 #include <stdio.h>
 #include <string.h>
 #include <argtable3/argtable3.h>
-#include "esp_log_buffer.h"
-#include "esp_log_level.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "hal/wdt_hal.h"
-#include "soc/io_mux_reg.h"
-#include "soc/gpio_sig_map.h"
-#include "esp_timer.h"
-#include "esp_err.h"
 #include "esp_log.h"
 #include "esp_console.h"
 
@@ -35,7 +29,6 @@ extern "C" {
 
 #include "driver/gpio.h"
 #include "hal/gpio_types.h"
-#include "rom/gpio.h"
 #include "hal/uart_types.h"
 #include "driver/i2c_master.h"
 

@@ -1,7 +1,6 @@
 #include "bmx280.h"
 #include "config.h"
 #include "gps.h"
-#include "hal/gpio_types.h"
 #include "lcd.h"
 #include "main.h"
 #include "scd4x.h"
@@ -102,13 +101,6 @@ bool yys_update = false;
 bool qmc5883l_update = false;
 bool adxl345_update = false;
 
-
-static void tabview_event_cb(lv_event_t * e)
-{
-    if (lv_event_get_code(e) == LV_EVENT_VALUE_CHANGED) {
-        ui_update();
-    }
-}
 
 i2c_master_bus_handle_t i2c_bus_init(uint8_t sda_io, uint8_t scl_io)
 {
@@ -339,7 +331,7 @@ void app_main(void)
     // LCD (SPI Mode)
     lcd = lcd_init(spi_host_id, LCD_PIN_NUM_CS, LCD_PIN_NUM_DC, LCD_PIN_NUM_RST, LCD_PIN_NUM_LED, LCD_PIN_NUM_T_CS);
     ui = ui_init(lcd);
-    lv_obj_add_event_cb(ui->tbv_main, tabview_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    ui_register_callbacks(ui);
     lcd_start();
 
     led_init();

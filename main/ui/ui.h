@@ -14,6 +14,7 @@ extern "C" {
 #endif
 
 #include "ui_init.h"
+#include "ui_config.h"
 #include "ui_update.h"
 //#include "ui_wifi.h"
 

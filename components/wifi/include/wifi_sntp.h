@@ -16,7 +16,6 @@ extern "C" {
 #include <stdint.h>
 #include <time.h>
 #include "freertos/FreeRTOS.h"
-#include "freertos/projdefs.h"
 
 typedef struct sntp_s {
     struct tm timeinfo;

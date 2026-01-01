@@ -8,116 +8,16 @@
 
 #include "ui_update.h"
 #include "lcd.h"
+#include "main.h"
 
-static const char *TAG = "UI";
+//static const char *TAG = "UIU";
 
 // 10MHz resolution, 1 tick = 0.1us (led strip needs a high resolution)
 #define LED_STRIP_RMT_RES_HZ  (10 * 1000 * 1000)
 
 
-void btn_calibrate_pressed(lv_event_t *e)
+void update_air_tab()
 {
-    esp_err_t err;
-    uint16_t frc;
-    const char *key = lv_event_get_user_data(e);
-
-    if (!strcmp(key, "CAL")) {
-        ESP_LOGI(TAG, "Calibrating sensors...");
-        if ((err = mhz19_calibrate_zero(mhz19)) != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to calibrate MHZ19 with error %d", err);
-        }
-        if ((err = scd4x_stop_periodic_measurement(scd4x)) != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to stop SCD41 with error %d", err);
-        } else {
-            vTaskDelay(pdMS_TO_TICKS(500));
-            frc = scd4x_perform_forced_recalibration(scd4x, mhz19->co2);
-            ESP_LOGI(TAG, "FRC=%d", frc);
-            vTaskDelay(pdMS_TO_TICKS(400));
-            if ((err = scd4x_start_periodic_measurement(scd4x)) != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to start SCD41 with error %d", err);
-            }
-        }
-        ESP_LOGI(TAG, "Calibrating sensors DONE");
-    }
-}
-
-void sw_lcd_pwr_cb(lv_event_t * e)
-{
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * obj = lv_event_get_target(e);
-
-    if (code == LV_EVENT_VALUE_CHANGED) {
-        if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-            lcd_set_bg_pwr(1);
-        } else {
-            lcd_set_bg_pwr(2);
-        }
-    }
-}
-
-void sw_gps_pwr_cb(lv_event_t *e)
-{
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * obj = lv_event_get_target(e);
-
-    if (code == LV_EVENT_VALUE_CHANGED) {
-        if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-            gps_set_power_mode(gps, 0);
-        } else {
-            gps_set_power_mode(gps, 2);
-        }
-    }
-}
-
-void sw_wifi_pwr_cb(lv_event_t *e)
-{
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * obj = lv_event_get_target(e);
-
-    if (code == LV_EVENT_VALUE_CHANGED) {
-        if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-            wifi_init();
-        } else {
-            //esp_http_client_cleanup(client); // dismiss the TCP stack
-            esp_wifi_disconnect();             // break connection to AP
-            esp_wifi_stop();                   // shut down the wifi radio
-            esp_wifi_deinit();                 // release wifi resources
-            lv_lock_acquire();
-            lv_label_set_text(ui->lbl_wifi_status, "Disconnected");
-            lv_lock_release();
-        }
-    }
-}
-
-void sw_sps30_pwr_cb(lv_event_t *e)
-{
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * obj = lv_event_get_target(e);
-
-    if (code == LV_EVENT_VALUE_CHANGED) {
-        if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-            sps30_stop_measurement(sps30);
-        } else {
-            sps30_start_measurement(sps30);
-        }
-    }
-}
-
-void sw_scd4x_pwr_cb(lv_event_t *e)
-{
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * obj = lv_event_get_target(e);
-
-    if (code == LV_EVENT_VALUE_CHANGED) {
-        if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-            scd4x_power_down(scd4x);
-        } else {
-            scd4x_device_init_do(scd4x);
-        }
-    }
-}
-
-void update_air_tab() {
     char buf[100];
     if (bmx280lo_update) {
         bmx280lo_update = false;
@@ -189,12 +89,12 @@ void update_gps_tab()
         day = gps_status->date / 10000;
         month = gps_status->date / 100 - day * 100;
         year = gps_status->date % 100;
-        sprintf(buf, "%02lu.%02lu.20%02lu", day, month, year);
+        sprintf(buf, "%02lu.%02lu.20%02lu", (unsigned long)day, (unsigned long)month, (unsigned long)year);
         lv_label_set_text(ui->lbl_gps_date, buf);
         hours = gps_status->time / 10000;
         minutes = gps_status->time / 100 - hours * 100;
         seconds = gps_status->time % 100;
-        sprintf(buf, "%02lu:%02lu:%02lu", hours, minutes, seconds);
+        sprintf(buf, "%02lu:%02lu:%02lu", (unsigned long)hours, (unsigned long)minutes, (unsigned long)seconds);
         lv_label_set_text(ui->lbl_gps_time, buf);
         sprintf(buf, "%f %c", gps_status->lat, gps_status->ns);
         lv_label_set_text(ui->lbl_gps_lat, buf);
@@ -257,13 +157,4 @@ void ui_update()
         update_cfg_tab();
     }
     lv_lock_release();
-}
-
-void ui_register_cb()
-{
-    lv_obj_add_event_cb(ui->sw_wifi_enable, sw_wifi_pwr_cb, LV_EVENT_ALL, NULL);
-    lv_obj_add_event_cb(ui->sw_lcd_pwr, sw_lcd_pwr_cb, LV_EVENT_ALL, NULL);
-    lv_obj_add_event_cb(ui->sw_gps_pwr, sw_gps_pwr_cb, LV_EVENT_ALL, NULL);
-    lv_obj_add_event_cb(ui->sw_sps30_pwr, sw_sps30_pwr_cb, LV_EVENT_ALL, NULL);
-    lv_obj_add_event_cb(ui->sw_scd4x_pwr, sw_scd4x_pwr_cb, LV_EVENT_ALL, NULL);
 }

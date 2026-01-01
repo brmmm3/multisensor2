@@ -4,10 +4,7 @@
 
 #include "esp_err.h"
 #include "hw_serial.h"
-#include "rom/gpio.h"
-#include "driver/gpio.h"
 #include "driver/uart.h"
-#include "esp_timer.h"
 #include "esp_log.h"
 
 #include "mhz19.h"

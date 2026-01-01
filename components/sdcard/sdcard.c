@@ -2,10 +2,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <dirent.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/projdefs.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
 #include "esp_vfs.h"
 #include "esp_err.h"
 #include "esp_log.h"
@@ -29,7 +25,7 @@ esp_err_t write_text_file(const char *path, char *data)
         ESP_LOGE(TAG, "Failed to open file for writing");
         return ESP_FAIL;
     }
-    fprintf(f, data);
+    fwrite(data, strlen(data), 1, f);
     fclose(f);
     return ESP_OK;
 }
@@ -171,18 +167,18 @@ int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t mis
     return host.slot;
 }
 
-static esp_err_t example_file_actions()
+/*static esp_err_t example_file_actions()
 {
     char data[64];
 
     const char *file_hello = MOUNT_POINT"/hello.txt";
 
     // First create a file.
-    /*snprintf(data, 64, "%s %d %d %s!\n", "Hello", card->cid.mfg_id, card->cid.oem_id, card->cid.name);
+    snprintf(data, 64, "%s %d %d %s!\n", "Hello", card->cid.mfg_id, card->cid.oem_id, card->cid.name);
     err = write_text_file(file_hello, data);
     if (err != ESP_OK) {
         return -1;
-    }*/
+    }
 
     const char *file_foo = MOUNT_POINT"/foo.txt";
 
@@ -215,3 +211,4 @@ static esp_err_t example_file_actions()
     list_dir(MOUNT_POINT);
     return ESP_OK;
 }
+*/
