@@ -23,6 +23,7 @@ esp_err_t console_init()
     register_led_cmd();
     register_scd4x_cmd();
     register_wifi_cmd();
+    register_config_cmd();
 
     repl_config.prompt = "MS>";
     repl_config.max_cmdline_length = 256;

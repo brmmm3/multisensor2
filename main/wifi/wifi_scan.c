@@ -3,7 +3,9 @@
 #include "freertos/event_groups.h"
 #include "esp_wifi.h"
 #include "esp_log.h"
+
 #include "include/wifi.h"
+#include "ui/include/ui_config.h"
 
 #define DEFAULT_SCAN_LIST_SIZE 10
 
@@ -14,6 +16,11 @@ static uint8_t channel_list[CHANNEL_LIST_SIZE] = {1, 6, 11};
 #endif /*CONFIG_EXAMPLE_USE_SCAN_CHANNEL_BITMAP*/
 
 static const char *TAG = "WiFi";
+
+static lv_obj_t *selected_btn = NULL;
+static const char *selected_ssid = NULL;
+static lv_style_t style_selected;
+static bool style_initialized = false;
 
 
 static void print_auth_mode(int authmode)
@@ -133,6 +140,43 @@ static void print_cipher_type(int pairwise_cipher, int group_cipher)
     }
 }
 
+static void wifi_selected_cb(lv_event_t *e)
+{
+    lv_obj_t *btn = lv_event_get_target(e);
+    lv_obj_t *list = lv_obj_get_parent(btn);
+    if (selected_btn && selected_btn != btn) {
+        lv_obj_remove_style(selected_btn, &style_selected, 0);
+    }
+    if (selected_btn == btn) {
+        lv_obj_remove_style(btn, &style_selected, 0);
+        selected_btn = NULL;
+        selected_ssid = NULL;
+        wifi_uninit();
+    } else {
+        if (!style_initialized) {
+            lv_style_init(&style_selected);
+            lv_style_set_bg_color(&style_selected, lv_palette_main(LV_PALETTE_BLUE));  // Your color
+            lv_style_set_bg_opa(&style_selected, LV_OPA_COVER);
+            // Optional: text color, border, etc.
+            lv_style_set_text_color(&style_selected, lv_color_white());
+            style_initialized = true;
+        }
+        lv_obj_add_style(btn, &style_selected, 0);
+        selected_btn = btn;
+        selected_ssid = lv_list_get_button_text(list, btn);
+        config->auto_connect = 0;
+        while (config->auto_connect < 4) {
+            if (strcmp(selected_ssid, config->nvs.wifi.ssid[config->auto_connect]) == 0) {
+                if (wifi_init() == ESP_OK) {
+                    config_write();
+                }
+                break;
+            }
+            config->auto_connect++;
+        }
+    }
+}
+
 /* Initialize Wi-Fi as sta and set scan method */
 void wifi_scan(void)
 {
@@ -141,6 +185,10 @@ void wifi_scan(void)
     uint16_t ap_count = 0;
     memset(ap_info, 0, sizeof(ap_info));
 
+    ui_list_clear(ui->lst_wifi);
+    selected_ssid = NULL;
+    if (!wifi_initialized()) wifi_init();
+    ui_set_label_text(ui->lbl_wifi_status1, "Scanning...");
     ESP_LOGI(TAG, "Start WiFi scan");
     set_scanning(true);
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
@@ -174,6 +222,9 @@ void wifi_scan(void)
             print_cipher_type(ap_info[i].pairwise_cipher, ap_info[i].group_cipher);
         }
         ESP_LOGI(TAG, "Channel \t\t%d", ap_info[i].primary);
+        lv_obj_t *btn = ui_list_add(ui->lst_wifi, NULL, (const char *)ap_info[i].ssid);
+        lv_obj_add_event_cb(btn, wifi_selected_cb, LV_EVENT_CLICKED, NULL);
     }
     set_scanning(false);
+    ui_set_label_text(ui->lbl_wifi_status1, "Select network");
 }

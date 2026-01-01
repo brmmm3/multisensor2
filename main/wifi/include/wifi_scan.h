@@ -9,7 +9,6 @@
 
 #pragma once
 
-#include "esp_err.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -17,16 +16,8 @@ extern "C" {
 #include <stdint.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "wifi_sntp.h"
-#include "wifi_scan.h"
 
-esp_err_t wifi_init();
-
-void wifi_uninit();
-
-bool wifi_initialized();
-
-void set_scanning(bool scanning);
+void wifi_scan(void);
 
 #ifdef __cplusplus
 };

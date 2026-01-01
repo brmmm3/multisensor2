@@ -1,4 +1,5 @@
 #include <string.h>
+#include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "esp_wifi.h"
@@ -6,6 +7,8 @@
 #include "esp_event.h"
 #include "include/wifi_sntp.h"
 #include "config.h"
+#include "ui/include/ui.h"
+#include "ui/include/ui_config.h"
 #include "include/wifi.h"
 
 #define ESP_MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
@@ -32,6 +35,10 @@
 #define WIFI_FAIL_BIT      BIT1
 
 static const char *TAG = "WiFi";
+
+static esp_event_handler_instance_t instance_any_id;
+static esp_event_handler_instance_t instance_got_ip;
+static esp_netif_t *netif = NULL;
 
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
@@ -64,18 +71,14 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 
 void wifi_init_sta(void)
 {
+    ESP_LOGI(TAG,"wifi_init_sta");
+    if (netif != NULL) return;
     s_wifi_event_group = xEventGroupCreate();
-
     ESP_ERROR_CHECK(esp_netif_init());
-
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
-
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_event_loop_create_default());
+    netif = esp_netif_create_default_wifi_sta();
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    esp_event_handler_instance_t instance_any_id;
-    esp_event_handler_instance_t instance_got_ip;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
                                                         ESP_EVENT_ANY_ID,
                                                         &event_handler,
@@ -86,10 +89,29 @@ void wifi_init_sta(void)
                                                         &event_handler,
                                                         NULL,
                                                         &instance_got_ip));
+    ESP_LOGI(TAG,"wifi_init_sta DONE");
+}
+
+void wifi_deinit_sta(void)
+{
+    ESP_LOGI(TAG,"wifi_deinit_sta");
+    esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &instance_any_id);
+    esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &instance_got_ip);
+    esp_wifi_disconnect();             // break connection to AP
+    esp_wifi_stop();                   // shut down the wifi radio
+    esp_wifi_deinit();                 // release wifi resources
+    esp_netif_destroy_default_wifi(netif);
+    netif = NULL;
+    esp_event_loop_delete_default();
+    esp_netif_deinit();
+    ESP_LOGI(TAG,"wifi_deinit_sta DONE");
 }
 
 esp_err_t wifi_connect(const char *ssid, const char *password)
 {
+    ESP_LOGI(TAG, "wifi_connect %s", ssid);
+    ui_set_label_text(ui->lbl_wifi_status1, "Connecting...");
+    ui_set_label_text(ui->lbl_wifi_status2, "?");
     wifi_config_t wifi_config = {
         .sta = {
             /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (password len => 8).
@@ -108,8 +130,6 @@ esp_err_t wifi_connect(const char *ssid, const char *password)
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    ESP_LOGI(TAG, "wifi_init_sta finished.");
-
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
@@ -121,7 +141,26 @@ esp_err_t wifi_connect(const char *ssid, const char *password)
     /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually happened
      * happened. */
     if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(TAG, "connected to ap SSID:%s", ssid);
+        esp_err_t err;
+        esp_netif_ip_info_t ip_info;
+
+        ui_set_label_text(ui->lbl_wifi_status1, ssid);
+        ESP_LOGI(TAG, "Connected to SSID:%s", ssid);
+        err = esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info);
+        if (err == ESP_OK && ip_info.ip.addr != 0) {
+            /* Print the local IP address */
+            char buf[32];
+            sprintf(buf, IPSTR, IP2STR(&ip_info.ip));
+
+            ui_set_label_text(ui->lbl_wifi_status2, buf);
+            ESP_LOGI(TAG, "IP Address : %s", buf);
+            ESP_LOGI(TAG, "Subnet mask: " IPSTR, IP2STR(&ip_info.netmask));
+            ESP_LOGI(TAG, "Gateway    : " IPSTR, IP2STR(&ip_info.gw));
+            // Austria/Vienna: CET-1CEST,M3.5.0,M10.5.0/3
+            setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1);
+            tzset();
+            sntp_obtain_time();
+        }
         return ESP_OK;
     }
     if (bits & WIFI_FAIL_BIT) {
@@ -132,45 +171,37 @@ esp_err_t wifi_connect(const char *ssid, const char *password)
     return ESP_FAIL;
 }
 
-static void connect_task(void *arg)
-{
-    esp_err_t err;
-    esp_netif_ip_info_t ip_info;
-    bool connected = false;
-
-    wifi_scan();
-    for (int i = 0; i < 4; i++) {
-        char *ssid = config->nvs.wifi.ssid[i];
-        char *password = config->nvs.wifi.password[i];
-        if (strlen(ssid) > 0 && strlen(password) > 0) {
-            if (wifi_connect(ssid, password) == ESP_OK) {
-                connected = true;
-                break;
-            }
-        }
-    }
-    if (connected) {
-        err = esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info);
-        if (err == ESP_OK && ip_info.ip.addr != 0) {
-            /* Print the local IP address */
-            ESP_LOGI(TAG, "IP Address : " IPSTR, IP2STR(&ip_info.ip));
-            ESP_LOGI(TAG, "Subnet mask: " IPSTR, IP2STR(&ip_info.netmask));
-            ESP_LOGI(TAG, "Gateway    : " IPSTR, IP2STR(&ip_info.gw));
-            // Austria/Vienna: CET-1CEST,M3.5.0,M10.5.0/3
-            setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1);
-            tzset();
-            ESP_ERROR_CHECK(sntp_obtain_time());
-        }
-    }
-    vTaskDelete(NULL);
-}
-
 esp_err_t wifi_init()
 {
     ESP_LOGI(TAG, "Initialize WiFi");
     wifi_init_sta();
-    xTaskCreate(connect_task, "connect_task", 4096, NULL, configMAX_PRIORITIES - 3, NULL);
+    ui_set_switch_state(ui->sw_wifi_enable, true);
+    wifi_scan();
+
+    uint8_t auto_connect = config->auto_connect;
+    if (auto_connect < 4) {
+        char *ssid = config->nvs.wifi.ssid[auto_connect];
+        char *password = config->nvs.wifi.password[auto_connect];
+        if (strlen(ssid) > 0 && strlen(password) > 0) {
+            return wifi_connect(ssid, password);
+        }
+        return ESP_FAIL;
+    }
     return ESP_OK;
+}
+
+void wifi_uninit()
+{
+    ESP_LOGI(TAG, "Uninitialize WiFi");
+    wifi_deinit_sta();
+    ui_set_switch_state(ui->sw_wifi_enable, false);
+    ui_set_label_text(ui->lbl_wifi_status1, "-");
+    ui_set_label_text(ui->lbl_wifi_status2, "-");
+}
+
+bool wifi_initialized()
+{
+    return netif != NULL;
 }
 
 void set_scanning(bool scanning)

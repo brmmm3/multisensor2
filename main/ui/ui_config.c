@@ -9,13 +9,47 @@
 #include <string.h>
 #include <esp_log.h>
 #include <esp_wifi.h>
+#include "esp_err.h"
 #include "main.h"
-#include "include/ui_config.h"
+#include "include/ui.h"
+#include "misc/lv_types.h"
 
 static const char *TAG = "UIC";
 
 // 10MHz resolution, 1 tick = 0.1us (led strip needs a high resolution)
 #define LED_STRIP_RMT_RES_HZ  (10 * 1000 * 1000)
+
+
+void ui_set_label_text(lv_obj_t *obj, const char *text)
+{
+    lv_lock_acquire();
+    lv_label_set_text(obj, text);
+    lv_lock_release();
+}
+
+
+void ui_set_switch_state(lv_obj_t *obj, bool enabled)
+{
+    lv_lock_acquire();
+    if (enabled) {
+        lv_obj_add_state(obj, LV_STATE_CHECKED);
+    } else {
+        lv_obj_remove_state(obj, LV_STATE_CHECKED);
+    }
+    lv_lock_release();
+}
+
+
+void ui_list_clear(lv_obj_t *obj)
+{
+    lv_obj_clean(obj);
+}
+
+
+lv_obj_t *ui_list_add(lv_obj_t *obj, const char *symbol, const char *text)
+{
+    return lv_list_add_button(obj, symbol, text);
+}
 
 
 static void btn_calibrate_pressed(lv_event_t *e)
@@ -46,78 +80,56 @@ static void btn_calibrate_pressed(lv_event_t *e)
 
 static void sw_lcd_pwr_cb(lv_event_t * e)
 {
-    lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t * obj = lv_event_get_target(e);
 
-    if (code == LV_EVENT_VALUE_CHANGED) {
-        if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-            lcd_set_bg_pwr(1);
-        } else {
-            lcd_set_bg_pwr(2);
-        }
+    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
+        lcd_set_bg_pwr(1);
+    } else {
+        lcd_set_bg_pwr(2);
     }
 }
 
 static void sw_gps_pwr_cb(lv_event_t *e)
 {
-    lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t * obj = lv_event_get_target(e);
 
-    if (code == LV_EVENT_VALUE_CHANGED) {
-        if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-            gps_set_power_mode(gps, 0);
-        } else {
-            gps_set_power_mode(gps, 2);
-        }
+    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
+        gps_set_power_mode(gps, 0);
+    } else {
+        gps_set_power_mode(gps, 2);
     }
 }
 
 static void sw_wifi_pwr_cb(lv_event_t *e)
 {
-    lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t * obj = lv_event_get_target(e);
 
-    ESP_LOGI(TAG, "sw_wifi_pwr_cb %d", code);
-    if (code == LV_EVENT_VALUE_CHANGED) {
-        if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-            wifi_init();
-        } else {
-            //esp_http_client_cleanup(client); // dismiss the TCP stack
-            esp_wifi_disconnect();             // break connection to AP
-            esp_wifi_stop();                   // shut down the wifi radio
-            esp_wifi_deinit();                 // release wifi resources
-            lv_lock_acquire();
-            lv_label_set_text(ui->lbl_wifi_status, "Disconnected");
-            lv_lock_release();
-        }
+    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
+        wifi_init();
+    } else {
+        wifi_uninit();
     }
 }
 
 static void sw_sps30_pwr_cb(lv_event_t *e)
 {
-    lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t * obj = lv_event_get_target(e);
 
-    if (code == LV_EVENT_VALUE_CHANGED) {
-        if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-            sps30_stop_measurement(sps30);
-        } else {
-            sps30_start_measurement(sps30);
-        }
+    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
+        sps30_stop_measurement(sps30);
+    } else {
+        sps30_start_measurement(sps30);
     }
 }
 
 static void sw_scd4x_pwr_cb(lv_event_t *e)
 {
-    lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t * obj = lv_event_get_target(e);
 
-    if (code == LV_EVENT_VALUE_CHANGED) {
-        if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-            scd4x_power_down(scd4x);
-        } else {
-            scd4x_device_init_do(scd4x);
-        }
+    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
+        scd4x_power_down(scd4x);
+    } else {
+        scd4x_device_init_do(scd4x);
     }
 }
 

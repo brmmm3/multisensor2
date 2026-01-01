@@ -6,6 +6,7 @@
 #include "nvs_flash.h"
 #include "scd4x.h"
 #include "sdcard.h"
+#include "ui/include/ui_config.h"
 #include "ui/include/ui_update.h"
 #include "wifi/include/wifi.h"
 
@@ -297,6 +298,19 @@ static void update_task(void *arg)
 {
     ESP_LOGI(TAG, "Start main loop.");
     esp_task_wdt_add(NULL);
+
+    // Update SD-Card info
+    ensure_dir(MOUNT_POINT"/data");
+    char buf[32];
+    uint64_t bytes_total, bytes_free;
+    sd_get_info(buf, &bytes_total, &bytes_free);
+    ui_set_label_text(ui->lbl_sd_card, buf);
+    sprintf(buf, "%llu MB", bytes_free / (1024 * 1024));
+    ui_set_label_text(ui->lbl_sd_free, buf);
+    int file_count = sd_get_file_count(MOUNT_POINT"/data");
+    sprintf(buf, "%d data files", file_count);
+    ui_set_label_text(ui->lbl_sd_files, buf);
+
     while (true) {
         sensors_update();
         ui_update();
@@ -353,8 +367,8 @@ void app_main(void)
     led_init();
     sensors_init();
     rtc_init(&rtc, &bus_handle);
-    if (config->auto_connect) {
-        ESP_ERROR_CHECK(wifi_init());
+    if (config->auto_connect < 4) {
+        wifi_init();
     }
 
     xTaskCreate(update_task, "update_task", 4096, NULL, UPDATE_TASK_PRIORITY, NULL);

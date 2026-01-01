@@ -30,7 +30,7 @@ typedef struct nvs_config_s {
 
 typedef struct config_s {
     uint8_t cfg_version;  // Configuration version
-    bool auto_connect;    // Connect automatically. Try SSIDs in the order of the list below.
+    uint8_t auto_connect; // 0 base index of SSID to connect to in the known networks list. If index >3 then do not connect.
     nvs_config_t nvs;
 } config_t;
 
@@ -39,6 +39,8 @@ extern config_t *config;
 esp_err_t config_read(void);
 
 esp_err_t config_write(void);
+
+void register_config_cmd(void);
 
 #ifdef __cplusplus
 };

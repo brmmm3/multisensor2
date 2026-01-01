@@ -2,12 +2,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <dirent.h>
+#include <errno.h>
 #include "esp_vfs.h"
 #include "esp_err.h"
 #include "esp_log.h"
 
 #include "esp_vfs_fat.h"
 #include "sdmmc_cmd.h"
+#include "sd_protocol_defs.h"
 #include "sdcard.h"
 
 static const char *TAG = "SD";
@@ -165,6 +167,75 @@ int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t mis
     esp_vfs_fat_info(MOUNT_POINT, &bytes_total, &bytes_free);
     ESP_LOGI(TAG, "FAT FS: %" PRIu64 " kB total, %" PRIu64 " kB free", bytes_total / 1024, bytes_free / 1024);
     return host.slot;
+}
+
+esp_err_t sd_get_info(char *buf, uint64_t *bytes_total, uint64_t *bytes_free)
+{
+    const char* type;
+
+    if (card->is_sdio) {
+        type = "SDIO";
+    } else if (card->is_mmc) {
+        type = "MMC";
+    } else {
+        if ((card->ocr & SD_OCR_SDHC_CAP) == 0) {
+            type = "SDSC";
+        } else {
+            if (card->ocr & SD_OCR_S18_RA) {
+                type = "SDHC/SDXC (UHS-I)";
+            } else {
+                type = "SDHC";
+            }
+        }
+    }
+    uint64_t size = ((uint64_t) card->csd.capacity) * card->csd.sector_size / (1024 * 1024 * 1024);
+    sprintf(buf, "%s (%s) %llu GB", card->cid.name, type, size);
+    return esp_vfs_fat_info(MOUNT_POINT, bytes_total, bytes_free);
+}
+
+int sd_get_file_count(const char *path)
+{
+    int file_count = 0;
+
+    DIR *dir = opendir(path);
+    if (dir == NULL) {
+        ESP_LOGE(TAG, "Failed to open directory %s", path);
+        return -1;
+    }
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        // Skip "." and ".." entries
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        if (entry->d_type != DT_DIR) {
+            file_count++;
+        }
+    }
+    closedir(dir);
+    return file_count;
+}
+
+esp_err_t ensure_dir(const char *path)
+{
+    struct stat st;
+    
+    if (stat(path, &st) == 0) {
+        // Path exists
+        if (S_ISDIR(st.st_mode)) {
+            return ESP_OK;  // Already a directory
+        } else {
+            ESP_LOGE(TAG, "Path exists but is not a directory: %s", path);
+            return ESP_ERR_INVALID_STATE;
+        }
+    }
+    // Directory does not exist → create it
+    if (mkdir(path, 0755) == 0) {  // 0755 = rwxr-xr-x permissions
+        return ESP_OK;
+    }
+    ESP_LOGE(TAG, "Failed to create directory %s (errno: %d)", path, errno);
+    return ESP_FAIL;
 }
 
 /*static esp_err_t example_file_actions()

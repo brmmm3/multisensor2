@@ -46,10 +46,16 @@ typedef struct ui_s {
     // Tab WiFi
     lv_obj_t *tab_wifi;
     lv_obj_t *sw_wifi_enable;
-    lv_obj_t *lbl_wifi_status;
+    lv_obj_t *lbl_wifi_status1;
+    lv_obj_t *lbl_wifi_status2;
+    lv_obj_t *lst_wifi;
     // Tab SD-Card
     lv_obj_t *tab_sd;
-    lv_obj_t *sw_record_enable;
+    lv_obj_t *sw_record;
+    lv_obj_t *sw_auto_record;
+    lv_obj_t *lbl_sd_card;
+    lv_obj_t *lbl_sd_free;
+    lv_obj_t *lbl_sd_files;
     // Tab Config
     lv_obj_t *tab_cfg;
     lv_obj_t *lbl_adxl345;

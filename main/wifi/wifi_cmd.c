@@ -13,60 +13,19 @@
 #include "argtable3/argtable3.h"
 #include "esp_pm.h"
 #include "esp_private/esp_clk.h"
+#include "config.h"
 
-#define MAX_RECONNECT_TIMES (5)
+#include "include/wifi.h"
+#include "include/wifi_cmd.h"
 
 const static char *TAG = "WIFI";
+
 static int s_reconnect_times = 0;
 
 
-static void wifi_event_any_handler(void* arg, esp_event_base_t event_base,
-                                int32_t event_id, void* event_data)
-{
-    ESP_LOGI(TAG, "WiFi event: 0x%"PRIx32, event_id);
-}
-
-static void wifi_event_disconnected_handler(void* arg, esp_event_base_t event_base,
-                                int32_t event_id, void* event_data)
-{
-    ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED");
-    if (s_reconnect_times++ < MAX_RECONNECT_TIMES) {
-        esp_wifi_connect();
-    } else {
-        ESP_LOGE(TAG, "MAX RECONNECT TIME, STOP!");
-    }
-}
-
-static void wifi_event_connected_handler(void* arg, esp_event_base_t event_base,
-                                int32_t event_id, void* event_data)
-{
-    ESP_LOGI(TAG, "WIFI_EVENT_STA_CONNECTED");
-    s_reconnect_times = 0;
-}
-
-
-static void ip_event_got_ip_handler(void* arg, esp_event_base_t event_base,
-                                int32_t event_id, void* event_data)
-{
-    ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-    ESP_LOGI(TAG, "STA_GOT_IP:" IPSTR, IP2STR(&event->ip_info.ip));
-}
-
 static int initialize_wifi(int argc, char **argv)
 {
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_any_handler, NULL);
-    esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, wifi_event_disconnected_handler, NULL);
-    esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, wifi_event_connected_handler, NULL);
-    esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, ip_event_got_ip_handler, NULL);
-
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
-    ESP_ERROR_CHECK(esp_wifi_start() );
-    /* always enable wifi sleep */
-    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MIN_MODEM));
-    ESP_LOGI(TAG, "initialize_wifi DONE.");
+    wifi_init();
     return 0;
 }
 
@@ -77,6 +36,25 @@ static void register_wifi_init(void)
         .help = "Initialize WiFi",
         .hint = NULL,
         .func = &initialize_wifi,
+        .argtable = NULL
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+
+static int uninitialize_wifi(int argc, char **argv)
+{
+    wifi_uninit();
+    return 0;
+}
+
+static void register_wifi_uninit(void)
+{
+    const esp_console_cmd_t cmd = {
+        .command = "wifi_uninit",
+        .help = "Uninitialize WiFi",
+        .hint = NULL,
+        .func = &uninitialize_wifi,
         .argtable = NULL
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
@@ -133,22 +111,22 @@ static int cmd_do_ap_set(int argc, char **argv)
 }
 
 
-static void register_ap_set(void)
+static void register_wifi_set_ap(void)
 {
     ap_set_args.ssid = arg_str1(NULL, NULL, "<ssid>", "SSID of AP");
     ap_set_args.password = arg_str0(NULL, NULL, "<pass>", "password of AP");
     ap_set_args.authmode = arg_int0("a", "authmode", "<authmode>", "wifi auth type (ie. open | wep| wpa2 | wpa2_enterprise)");
     ap_set_args.channel = arg_int0("n", "channel", "<channel>", "channel of AP");
     ap_set_args.max_conn = arg_int0("m", "max_conn", "<max_conn>", "Max station number, default: 2");
-    ap_set_args.end = arg_end(2);
+    ap_set_args.end = arg_end(5);
     const esp_console_cmd_t cmd = {
-        .command = "ap_set",
+        .command = "wifi_set_ap",
         .help = "WiFi is ap mode, set ap config.",
         .hint = NULL,
         .func = &cmd_do_ap_set,
         .argtable = &ap_set_args
     };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 
 }
 
@@ -197,72 +175,128 @@ static int cmd_do_sta_connect(int argc, char **argv)
     return 0;
 }
 
-static void register_sta_connect(void)
+static void register_wifi_connect(void)
 {
     connect_args.ssid = arg_str1(NULL, NULL, "<ssid>", "SSID of AP");
     connect_args.password = arg_str0(NULL, NULL, "<pass>", "password of AP");
     connect_args.channel = arg_int0("n", "channel", "<channel>", "channel of AP");
-    connect_args.end = arg_end(2);
+    connect_args.end = arg_end(3);
     const esp_console_cmd_t cmd = {
-        .command = "sta_connect",
+        .command = "wifi_connect",
         .help = "WiFi is station mode, join specified soft-AP",
         .hint = NULL,
         .func = &cmd_do_sta_connect,
         .argtable = &connect_args
     };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
 
 typedef struct {
-    struct arg_str *type;
+    struct arg_int *type;
     struct arg_end *end;
 } light_sleep_args_t;
 static light_sleep_args_t sleep_args;
 
-static int cmd_do_light_sleep(int argc, char **argv)
+static int cmd_do_wifi_light_sleep(int argc, char **argv)
 {
     int nerrors = arg_parse(argc, argv, (void **) &sleep_args);
     if (nerrors != 0) {
         arg_print_errors(stderr, sleep_args.end, argv[0]);
         return 1;
     }
-    const char *sleep_type = sleep_args.type->sval[0];
-    if (!strcmp(sleep_type, "enable")) {
+    if (sleep_args.type->count > 0) {
+        int enabled = sleep_args.type->ival[0] != 0;
         esp_pm_config_t pm_config = {
             .max_freq_mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ,
             .min_freq_mhz = esp_clk_xtal_freq() / 1000000,
-            .light_sleep_enable = true,
+            .light_sleep_enable = enabled,
         };
         ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
-        ESP_LOGI(TAG, "LIGHT_SLEEP_ENABLED,OK");
-    } else {
-        ESP_LOGE(TAG, "invaild arg!");
-        return 1;
+        ESP_LOGI(TAG, "WIFI_LIGHT_SLEEP %d", enabled);
     }
-
     return 0;
 }
 
 
-static void register_light_sleep(void)
+static void register_wifi_light_sleep(void)
 {
-    sleep_args.type = arg_str1(NULL, NULL, "<type>", "light sleep mode: enable");
-    sleep_args.end = arg_end(2);
+    sleep_args.type = arg_int1(NULL, NULL, "<type>", "light sleep mode: 0|1");
+    sleep_args.end = arg_end(1);
     const esp_console_cmd_t cmd = {
-        .command = "light_sleep",
+        .command = "wifi_light_sleep",
         .help = "Config light sleep mode",
         .hint = NULL,
-        .func = &cmd_do_light_sleep,
+        .func = &cmd_do_wifi_light_sleep,
         .argtable = &sleep_args,
     };
-    ESP_ERROR_CHECK( esp_console_cmd_register(&cmd) );
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+
+typedef struct {
+    struct arg_int *type;
+    struct arg_end *end;
+} powersave_args_t;
+static powersave_args_t powersave_args;
+
+static int cmd_do_wifi_powersave(int argc, char **argv)
+{
+    int nerrors = arg_parse(argc, argv, (void **) &sleep_args);
+    if (nerrors != 0) {
+        arg_print_errors(stderr, sleep_args.end, argv[0]);
+        return 1;
+    }
+    if (powersave_args.type->count > 0) {
+        int mode = powersave_args.type->ival[0];
+        esp_err_t err = esp_wifi_set_ps(mode);  // Or WIFI_PS_MAX_MODEM / WIFI_PS_NONE
+        ESP_LOGI(TAG, "WIFI_POWERSAVE mode=%d err=%d", mode, err);
+    }
+    return 0;
+}
+
+
+static void register_wifi_powersave(void)
+{
+    powersave_args.type = arg_int1(NULL, NULL, "<type>", "powersave mode: 0|1|2");
+    powersave_args.end = arg_end(1);
+    const esp_console_cmd_t cmd = {
+        .command = "wifi_powersave",
+        .help = "Config powersave mode",
+        .hint = NULL,
+        .func = &cmd_do_wifi_powersave,
+        .argtable = &powersave_args,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+
+static int cmd_do_wifi_scan(int argc, char **argv)
+{
+    wifi_scan();
+    return 0;
+}
+
+
+static void register_wifi_scan(void)
+{
+    const esp_console_cmd_t cmd = {
+        .command = "wifi_scan",
+        .help = "Scan WiFi",
+        .hint = NULL,
+        .func = &cmd_do_wifi_scan,
+        .argtable = NULL,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
 void register_wifi_cmd(void)
 {
     register_wifi_init();
-    register_ap_set();
-    register_sta_connect();
-    register_light_sleep();
+    register_wifi_uninit();
+    register_wifi_set_ap();
+    register_wifi_connect();
+    register_wifi_light_sleep();
+    register_wifi_powersave();
+    register_wifi_scan();
 }

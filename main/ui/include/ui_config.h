@@ -16,6 +16,14 @@ extern "C" {
 #include <esp_lvgl_port.h>
 #include "main.h"
 
+void ui_set_label_text(lv_obj_t *obj, const char *text);
+
+void ui_set_switch_state(lv_obj_t *obj, bool enabled);
+
+void ui_list_clear(lv_obj_t *obj);
+
+lv_obj_t *ui_list_add(lv_obj_t *obj, const char *symbol, const char *text);
+
 void ui_register_callbacks(ui_t *ui);
 
 #ifdef __cplusplus

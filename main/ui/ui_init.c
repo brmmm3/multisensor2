@@ -6,13 +6,11 @@
 
 // This demo UI is adapted from LVGL official example: https://docs.lvgl.io/master/examples.html#loader-with-arc
 
-#include "core/lv_obj_event.h"
 #include "core/lv_obj_style.h"
 #include "esp_log.h"
 
 #include "misc/lv_area.h"
 #include "misc/lv_color.h"
-#include "misc/lv_event.h"
 #include "misc/lv_palette.h"
 #include "widgets/label/lv_label.h"
 
@@ -247,19 +245,18 @@ lv_obj_t *add_page_gps(ui_t *ui)
 {
     lv_obj_t *tab = add_tab(ui->tbv_main, "GPS");
     lv_obj_t *sec_date = add_section(tab, 0, 0, 320, 30, 64, "Date");
-    lv_obj_t *sec_time = add_section(tab, 0, 28, 320, 30, 64, "Time");
-    lv_obj_t *sec_lat = add_section(tab, 0, 56, 320, 30, 64, "Lat");
-    lv_obj_t *sec_lng = add_section(tab, 0, 84, 320, 30, 64, "Lng");
-    lv_obj_t *sec_alt = add_section(tab, 0, 112, 320, 30, 64, "Alt");
-    lv_obj_t *sec_speed = add_section(tab, 0, 140, 320, 30, 64, "Speed");
-    lv_obj_t *sec_sats = add_section(tab, 0, 168, 320, 30, 64, "Sats");
-
     ui->lbl_gps_date = add_label(lv_obj_get_child(sec_date, 0), 8, 0);
+    lv_obj_t *sec_time = add_section(tab, 0, 28, 320, 30, 64, "Time");
     ui->lbl_gps_time = add_label(lv_obj_get_child(sec_time, 0), 8, 0);
+    lv_obj_t *sec_lat = add_section(tab, 0, 56, 320, 30, 64, "Lat");
     ui->lbl_gps_lat = add_label(lv_obj_get_child(sec_lat, 0), 8, 0);
+    lv_obj_t *sec_lng = add_section(tab, 0, 84, 320, 30, 64, "Lng");
     ui->lbl_gps_lng = add_label(lv_obj_get_child(sec_lng, 0), 8, 0);
+    lv_obj_t *sec_alt = add_section(tab, 0, 112, 320, 30, 64, "Alt");
     ui->lbl_gps_alt = add_label(lv_obj_get_child(sec_alt, 0), 8, 0);
+    lv_obj_t *sec_speed = add_section(tab, 0, 140, 320, 30, 64, "Speed");
     ui->lbl_gps_speed = add_label(lv_obj_get_child(sec_speed, 0), 8, 0);
+    lv_obj_t *sec_sats = add_section(tab, 0, 168, 320, 30, 64, "Sats");
     ui->lbl_gps_sats = add_label(lv_obj_get_child(sec_sats, 0), 8, 0);
     return tab;
 }
@@ -267,21 +264,31 @@ lv_obj_t *add_page_gps(ui_t *ui)
 lv_obj_t *add_page_wifi(ui_t *ui)
 {
     lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_WIFI);
-
     add_label_text(tab, 0, 0, "Enable", lv_color_black());
-
     ui->sw_wifi_enable = add_switch(tab, 260, 00, 60, 30);
-    ui->lbl_wifi_status = add_label_text(tab, 0, 28, "-", lv_color_black());
+    lv_obj_t *sec_wifi_status1 = add_section(tab, 0, 30, 320, 30, 64, "Network");
+    ui->lbl_wifi_status1 = add_label(lv_obj_get_child(sec_wifi_status1, 0), 8, 0);
+    lv_obj_t *sec_wifi_status2 = add_section(tab, 0, 60, 320, 30, 64, "IP");
+    ui->lbl_wifi_status2 = add_label(lv_obj_get_child(sec_wifi_status2, 0), 8, 0);
+    ui->lst_wifi = lv_list_create(tab);
+    lv_obj_set_pos(ui->lst_wifi, 0, 90);
+    lv_obj_set_size(ui->lst_wifi, 320, 120);
     return tab;
 }
 
 lv_obj_t *add_page_sd(ui_t *ui)
 {
     lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_SD_CARD);
-
     add_label_text(tab, 0, 0, "Record", lv_color_black());
-
-    ui->sw_record_enable = add_switch(tab, 260, 00, 60, 30);
+    ui->sw_record = add_switch(tab, 260, 0, 60, 30);
+    add_label_text(tab, 0, 30, "Auto Record", lv_color_black());
+    ui->sw_auto_record = add_switch(tab, 260, 30, 60, 30);
+    lv_obj_t *sec_sd_card = add_section(tab, 0, 60, 320, 30, 64, "SD-Card");
+    ui->lbl_sd_card = add_label(lv_obj_get_child(sec_sd_card, 0), 8, 0);
+    lv_obj_t *sec_sd_free = add_section(tab, 0, 90, 320, 30, 64, "Free");
+    ui->lbl_sd_free = add_label(lv_obj_get_child(sec_sd_free, 0), 8, 0);
+    lv_obj_t *sec_sd_files = add_section(tab, 0, 120, 320, 30, 64, "Files");
+    ui->lbl_sd_files = add_label(lv_obj_get_child(sec_sd_files, 0), 8, 0);
     return tab;
 }
 

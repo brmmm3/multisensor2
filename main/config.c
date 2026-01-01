@@ -1,5 +1,6 @@
 #include <nvs.h>
 #include "esp_log.h"
+#include "esp_console.h"
 #include "sdcard.h"
 #include "config.h"
 
@@ -60,4 +61,29 @@ esp_err_t config_write(void)
     }
     memcpy(&nvs, &config->nvs, sizeof(nvs_config_t));
     return err;
+}
+
+static int cmd_do_config_write(int argc, char **argv)
+{
+    esp_err_t err = config_write();
+    ESP_LOGI(TAG, "Config written: %d", err);
+    return 0;
+}
+
+
+static void register_config_write(void)
+{
+    const esp_console_cmd_t cmd = {
+        .command = "config_write",
+        .help = "Write Config file",
+        .hint = NULL,
+        .func = &cmd_do_config_write,
+        .argtable = NULL,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+void register_config_cmd(void)
+{
+    register_config_write();
 }
