@@ -16,7 +16,7 @@
 #include "misc/lv_palette.h"
 #include "widgets/label/lv_label.h"
 
-#include "ui.h"
+#include "include/ui.h"
 
 static const char *TAG = "UII";
 

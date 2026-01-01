@@ -2,9 +2,9 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_sntp.h"
-#include "wifi_sntp.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "include/wifi_sntp.h"
 
 static const char *TAG = "SNTP";
 
@@ -15,9 +15,7 @@ void time_sync_notification_cb(struct timeval *tv)
 {
 	ESP_LOGI(TAG, "Notification of a time synchronization event");
     ESP_LOGI(TAG, "Waiting for adjusting time ... outdelta = %jd sec: %li ms: %li us",
-                        (intmax_t)tv->tv_sec,
-                        tv->tv_usec / 1000,
-                        tv->tv_usec % 1000);
+		(intmax_t)tv->tv_sec, tv->tv_usec / 1000, tv->tv_usec % 1000);
     time_t now;
     char strftime_buf[64];
 

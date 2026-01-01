@@ -8,8 +8,9 @@
 
 #include <string.h>
 #include <esp_log.h>
+#include <esp_wifi.h>
 #include "main.h"
-#include "ui_config.h"
+#include "include/ui_config.h"
 
 static const char *TAG = "UIC";
 

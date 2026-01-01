@@ -6,9 +6,9 @@
 
 // This demo UI is adapted from LVGL official example: https://docs.lvgl.io/master/examples.html#loader-with-arc
 
-#include "ui_update.h"
 #include "lcd.h"
 #include "main.h"
+#include "include/ui_update.h"
 
 //static const char *TAG = "UIU";
 

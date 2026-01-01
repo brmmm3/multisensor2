@@ -1,195 +1,179 @@
-/* Scan Example
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
-
-/*
-    This example shows how to scan for available set of APs.
-*/
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "esp_wifi.h"
 #include "esp_log.h"
 #include "esp_event.h"
-#include "nvs_flash.h"
-#include "regex.h"
+#include "include/wifi_sntp.h"
+#include "config.h"
+#include "include/wifi.h"
 
-#define DEFAULT_SCAN_LIST_SIZE 10
+#define ESP_MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
 
-#ifdef CONFIG_EXAMPLE_USE_SCAN_CHANNEL_BITMAP
-#define USE_CHANNEL_BITMAP 1
-#define CHANNEL_LIST_SIZE 3
-static uint8_t channel_list[CHANNEL_LIST_SIZE] = {1, 6, 11};
-#endif /*CONFIG_EXAMPLE_USE_SCAN_CHANNEL_BITMAP*/
+#if CONFIG_ESP_WPA3_SAE_PWE_HUNT_AND_PECK
+#define ESP_WIFI_SAE_MODE WPA3_SAE_PWE_HUNT_AND_PECK
+#define EXAMPLE_H2E_IDENTIFIER ""
+#elif CONFIG_ESP_WPA3_SAE_PWE_HASH_TO_ELEMENT
+#define ESP_WIFI_SAE_MODE WPA3_SAE_PWE_HASH_TO_ELEMENT
+#define EXAMPLE_H2E_IDENTIFIER CONFIG_ESP_WIFI_PW_ID
+#elif CONFIG_ESP_WPA3_SAE_PWE_BOTH
+#define ESP_WIFI_SAE_MODE WPA3_SAE_PWE_BOTH
+#define EXAMPLE_H2E_IDENTIFIER CONFIG_ESP_WIFI_PW_ID
+#endif
 
-static const char *TAG = "scan";
+#define ESP_WIFI_SAE_MODE WPA3_SAE_PWE_UNSPECIFIED
+#define EXAMPLE_H2E_IDENTIFIER ""
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA_WPA2_PSK
 
-static void print_auth_mode(int authmode)
+/* The event group allows multiple bits for each event, but we only care about two events:
+ * - we are connected to the AP with an IP
+ * - we failed to connect after the maximum amount of retries */
+#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_FAIL_BIT      BIT1
+
+static const char *TAG = "WiFi";
+
+/* FreeRTOS event group to signal when we are connected*/
+static EventGroupHandle_t s_wifi_event_group;
+static int s_retry_num = 0;
+static bool is_scanning = false;
+
+
+static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
-    switch (authmode) {
-    case WIFI_AUTH_OPEN:
-        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_OPEN");
-        break;
-    case WIFI_AUTH_OWE:
-        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_OWE");
-        break;
-    case WIFI_AUTH_WEP:
-        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WEP");
-        break;
-    case WIFI_AUTH_WPA_PSK:
-        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WPA_PSK");
-        break;
-    case WIFI_AUTH_WPA2_PSK:
-        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WPA2_PSK");
-        break;
-    case WIFI_AUTH_WPA_WPA2_PSK:
-        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WPA_WPA2_PSK");
-        break;
-    case WIFI_AUTH_ENTERPRISE:
-        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_ENTERPRISE");
-        break;
-    case WIFI_AUTH_WPA3_PSK:
-        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WPA3_PSK");
-        break;
-    case WIFI_AUTH_WPA2_WPA3_PSK:
-        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WPA2_WPA3_PSK");
-        break;
-    case WIFI_AUTH_WPA3_ENTERPRISE:
-        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WPA3_ENTERPRISE");
-        break;
-    case WIFI_AUTH_WPA2_WPA3_ENTERPRISE:
-        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WPA2_WPA3_ENTERPRISE");
-        break;
-    case WIFI_AUTH_WPA3_ENT_192:
-        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WPA3_ENT_192");
-        break;
-    default:
-        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_UNKNOWN");
-        break;
+    if (is_scanning) return;
+    ESP_LOGI(TAG, "event_handler: %d %d %s", s_retry_num, event_id, event_base);
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        esp_wifi_connect();
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        if (s_retry_num < ESP_MAXIMUM_RETRY) {
+            esp_wifi_connect();
+            s_retry_num++;
+            ESP_LOGI(TAG, "retry to connect to the AP");
+        } else {
+            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+        }
+        ESP_LOGE(TAG,"connect to the AP fail");
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+        s_retry_num = 0;
+        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
 
-static void print_cipher_type(int pairwise_cipher, int group_cipher)
+void wifi_init_sta(void)
 {
-    switch (pairwise_cipher) {
-    case WIFI_CIPHER_TYPE_NONE:
-        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_NONE");
-        break;
-    case WIFI_CIPHER_TYPE_WEP40:
-        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_WEP40");
-        break;
-    case WIFI_CIPHER_TYPE_WEP104:
-        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_WEP104");
-        break;
-    case WIFI_CIPHER_TYPE_TKIP:
-        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_TKIP");
-        break;
-    case WIFI_CIPHER_TYPE_CCMP:
-        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_CCMP");
-        break;
-    case WIFI_CIPHER_TYPE_TKIP_CCMP:
-        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_TKIP_CCMP");
-        break;
-    case WIFI_CIPHER_TYPE_AES_CMAC128:
-        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_AES_CMAC128");
-        break;
-    case WIFI_CIPHER_TYPE_SMS4:
-        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_SMS4");
-        break;
-    case WIFI_CIPHER_TYPE_GCMP:
-        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_GCMP");
-        break;
-    case WIFI_CIPHER_TYPE_GCMP256:
-        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_GCMP256");
-        break;
-    default:
-        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_UNKNOWN");
-        break;
-    }
+    s_wifi_event_group = xEventGroupCreate();
 
-    switch (group_cipher) {
-    case WIFI_CIPHER_TYPE_NONE:
-        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_NONE");
-        break;
-    case WIFI_CIPHER_TYPE_WEP40:
-        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_WEP40");
-        break;
-    case WIFI_CIPHER_TYPE_WEP104:
-        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_WEP104");
-        break;
-    case WIFI_CIPHER_TYPE_TKIP:
-        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_TKIP");
-        break;
-    case WIFI_CIPHER_TYPE_CCMP:
-        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_CCMP");
-        break;
-    case WIFI_CIPHER_TYPE_TKIP_CCMP:
-        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_TKIP_CCMP");
-        break;
-    case WIFI_CIPHER_TYPE_SMS4:
-        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_SMS4");
-        break;
-    case WIFI_CIPHER_TYPE_GCMP:
-        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_GCMP");
-        break;
-    case WIFI_CIPHER_TYPE_GCMP256:
-        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_GCMP256");
-        break;
-    default:
-        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_UNKNOWN");
-        break;
-    }
-}
-
-/* Initialize Wi-Fi as sta and set scan method */
-void wifi_scan(void)
-{
     ESP_ERROR_CHECK(esp_netif_init());
+
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
-    assert(sta_netif);
+    esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    uint16_t number = DEFAULT_SCAN_LIST_SIZE;
-    wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE];
-    uint16_t ap_count = 0;
-    memset(ap_info, 0, sizeof(ap_info));
+    esp_event_handler_instance_t instance_any_id;
+    esp_event_handler_instance_t instance_got_ip;
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
+                                                        ESP_EVENT_ANY_ID,
+                                                        &event_handler,
+                                                        NULL,
+                                                        &instance_any_id));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
+                                                        IP_EVENT_STA_GOT_IP,
+                                                        &event_handler,
+                                                        NULL,
+                                                        &instance_got_ip));
+}
 
+esp_err_t wifi_connect(const char *ssid, const char *password)
+{
+    wifi_config_t wifi_config = {
+        .sta = {
+            /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (password len => 8).
+             * If you want to connect the device to deprecated WEP/WPA networks, Please set the threshold value
+             * to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format matching to
+             * WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK standards.
+             */
+            .threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD,
+            .sae_pwe_h2e = ESP_WIFI_SAE_MODE,
+            .sae_h2e_identifier = EXAMPLE_H2E_IDENTIFIER,
+        },
+    };
+    strncpy((char *)wifi_config.sta.ssid, ssid, 32);
+    strncpy((char *)wifi_config.sta.password, password, 64);
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-#ifdef USE_CHANNEL_BITMAP
-    wifi_scan_config_t *scan_config = (wifi_scan_config_t *)calloc(1, sizeof(wifi_scan_config_t));
-    if (!scan_config) {
-        ESP_LOGE(TAG, "Memory Allocation for scan config failed!");
-        return;
+    ESP_LOGI(TAG, "wifi_init_sta finished.");
+
+    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
+     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
+    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
+            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+            pdFALSE,
+            pdFALSE,
+            portMAX_DELAY);
+
+    /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually happened
+     * happened. */
+    if (bits & WIFI_CONNECTED_BIT) {
+        ESP_LOGI(TAG, "connected to ap SSID:%s", ssid);
+        return ESP_OK;
     }
-    array_2_channel_bitmap(channel_list, CHANNEL_LIST_SIZE, scan_config);
-    esp_wifi_scan_start(scan_config, true);
-    free(scan_config);
+    if (bits & WIFI_FAIL_BIT) {
+        ESP_LOGI(TAG, "Failed to connect to SSID:%s", ssid);
+    } else {
+        ESP_LOGE(TAG, "UNEXPECTED EVENT %x", bits);
+    }
+    return ESP_FAIL;
+}
 
-#else
-    esp_wifi_scan_start(NULL, true);
-#endif /*USE_CHANNEL_BITMAP*/
+static void connect_task(void *arg)
+{
+    esp_err_t err;
+    esp_netif_ip_info_t ip_info;
+    bool connected = false;
 
-    ESP_LOGI(TAG, "Max AP number ap_info can hold = %u", number);
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&number, ap_info));
-    ESP_LOGI(TAG, "Total APs scanned = %u, actual AP number ap_info holds = %u", ap_count, number);
-    for (int i = 0; i < number; i++) {
-        ESP_LOGI(TAG, "SSID \t\t%s", ap_info[i].ssid);
-        ESP_LOGI(TAG, "RSSI \t\t%d", ap_info[i].rssi);
-        print_auth_mode(ap_info[i].authmode);
-        if (ap_info[i].authmode != WIFI_AUTH_WEP) {
-            print_cipher_type(ap_info[i].pairwise_cipher, ap_info[i].group_cipher);
+    wifi_scan();
+    for (int i = 0; i < 4; i++) {
+        char *ssid = config->nvs.wifi.ssid[i];
+        char *password = config->nvs.wifi.password[i];
+        if (strlen(ssid) > 0 && strlen(password) > 0) {
+            if (wifi_connect(ssid, password) == ESP_OK) {
+                connected = true;
+                break;
+            }
         }
-        ESP_LOGI(TAG, "Channel \t\t%d", ap_info[i].primary);
     }
+    if (connected) {
+        err = esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info);
+        if (err == ESP_OK && ip_info.ip.addr != 0) {
+            /* Print the local IP address */
+            ESP_LOGI(TAG, "IP Address : " IPSTR, IP2STR(&ip_info.ip));
+            ESP_LOGI(TAG, "Subnet mask: " IPSTR, IP2STR(&ip_info.netmask));
+            ESP_LOGI(TAG, "Gateway    : " IPSTR, IP2STR(&ip_info.gw));
+            // Austria/Vienna: CET-1CEST,M3.5.0,M10.5.0/3
+            setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1);
+            tzset();
+            ESP_ERROR_CHECK(sntp_obtain_time());
+        }
+    }
+    vTaskDelete(NULL);
+}
+
+esp_err_t wifi_init()
+{
+    ESP_LOGI(TAG, "Initialize WiFi");
+    wifi_init_sta();
+    xTaskCreate(connect_task, "connect_task", 4096, NULL, configMAX_PRIORITIES - 3, NULL);
+    return ESP_OK;
+}
+
+void set_scanning(bool scanning)
+{
+    is_scanning = scanning;
 }

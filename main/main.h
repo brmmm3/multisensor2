@@ -34,12 +34,12 @@ extern "C" {
 
 #include "config.h"
 
-#include "wifi.h"
+#include "wifi/include/wifi.h"
 #include "rtc_tiny.h"
 #include "ftp.h"
 #include "gps.h"
 #include "lcd.h"
-#include "ui/ui.h"
+#include "ui/include/ui.h"
 #include "sdcard.h"
 #include "bmx280.h"
 #include "scd4x.h"

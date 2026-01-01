@@ -14,8 +14,14 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+esp_err_t wifi_init();
 
 void wifi_scan(void);
+
+void set_scanning(bool scanning);
 
 #ifdef __cplusplus
 };

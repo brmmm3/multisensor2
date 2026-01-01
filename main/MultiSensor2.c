@@ -3,10 +3,11 @@
 #include "gps.h"
 #include "lcd.h"
 #include "main.h"
+#include "nvs_flash.h"
 #include "scd4x.h"
 #include "sdcard.h"
-#include "ui/ui_update.h"
-#include "wifi.h"
+#include "ui/include/ui_update.h"
+#include "wifi/include/wifi.h"
 
 #include "esp_task_wdt.h"
 #include "console/console.h"
@@ -101,6 +102,20 @@ bool yys_update = false;
 bool qmc5883l_update = false;
 bool adxl345_update = false;
 
+void dump_data();
+
+
+esp_err_t nvs_init()
+{
+    ESP_LOGI(TAG, "Initialize NVS");
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        // NVS partition is truncated or version mismatch → erase and re-init
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    return ret;
+}
 
 i2c_master_bus_handle_t i2c_bus_init(uint8_t sda_io, uint8_t scl_io)
 {
@@ -151,17 +166,21 @@ void led_init(void)
     led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip);
 }
 
-void dump_data()
+void sensors_init()
 {
-    gps_dump(gps);
-    bmx280_dump(bmx280lo);
-    bmx280_dump(bmx280hi);
-    scd4x_dump(scd4x);
-    mhz19_dump(mhz19);
-    yys_dump(yys_sensor);
-    sps30_dump(sps30);
-    qmc5883l_dump(qmc5883l);
-    adxl345_dump(adxl345);
+    ESP_LOGI(TAG, "Initialize Sensors");
+    ESP_ERROR_CHECK(gps_init(&gps, GPS_UART_NUM, GPS_PIN_NUM_RX, GPS_PIN_NUM_TX));
+    gps_status = &gps->status;
+    ESP_ERROR_CHECK(adxl345_init(&adxl345, bus_handle));
+    ESP_ERROR_CHECK(bmx280_init(&bmx280lo, bus_handle, false));
+    ESP_ERROR_CHECK(bmx280_init(&bmx280hi, bus_handle, true));
+    ESP_ERROR_CHECK(mhz19_init(&mhz19, MHZ19_UART_NUM, MHZ19_PIN_NUM_RX, MHZ19_PIN_NUM_TX));
+    ESP_ERROR_CHECK(scd4x_device_init(&scd4x, bus_handle));
+    ESP_ERROR_CHECK(yys_init(&yys_sensor, YYS_PIN_NUM_RX, YYS_PIN_NUM_TX));
+    ESP_ERROR_CHECK(qmc5883l_init(&qmc5883l, bus_handle));
+    //ESP_ERROR_CHECK(tlv493_init(&tlv493, bus_handle));
+    //ESP_LOGI("TLV493D", "ChipId = %d", tlv493->device_id);
+    ESP_ERROR_CHECK(sps30_init(&sps30, bus_handle));
 }
 
 static void update_scd4x()
@@ -291,21 +310,17 @@ static void update_task(void *arg)
     }
 }
 
-void sensors_init()
+void dump_data()
 {
-    ESP_LOGI(TAG, "Initialize Sensors");
-    ESP_ERROR_CHECK(gps_init(&gps, GPS_UART_NUM, GPS_PIN_NUM_RX, GPS_PIN_NUM_TX));
-    gps_status = &gps->status;
-    ESP_ERROR_CHECK(adxl345_init(&adxl345, bus_handle));
-    ESP_ERROR_CHECK(bmx280_init(&bmx280lo, bus_handle, false));
-    ESP_ERROR_CHECK(bmx280_init(&bmx280hi, bus_handle, true));
-    ESP_ERROR_CHECK(mhz19_init(&mhz19, MHZ19_UART_NUM, MHZ19_PIN_NUM_RX, MHZ19_PIN_NUM_TX));
-    ESP_ERROR_CHECK(scd4x_device_init(&scd4x, bus_handle));
-    ESP_ERROR_CHECK(yys_init(&yys_sensor, YYS_PIN_NUM_RX, YYS_PIN_NUM_TX));
-    ESP_ERROR_CHECK(qmc5883l_init(&qmc5883l, bus_handle));
-    //ESP_ERROR_CHECK(tlv493_init(&tlv493, bus_handle));
-    //ESP_LOGI("TLV493D", "ChipId = %d", tlv493->device_id);
-    ESP_ERROR_CHECK(sps30_init(&sps30, bus_handle));
+    gps_dump(gps);
+    bmx280_dump(bmx280lo);
+    bmx280_dump(bmx280hi);
+    scd4x_dump(scd4x);
+    mhz19_dump(mhz19);
+    yys_dump(yys_sensor);
+    sps30_dump(sps30);
+    qmc5883l_dump(qmc5883l);
+    adxl345_dump(adxl345);
 }
 
 void app_main(void)
@@ -321,12 +336,13 @@ void app_main(void)
     esp_task_wdt_reconfigure(&twdt_config);
     //esp_task_wdt_deinit();
 
-    config_read();
-
+    ESP_ERROR_CHECK(nvs_init());
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
     bus_handle = i2c_bus_init(I2C_PIN_NUM_SDA, I2C_PIN_NUM_SCL);
     // SD-Card (SPI Mode)
     spi_host_id = sd_card_init(SDCARD_PIN_NUM_CS, SPI_PIN_NUM_SCLK, SPI_PIN_NUM_MOSI, SPI_PIN_NUM_MISO);
+
+    config_read();
 
     // LCD (SPI Mode)
     lcd = lcd_init(spi_host_id, LCD_PIN_NUM_CS, LCD_PIN_NUM_DC, LCD_PIN_NUM_RST, LCD_PIN_NUM_LED, LCD_PIN_NUM_T_CS);
