@@ -1,7 +1,7 @@
 
 #include "main.h"
 
-#include "debug_cmd.h"
+#include "include/debug_cmd.h"
 
 static const char *TAG = "CMD";
 
@@ -16,6 +16,11 @@ static struct {
     struct arg_int *adx;    // Debug ADXL345
     struct arg_end *end;
 } debug_cmd_args;
+
+static struct {
+    struct arg_int *value;
+    struct arg_end *end;
+} debug_main_cmd_args;
 
 
 int process_debug_cmd(int argc, char **argv)
@@ -50,6 +55,25 @@ int process_debug_cmd(int argc, char **argv)
     return 0;
 }
 
+
+int process_debug_main_cmd(int argc, char **argv)
+{
+    int nerrors = arg_parse(argc, argv, (void **)&debug_main_cmd_args);
+
+    if (nerrors != 0) {
+        arg_print_errors(stderr, debug_cmd_args.end, argv[0]);
+        return 1;
+    }
+    if (debug_main_cmd_args.value->count == 1) {
+        debug_main = debug_main_cmd_args.value->ival[0];
+    } else {
+        ESP_LOGE(TAG, "no valid arguments");
+        return 1;
+    }
+    return 0;
+}
+
+
 void register_debug_cmd()
 {
     debug_cmd_args.gps = arg_int0("g", "gps", "<0-31>", "Configure GPS debugging");
@@ -71,4 +95,17 @@ void register_debug_cmd()
     };
 
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+
+    debug_main_cmd_args.value = arg_int1(NULL, NULL, "<int>", "Configure main debugging");
+    debug_main_cmd_args.end = arg_end(1);
+
+    const esp_console_cmd_t cmd2 = {
+        .command = "debug_main",
+        .help = "configure main debugging",
+        .hint = NULL,
+        .func = &process_debug_main_cmd,
+        .argtable = &debug_main_cmd_args
+    };
+
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd2));
 }

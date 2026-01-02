@@ -1,6 +1,6 @@
 #include "main.h"
 
-#include "scd4x_cmd.h"
+#include "include/scd4x_cmd.h"
 
 static const char *TAG = "CMD";
 

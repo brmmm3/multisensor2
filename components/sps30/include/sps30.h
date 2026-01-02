@@ -58,6 +58,7 @@ typedef struct sps30_values_s {
     float nc_4p0;
     float nc_10p0;
     float typical_particle_size;
+    uint32_t status;
 } sps30_values_t;
 
 typedef struct sps30_s {
@@ -74,7 +75,6 @@ typedef struct sps30_s {
     uint16_t firmware_version;
     // Auto cleaning interval
     uint32_t autoclean_interval;
-    uint32_t status;
     sps30_values_t values;
     bool enabled;
     uint8_t debug;

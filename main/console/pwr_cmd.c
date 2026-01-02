@@ -1,7 +1,7 @@
 #include "gps.h"
 #include "main.h"
 
-#include "pwr_cmd.h"
+#include "include/pwr_cmd.h"
 
 static const char *TAG = "CMD";
 

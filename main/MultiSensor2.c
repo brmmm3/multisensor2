@@ -14,7 +14,7 @@
 #include "wifi/include/wifi.h"
 
 #include "esp_task_wdt.h"
-#include "console/console.h"
+#include "console/include/console.h"
 
 static const char *TAG = "MS2";
 
@@ -81,7 +81,7 @@ static const char *TAG = "MS2";
 #define DATA_HEADER_ID0     0xAA
 #define DATA_HEADER_ID1     0x55
 #define DATA_HEADER_VERSION 1
-#define DATA_MAX_SIZE       5000
+#define DATA_MAX_SIZE       65000
 
 rtc_t *rtc = NULL;
 gps_sensor_t *gps = NULL;
@@ -291,8 +291,8 @@ static void update_sps30()
         return;
     }
     if ((err = sps30_read_device_status_register(sps30)) == ESP_OK) {
-        if (sps30->status != 0) {
-            ESP_LOGW("SPS30", "STATUS=%08X", (unsigned int)sps30->status);
+        if (sps30->values.status != 0) {
+            ESP_LOGW("SPS30", "STATUS=%08X", (unsigned int)sps30->values.status);
         }
     } else {
         ESP_LOGE("SPS30", "Failed to read status");
@@ -330,6 +330,9 @@ static void sensors_update()
             gps_values.mode_3d = gps->status.mode_3d;
             gps_values.sats = gps->status.sats;
             gps_values.status = gps->status.status;
+            gps_values.pdop = gps->gsa.pdop;
+            gps_values.hdop = gps->gsa.hdop;
+            gps_values.vdop = gps->gsa.vdop;
             if (force_update || memcmp(&last_values.gps, &gps_values, sizeof(sensors_data_gps_t)) != 0) {
                 memcpy(&last_values.gps, &gps_values, sizeof(sensors_data_gps_t));
                 gps_update = true;
@@ -423,6 +426,7 @@ static void sensors_recording()
         return;
     }
     bool log_values = (debug_main & 2) != 0;
+    uint16_t record_pos = status.record_pos;
     uint16_t year;
     uint8_t month;
     uint8_t day;
@@ -439,42 +443,48 @@ static void sensors_recording()
         data[status.record_pos++] = year;
         data[status.record_pos++] = month;
         data[status.record_pos++] = day;
+        if (log_values) {
+            ESP_LOGI(TAG, "DATE: %02d.%02d.%02d", year, month, day);
+        }
     }
     // Add current time
     data[status.record_pos++] = E_SENSOR_TIME;
     data[status.record_pos++] = hour;
     data[status.record_pos++] = min;
     data[status.record_pos++] = sec;
+    if (log_values) {
+        ESP_LOGI(TAG, "TIME: %02d:%02d.%02d", hour, min, sec);
+    }
     if (gps_update) {
         data_add(E_SENSOR_GPS, &last_values.gps, sizeof(sensors_data_gps_t));
-        if (log_values) {
-            ESP_LOGI(TAG, "GPS: %s date=%lu time=%lu lat=%f %c lng=%f %c altitude=%f speed=%f mode_3d=%c sats=%d status=%d",
+        if (log_values || (debug_main & 4) != 0) {
+            ESP_LOGI(TAG, "GPS: %s date=%lu time=%lu lat=%f %c lng=%f %c alt=%f spd=%f mode_3d=%c sats=%d st=%d pdop=%f hdop=%f vdop=%f",
                     gps_values.sat, gps_values.date, gps_values.time, gps_values.lat, gps_values.ns, gps_values.lng,
                     gps_values.ew, gps_values.altitude, gps_values.speed, gps_values.mode_3d, gps_values.sats,
-                    gps_values.status);
+                    gps_values.status, gps_values.pdop, gps_values.hdop, gps_values.vdop);
         }
     }
     if (bmx280lo_update) {
         data_add(E_SENSOR_BMX280_LO, &last_values.bmx280lo, sizeof(sensors_data_bmx280_t));
-        if (log_values) {
+        if (log_values || (debug_main & 8) != 0) {
             sensors_data_bmx280_t *values = &last_values.bmx280lo;
-            ESP_LOGI(TAG, "BMX280LO: temp=%.1f °C  hum=%.1f  press=%.1f hPa  altitude=%.1f m",
+            ESP_LOGI(TAG, "BMX280LO: temp=%.1f °C  hum=%.1f  press=%.1f hPa  alt=%.1f m",
                     values->temperature, values->humidity, values->pressure, values->altitude);
         }
     }
     if (bmx280hi_update) {
         data_add(E_SENSOR_BMX280_HI, &last_values.bmx280hi, sizeof(sensors_data_bmx280_t));
-        if (log_values) {
+        if (log_values || (debug_main & 8) != 0) {
             sensors_data_bmx280_t *values = &last_values.bmx280hi;
-            ESP_LOGI(TAG, "BMX280HI: temp=%.1f °C  hum=%.1f  press=%.1f hPa  altitude=%.1f m",
+            ESP_LOGI(TAG, "BMX280HI: temp=%.1f °C  hum=%.1f  press=%.1f hPa  alt=%.1f m",
                     values->temperature, values->humidity, values->pressure, values->altitude);
         }
     }
     if (mhz19_update) {
         data_add(E_SENSOR_MHZ19, &last_values.mhz19, sizeof(sensors_data_mhz19_t));
-        if (log_values) {
+        if (log_values || (debug_main & 16) != 0) {
             sensors_data_mhz19_t *values = &last_values.mhz19;
-            ESP_LOGI(TAG, "MHZ19: co2=%d ppm  temp=%d °C  status=%d", values->co2, values->temp, values->status);
+            ESP_LOGI(TAG, "MHZ19: co2=%d ppm  temp=%d °C  st=%d", values->co2, values->temp, values->status);
         }
     }
     if (scd4x_calibrate) {
@@ -484,25 +494,57 @@ static void sensors_recording()
             .pressure =scd4x->pressure
         };
         data_add(E_SENSOR_SCD4XCAL, &values, sizeof(scd4x_cal_values_t));
+        if (log_values || (debug_main & 16) != 0) {
+            ESP_LOGI(TAG, "SCD4XCAL: temp_offs=%f  alt=%d  press=%d", values.temperature_offset, values.altitude, values.pressure);
+        }
     }
     if (scd4x_update) {
         data_add(E_SENSOR_SCD4X, &last_values.scd4x, sizeof(sensors_data_scd4x_t));
-        if (log_values) {
+        if (log_values || (debug_main & 16) != 0) {
             sensors_data_scd4x_t *values = &last_values.scd4x;
             ESP_LOGI(TAG, "SCD4X: co2=%d ppm  temp=%f °C  hum=%f %%", values->co2, values->temperature, values->humidity);
         }
     }
     if (yys_update) {
         data_add(E_SENSOR_YYS, &last_values.yys, sizeof(sensors_data_yys_t));
+        if (log_values || (debug_main & 32) != 0) {
+            ESP_LOGI(TAG, "YYS: o2=%f %%  co=%f ppm  h2s=%f ppm  ch4=%f ppm",
+                    yys_get_o2(yys_sensor), yys_get_co(yys_sensor),
+                    yys_get_h2s(yys_sensor), yys_get_ch4(yys_sensor));
+        }
     }
     if (sps30_update) {
         data_add(E_SENSOR_SPS30, &last_values.sps30, sizeof(sensors_data_sps30_t));
+        if (log_values || (debug_main & 64) != 0) {
+            sensors_data_sps30_t *values = &last_values.sps30;
+            ESP_LOGI(TAG, "SPS30: STATUS=%08X", (unsigned int)values->status);
+            ESP_LOGI(TAG, "PM0.5 =%.1f #/cm3", values->nc_0p5);
+            ESP_LOGI(TAG, "PM1.0 =%.1f ug/cm3 P1.0 =%.1f #/cm3", values->mc_1p0, values->nc_1p0);
+            ESP_LOGI(TAG, "PM2.5 =%.1f ug/cm3 P2.5 =%.1f #/cm3", values->mc_2p5, values->nc_2p5);
+            ESP_LOGI(TAG, "PM4.0 =%.1f ug/cm3 P4.0 =%.1f #/cm3", values->mc_4p0, values->nc_4p0);
+            ESP_LOGI(TAG, "PM10.0=%.1f ug/cm3 P10.0=%.1f #/cm3", values->mc_10p0, values->nc_10p0);
+            ESP_LOGI(TAG, "TypPartSz=%.3f um", values->typical_particle_size);
+        }
     }
     if (adxl345_update) {
         data_add(E_SENSOR_ADXL345, &last_values.adxl345, sizeof(sensors_data_adxl345_t));
+        if (log_values || (debug_main & 128) != 0) {
+            sensors_data_adxl345_t *values = &last_values.adxl345;
+            ESP_LOGI(TAG, "ADXL345: x=%f g  y=%f g  z=%f g  abs=%f g  offs=%f %f %f",
+                    values->accel_x, values->accel_y, values->accel_z, values->accel_abs,
+                    values->accel_offset_x, values->accel_offset_y, values->accel_offset_z);
+        }
     }
     if (qmc5883l_update) {
         data_add(E_SENSOR_QMC5883L, &last_values.qmc5883l, sizeof(sensors_data_qmc5883l_t));
+        if (log_values || (debug_main & 128) != 0) {
+            sensors_data_qmc5883l_t *values = &last_values.qmc5883l;
+            ESP_LOGI(TAG, "QMC5883L: x=%f gauss  y=%f gauss  z=%f gauss  range=%d  st=%d",
+                values->mag_x, values->mag_y, values->mag_z, values->range, values->status);
+        }
+    }
+    if (log_values) {
+        ESP_LOGI(TAG, "WRITTEN: %d bytes", status.record_pos - record_pos);
     }
 }
 
@@ -516,7 +558,7 @@ void set_data_filename()
     uint8_t sec;
     get_current_date_time(&year, &month, &day, &hour, &min, &sec);
     sprintf(status.filename, "%02d%02d%02d_%02d%02d%02d.dat", year, month, day, hour, min, sec);
-    ESP_LOGI(TAG, "Data Filename=%s", status.filename);
+    ESP_LOGI(TAG, "New Data Filename=%s", status.filename);
 }
 
 

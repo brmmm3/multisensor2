@@ -86,7 +86,10 @@ void ui_list_clear(lv_obj_t *obj)
 
 lv_obj_t *ui_list_add(lv_obj_t *obj, const char *symbol, const char *text)
 {
-    return lv_list_add_button(obj, symbol, text);
+    lv_lock_acquire();
+    obj = lv_list_add_button(obj, symbol, text);
+    lv_lock_release();
+    return obj;
 }
 
 

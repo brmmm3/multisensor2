@@ -1,12 +1,11 @@
 #include "main.h"
 
-#include "console.h"
-
-#include "debug_cmd.h"
-#include "led_cmd.h"
-#include "pwr_cmd.h"
-#include "scd4x_cmd.h"
-#include "wifi_cmd.h"
+#include "include/console.h"
+#include "include/debug_cmd.h"
+#include "include/led_cmd.h"
+#include "include/pwr_cmd.h"
+#include "include/scd4x_cmd.h"
+#include "include/wifi_cmd.h"
 
 static const char *TAG = "CMD";
 

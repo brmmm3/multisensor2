@@ -15,7 +15,7 @@
 #include "esp_private/esp_clk.h"
 #include "config.h"
 
-#include "include/wifi.h"
+#include "wifi/include/wifi.h"
 #include "include/wifi_cmd.h"
 
 const static char *TAG = "WIFI";

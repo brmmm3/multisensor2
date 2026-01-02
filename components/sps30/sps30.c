@@ -326,7 +326,7 @@ esp_err_t sps30_read_device_status_register(sps30_t *sensor)
 
     if (err != ESP_OK) return err;
     if (!sps30_is_data_valid(buffer, 6)) return ESP_FAIL;
-    sensor->status = sps30_bytes_to_uint32(buffer);
+    sensor->values.status = sps30_bytes_to_uint32(buffer);
     return ESP_OK;
 }
 
@@ -380,7 +380,7 @@ void sps30_dump(sps30_t *sensor)
     sps30_values_t *values = &sensor->values;
 
     if (sensor->debug & 1) {
-        ESP_LOGI(TAG, "STATUS=%08X", (unsigned int)sensor->status);
+        ESP_LOGI(TAG, "STATUS=%08X", (unsigned int)sensor->values.status);
         ESP_LOGI(TAG, "PM0.5 =%.1f #/cm3", values->nc_0p5);
         ESP_LOGI(TAG, "PM1.0 =%.1f ug/cm3 P1.0 =%.1f #/cm3", values->mc_1p0, values->nc_1p0);
         ESP_LOGI(TAG, "PM2.5 =%.1f ug/cm3 P2.5 =%.1f #/cm3", values->mc_2p5, values->nc_2p5);

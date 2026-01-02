@@ -96,6 +96,9 @@ typedef struct gps_values_s {
     uint8_t mode_3d;
     uint8_t sats;
     uint8_t status;
+    float pdop;         // Position dilution of precision (PDOP), typically 1 or 2 dp
+    float hdop;         // Horizontal dilution of precision (HDOP), typically 1 or 2 dp
+    float vdop;         // Vertical dilution of precision (VDOP), typically 1 or 2 dp
 } gps_values_t;
 
 typedef struct scd4x_cal_values_s {
@@ -154,6 +157,11 @@ extern bool qmc5883l_update;
 // Debug flags for main file
 // Bit 0: Force sensor update flags to true
 // Bit 1: Log new sensor values
+// Bit 2: Log BMX280 sensor values
+// Bit 3: Log MHZ19 and SCD4X sensor values
+// Bit 4: Log YYS sensor values
+// Bit 5: Log SPS30 sensor values
+// Bit 6: Log ADXL345 ad QMC5883L sensor values
 extern uint32_t debug_main;
 
 void set_data_filename();
