@@ -34,6 +34,12 @@ enum MHZ19_RANGE {
     MHZ19_RANGE_INVALID
 };
 
+typedef struct mhz19_values_s {
+    uint16_t co2;
+    uint8_t temp;
+    uint8_t status;
+} mhz19_values_t;
+
 typedef struct mhz19_s {
     char *name;
     hw_serial_t *hw_serial;
@@ -41,9 +47,7 @@ typedef struct mhz19_s {
     uint8_t pending;
 
     bool auto_calib;
-    uint16_t co2;
-    uint8_t temp;
-    uint8_t status;
+    mhz19_values_t values;
     uint8_t data_cnt;
     enum MHZ19_RANGE range;
     char fw_version[7];

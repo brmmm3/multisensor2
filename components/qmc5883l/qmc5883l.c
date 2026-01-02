@@ -83,17 +83,17 @@ esp_err_t qmc5883l_get_device_id(qmc5883l_t *sensor)
 
 esp_err_t qmc5883l_get_status(qmc5883l_t *sensor)
 {
-    return qmc5883l_read(sensor, QMC5883L_STATUS_REG, &sensor->status, 1);
+    return qmc5883l_read(sensor, QMC5883L_STATUS_REG, &sensor->values.status, 1);
 }
 
 bool qmc5883l_data_ready(qmc5883l_t *sensor)
 {
-    return (sensor->status & 1) != 0;
+    return (sensor->values.status & 1) != 0;
 }
 
 bool qmc5883l_data_overflow(qmc5883l_t *sensor)
 {
-    return (sensor->status & 2) != 0;
+    return (sensor->values.status & 2) != 0;
 }
 
 esp_err_t qmc5883l_set_mode(qmc5883l_t *sensor, uint8_t mode, uint8_t odr, uint8_t rng, uint8_t osr)
@@ -110,8 +110,8 @@ esp_err_t qmc5883l_set_range(qmc5883l_t *sensor, uint8_t range)
 
     if (range == 1) data = 0x51;
     if ((err = qmc5883l_write(sensor, QMC5883L_CTL0_REG, &data, 1)) != ESP_OK) return err;
-    if (range == 0) sensor->range = 2.0 / 32768.0;
-    else sensor->range = 8.0 / 32768.0;
+    if (range == 0) sensor->values.range = 2.0 / 32768.0;
+    else sensor->values.range = 8.0 / 32768.0;
     return ESP_OK;
 }
 
@@ -119,15 +119,16 @@ esp_err_t qmc5883l_read_data(qmc5883l_t *sensor)
 {
     esp_err_t err;
     uint8_t data[9];
+    qmc5883l_values_t *values = &sensor->values;
 
     if ((err = qmc5883l_read(sensor, QMC5883L_DATAX0_REG, data, sizeof(data))) != ESP_OK) return err;
     int16_t mag_x = (int16_t)((uint16_t)data[0] | (uint16_t)data[1] << 8);
     int16_t mag_y = (int16_t)((uint16_t)data[2] | (uint16_t)data[3] << 8);
     int16_t mag_z = (int16_t)((uint16_t)data[4] | (uint16_t)data[5] << 8);
-    sensor->mag_x = (float)mag_x * sensor->range;
-    sensor->mag_y = (float)mag_y * sensor->range;
-    sensor->mag_z = (float)mag_z * sensor->range;
-    sensor->status = data[6];
+    values->mag_x = (float)mag_x * values->range;
+    values->mag_y = (float)mag_y * values->range;
+    values->mag_z = (float)mag_z * values->range;
+    values->status = data[6];
     //ESP_LOGI(TAG, "status=%X bx=%d by=%d bz=%d", sensor->status, mag_x, mag_y, mag_z);
     //ESP_LOG_BUFFER_HEXDUMP(TAG, data, sizeof(data), ESP_LOG_INFO);
     return ESP_OK;
@@ -159,17 +160,18 @@ qmc5883l_t *qmc5883l_create_master(i2c_master_bus_handle_t bus_handle)
     qmc5883l_t *sensor = malloc(sizeof(qmc5883l_t));
 
     if (sensor) {
+        qmc5883l_values_t *values = &sensor->values;
         memset(sensor, 0, sizeof(qmc5883l_t));
         sensor->bus_handle = bus_handle;
         sensor->dev_cfg.dev_addr_length = I2C_ADDR_BIT_LEN_7;
         sensor->dev_cfg.device_address = QMC5883L_I2C_ADDR;
         sensor->dev_cfg.scl_speed_hz = CONFIG_QMC5883L_I2C_CLK_SPEED_HZ;
         sensor->i2c_dev = NULL;
-        sensor->mag_x = 0.0;
-        sensor->mag_y = 0.0;
-        sensor->mag_z = 0.0;
-        sensor->range = 2.0 / 32768.0;
-        sensor->status = 0x00;
+        values->mag_x = 0.0;
+        values->mag_y = 0.0;
+        values->mag_z = 0.0;
+        values->range = 2.0 / 32768.0;
+        values->status = 0x00;
         sensor->device_id = 0x00;
     } else {
         ESP_LOGE(TAG, "Failed to allocate memory for QMC5883L.");
@@ -233,6 +235,8 @@ esp_err_t qmc5883l_init(qmc5883l_t **sensor, i2c_master_bus_handle_t bus_handle)
 void qmc5883l_dump(qmc5883l_t *sensor)
 {
     if (sensor->debug & 1) {
-        ESP_LOGI(TAG, "x=%f gauss  y=%f gauss  z=%f gauss", sensor->mag_x, sensor->mag_y, sensor->mag_z);
+        qmc5883l_values_t *values = &sensor->values;
+        ESP_LOGI(TAG, "x=%f gauss  y=%f gauss  z=%f gauss  range=%d  status=%d",
+            values->mag_x, values->mag_y, values->mag_z, values->range, values->status);
     }
 }

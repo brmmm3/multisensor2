@@ -105,7 +105,7 @@ static void btn_calibrate_pressed(lv_event_t *e)
             ESP_LOGE(TAG, "Failed to stop SCD41 with error %d", err);
         } else {
             vTaskDelay(pdMS_TO_TICKS(500));
-            frc = scd4x_perform_forced_recalibration(scd4x, mhz19->co2);
+            frc = scd4x_perform_forced_recalibration(scd4x, mhz19->values.co2);
             ESP_LOGI(TAG, "FRC=%d", frc);
             vTaskDelay(pdMS_TO_TICKS(400));
             if ((err = scd4x_start_periodic_measurement(scd4x)) != ESP_OK) {
@@ -158,7 +158,7 @@ static void sw_sd_record_cb(lv_event_t *e)
         status.record_pos = 0;
         set_data_filename();
         ui_set_tab_color(4, LV_PALETTE_GREEN);
-        ui_set_label_text(ui->lbl_sd_fill, "0 / 65000");
+        ui_set_label_text(ui->lbl_sd_fill, "0.0 %");
     } else {
         status.recording = false;
         ui_set_tab_color(4, LV_PALETTE_GREY);

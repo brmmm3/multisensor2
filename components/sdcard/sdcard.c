@@ -14,7 +14,7 @@
 
 static const char *TAG = "SD";
 
-#define SDCARD_MAX_FREQ_KHZ 8000
+#define SDCARD_MAX_FREQ_KHZ 4000
 
 static sdmmc_card_t *card = NULL;
 

@@ -25,16 +25,16 @@ static const char *TAG = "LCD";
 
 #define LCD_H_RES               240
 #define LCD_V_RES               320
-#define LCD_PCLK_HZ             10000000
+#define LCD_PCLK_HZ             8000000  /* 8MHz */
 
-#define LVGL_DRAW_BUF_LINES     24 // number of display lines in each draw buffer
+#define LVGL_DRAW_BUF_LINES     24       /* number of display lines in each draw buffer */
 #define LVGL_TICK_PERIOD_MS     2
 #define LVGL_TASK_MAX_DELAY_MS  500
 #define LVGL_TASK_MIN_DELAY_MS  1
 #define LVGL_TASK_STACK_SIZE    8192
 #define LVGL_TASK_PRIORITY      2
 
-// LVGL library is not thread-safe, this example will call LVGL APIs from different tasks, so use a mutex to protect it
+// LVGL library is not thread-safe, so we need a mutex
 _lock_t lvgl_api_lock;
 
 gpio_config_t bk_gpio_config;

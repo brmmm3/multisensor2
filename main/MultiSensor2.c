@@ -1,3 +1,4 @@
+#include "esp_rom_crc.h"
 #include "bmx280.h"
 #include "config.h"
 #include "gps.h"
@@ -80,9 +81,11 @@ static const char *TAG = "MS2";
 #define DATA_HEADER_ID0     0xAA
 #define DATA_HEADER_ID1     0x55
 #define DATA_HEADER_VERSION 1
+#define DATA_MAX_SIZE       5000
 
 rtc_t *rtc = NULL;
 gps_sensor_t *gps = NULL;
+gps_values_t gps_values = {0};
 gps_status_t *gps_status = NULL;
 bmx280_t *bmx280lo = NULL;
 bmx280_t *bmx280hi = NULL;
@@ -105,24 +108,53 @@ bool gps_update = false;
 bool bmx280lo_update = false;
 bool bmx280hi_update = false;
 bool mhz19_update = false;
+bool scd4x_calibrate = false;
 bool scd4x_update = false;
 bool yys_update = false;
 bool sps30_update = false;
 bool adxl345_update = false;
 bool qmc5883l_update = false;
 
+uint32_t debug_main = 0;
+
 uint8_t sps30_not_ready_cnt = 0;
 
-// Measurement data
+// Last sensor values
+sensors_data_t last_values = {0};
+
+// Recorded measurement data
 uint8_t data[65536];
 
 void dump_data();
 
 
-void data_add_uint16(uint16_t value)
+void get_current_date_time(uint16_t *year, uint8_t *month, uint8_t *day, uint8_t *hour, uint8_t *min, uint8_t *sec)
 {
-    data[status.record_pos++] = value & 0xff;
-    data[status.record_pos++] = (value >> 8) & 0xff;
+    if (gps->status.date != 0) {
+        uint32_t date = gps->status.date;
+        uint32_t time = gps->status.time;
+        uint32_t _day = date / 10000;
+        uint32_t _month = (date - _day * 10000) / 100;
+        *year = (uint16_t)(date - _day * 10000 - _month * 100);
+        *month = (uint8_t)_month;
+        *day = (uint8_t)_day;
+        uint32_t _hour = time / 10000;
+        uint32_t _min = (time - _hour * 10000) / 100;
+        *sec = (uint8_t)(time - _hour * 10000 - _min * 100);
+        *min = (uint8_t)_min;
+        *hour = (uint8_t)_hour;
+    } else {
+        // Fallback is RTC
+        ESP_LOGW(TAG, "No GPS date/time -> fallback to RTC");
+        struct tm t;
+        rtc_get_datetime(rtc->rtc, &t);
+        *year = t.tm_year;
+        *month = t.tm_mon;
+        *day = t.tm_mday;
+        *hour = t.tm_hour;
+        *min = t.tm_min;
+        *sec = t.tm_sec;
+    }
 }
 
 
@@ -135,94 +167,11 @@ void data_add_uint32(uint32_t value)
 }
 
 
-void data_add_gps()
+void data_add(uint8_t id, void *values, size_t size)
 {
-    // Write up to 38 bytes
-    data[status.record_pos++] = E_SENSOR_GPS;
-    status.record_pos += sprintf((char *)&data[status.record_pos], "%s", gps->status.sat);
-    status.record_pos++;
-    data_add_uint32(gps->status.date);
-    data_add_uint32(gps->status.time);
-    data_add_uint32((uint32_t)gps->status.lat);
-    data[status.record_pos++] = gps->status.ns;
-    data_add_uint32((uint32_t)gps->status.lng);
-    data[status.record_pos++] = gps->status.ew;
-    data_add_uint32((uint32_t)gps->status.altitude);
-    data_add_uint32((uint32_t)gps->status.speed);
-    data[status.record_pos++] = gps->status.mode_3d;
-    data[status.record_pos++] = gps->status.sats;
-    data[status.record_pos++] = gps->status.status;
-}
-
-
-void data_add_bmx280(uint8_t id, bmx280_t *bmx280)
-{
-    // Write 17 bytes
     data[status.record_pos++] = id;
-    data_add_uint32((uint32_t)bmx280->values.temperature);
-    data_add_uint32((uint32_t)bmx280->values.humidity);
-    data_add_uint32((uint32_t)bmx280->values.pressure);
-    data_add_uint32((uint32_t)bmx280->values.altitude);
-}
-
-
-void data_add_mhz19()
-{
-    // Write 4 bytes
-    data[status.record_pos++] = E_SENSOR_MHZ19;
-    data_add_uint16(mhz19->co2);
-    data[status.record_pos++] = mhz19->temp;
-}
-
-
-void data_add_yys()
-{
-    // Write 9 bytes
-    data[status.record_pos++] = E_SENSOR_YYS;
-    data_add_uint16(yys_sensor->co);
-    data_add_uint16(yys_sensor->o2);
-    data_add_uint16(yys_sensor->h2s);
-    data_add_uint16(yys_sensor->ch4);
-}
-
-
-void data_add_sps30()
-{
-    // Write 41 bytes
-    data[status.record_pos++] = E_SENSOR_SPS30;
-    data_add_uint32((uint32_t)sps30->values.mc_1p0);
-    data_add_uint32((uint32_t)sps30->values.mc_2p5);
-    data_add_uint32((uint32_t)sps30->values.mc_4p0);
-    data_add_uint32((uint32_t)sps30->values.mc_10p0);
-    data_add_uint32((uint32_t)sps30->values.nc_0p5);
-    data_add_uint32((uint32_t)sps30->values.nc_1p0);
-    data_add_uint32((uint32_t)sps30->values.nc_2p5);
-    data_add_uint32((uint32_t)sps30->values.nc_4p0);
-    data_add_uint32((uint32_t)sps30->values.nc_10p0);
-    data_add_uint32((uint32_t)sps30->values.typical_particle_size);
-}
-
-
-void data_add_adxl345()
-{
-    // Write 25 bytes
-    data[status.record_pos++] = E_SENSOR_ADXL345;
-    data_add_uint32((uint32_t)adxl345->accel_x);
-    data_add_uint32((uint32_t)adxl345->accel_y);
-    data_add_uint32((uint32_t)adxl345->accel_z);
-    data_add_uint32((uint32_t)adxl345->accel_offset_x);
-    data_add_uint32((uint32_t)adxl345->accel_offset_y);
-    data_add_uint32((uint32_t)adxl345->accel_offset_z);
-}
-
-
-void data_add_qmc5883l()
-{
-    // Write 13 bytes
-    data[status.record_pos++] = E_SENSOR_QMC5883L;
-    data_add_uint32((uint32_t)qmc5883l->mag_x);
-    data_add_uint32((uint32_t)qmc5883l->mag_y);
-    data_add_uint32((uint32_t)qmc5883l->mag_z);
+    memcpy(&data[status.record_pos], (uint8_t *)values, size);
+    status.record_pos += size;
 }
 
 
@@ -320,24 +269,13 @@ static void update_scd4x()
         scd4x_set_temperature_offset(scd4x, temp_offset);
         scd4x_set_sensor_altitude(scd4x, bmx280->values.altitude);
         scd4x_set_ambient_pressure(scd4x, bmx280->values.pressure);
-        if (status.recording) {
-            data[status.record_pos++] = E_SENSOR_SCD4XCAL;
-            data_add_uint32((uint32_t)scd4x->temperature_offset);
-            data_add_uint16(scd4x->altitude);
-            data_add_uint16(scd4x->pressure);
-        }
+        scd4x_calibrate = true;
         ESP_LOGI("SCD4X", "Adjust: TempOffset=%f °C  Alt=%f m  Press=%f hPa",
                     temp_offset, bmx280->values.altitude, bmx280->values.pressure);
     }
     if (scd4x_get_data_ready_status(scd4x)) {
         if ((err = scd4x_read_measurement(scd4x)) == ESP_OK) {
             scd4x_update = true;
-            if (status.recording) {
-                data[status.record_pos++] = E_SENSOR_SCD4X;
-                data_add_uint16(scd4x->values.co2);
-                data_add_uint32((uint32_t)scd4x->values.temperature);
-                data_add_uint32((uint32_t)scd4x->values.humidity);
-            }
         }
         err = scd4x_start_periodic_measurement(scd4x);
     } else if (scd4x->enabled) {
@@ -375,30 +313,39 @@ static void sensors_update()
 {
     esp_err_t err;
     uint16_t v16;
-    bool recording = status.recording;
+    bool force_update = (debug_main & 1) != 0;
 
     // Update/Read data
-    if (recording && status.record_pos == 0) {
-        data[status.record_pos++] = DATA_HEADER_ID0;
-        data[status.record_pos++] = DATA_HEADER_ID1;
-        data[status.record_pos++] = DATA_HEADER_VERSION;
-    }
     if (gps != NULL) {
-        gps_update = gps_data_ready(gps);
+        if (gps_data_ready(gps)) {
+            gps_values.sat = gps->status.sat;
+            gps_values.date = gps->status.date;
+            gps_values.time = gps->status.time;
+            gps_values.lat = gps->status.lat;
+            gps_values.ns = gps->status.ns;
+            gps_values.lng = gps->status.lng;
+            gps_values.ew = gps->status.ew;
+            gps_values.altitude = gps->status.altitude;
+            gps_values.speed = gps->status.speed;
+            gps_values.mode_3d = gps->status.mode_3d;
+            gps_values.sats = gps->status.sats;
+            gps_values.status = gps->status.status;
+            if (force_update || memcmp(&last_values.gps, &gps_values, sizeof(sensors_data_gps_t)) != 0) {
+                memcpy(&last_values.gps, &gps_values, sizeof(sensors_data_gps_t));
+                gps_update = true;
+            }
+        }
         if (xQueueReceive(gps->queue, &v16, 1)) {
             if (gps->debug & 1) {
                 ESP_LOGI("GPS", "%04X", v16);
             }
         }
-        if (gps_update && recording) {
-            data_add_gps();
-        }
     }
     if (bmx280lo != NULL) {
         if ((err = bmx280_readout(bmx280lo)) == ESP_OK) {
-            bmx280lo_update = true;
-            if (recording) {
-                data_add_bmx280(E_SENSOR_BMX280_LO, bmx280lo);
+            if (force_update || memcmp(&last_values.bmx280lo, &bmx280lo->values, sizeof(sensors_data_bmx280_t)) != 0) {
+                memcpy(&last_values.bmx280lo, &bmx280lo->values, sizeof(sensors_data_bmx280_t));
+                bmx280lo_update = true;
             }
         } else {
             ESP_LOGE("BME280LO", "Error=%d", err);
@@ -406,40 +353,51 @@ static void sensors_update()
     }
     if (bmx280hi != NULL) {
         if ((err = bmx280_readout(bmx280hi)) == ESP_OK) {
-            bmx280hi_update = true;
-            if (recording) {
-                data_add_bmx280(E_SENSOR_BMX280_HI, bmx280hi);
+            if (force_update || memcmp(&last_values.bmx280hi, &bmx280hi->values, sizeof(sensors_data_bmx280_t)) != 0) {
+                memcpy(&last_values.bmx280lo, &bmx280lo->values, sizeof(sensors_data_bmx280_t));
+                bmx280hi_update = true;
             }
         } else {
             ESP_LOGE("BME280HI", "Error=%d", err);
         }
     }
     if (mhz19 != NULL) {
-        mhz19_update = mhz19_data_ready(mhz19);
-        if (mhz19_update && recording) {
-            data_add_mhz19();
+        if (mhz19_data_ready(mhz19)) {
+            if (force_update || memcmp(&last_values.mhz19, &mhz19->values, sizeof(sensors_data_mhz19_t)) != 0) {
+                memcpy(&last_values.mhz19, &mhz19->values, sizeof(sensors_data_mhz19_t));
+                mhz19_update = true;
+            }
         }
     }
     if (scd4x != NULL) {
         update_scd4x();
+        if (scd4x_update && (force_update || memcmp(&last_values.scd4x, &scd4x->values, sizeof(sensors_data_scd4x_t)) != 0)) {
+            memcpy(&last_values.scd4x, &scd4x->values, sizeof(sensors_data_scd4x_t));
+        } else {
+            scd4x_update = false;
+        }
     }
     if (yys_sensor != NULL) {
-        yys_update = yys_data_ready(yys_sensor);
-        if (yys_update && recording) {
-            data_add_yys();
+        if (yys_data_ready(yys_sensor)) {
+            if (force_update || memcmp(&last_values.yys, &yys_sensor->values, sizeof(sensors_data_yys_t)) != 0) {
+                memcpy(&last_values.yys, &yys_sensor->values, sizeof(sensors_data_yys_t));
+                yys_update = true;
+            }
         }
     }
     if (sps30 != NULL) {
         update_sps30();
-        if (sps30_update && recording) {
-            data_add_sps30();
+        if (sps30_update && (force_update || memcmp(&last_values.sps30, &sps30->values, sizeof(sensors_data_sps30_t)) != 0)) {
+            memcpy(&last_values.sps30, &sps30->values, sizeof(sensors_data_sps30_t));
+        } else {
+            sps30_update = false;
         }
     }
     if (adxl345 != NULL) {
         if ((err = adxl345_read_data(adxl345)) == ESP_OK) {
-            adxl345_update = true;
-            if (recording) {
-                data_add_adxl345();
+            if (force_update || memcmp(&last_values.adxl345, &adxl345->values, sizeof(sensors_data_adxl345_t)) != 0) {
+                memcpy(&last_values.adxl345, &adxl345->values, sizeof(sensors_data_adxl345_t));
+                adxl345_update = true;
             }
         } else {
             ESP_LOGE("ADXL345", "Error=%d", err);
@@ -447,9 +405,9 @@ static void sensors_update()
     }
     if (qmc5883l != NULL) {
         if ((err = qmc5883l_read_data(qmc5883l)) == ESP_OK) {
-            qmc5883l_update = true;
-            if (recording) {
-                data_add_qmc5883l();
+            if (force_update || memcmp(&last_values.qmc5883l, &qmc5883l->values, sizeof(sensors_data_qmc5883l_t)) != 0) {
+                memcpy(&last_values.qmc5883l, &qmc5883l->values, sizeof(sensors_data_qmc5883l_t));
+                qmc5883l_update = true;
             }
         } else {
             ESP_LOGE("QMC5883L", "Error=%d", err);
@@ -458,25 +416,114 @@ static void sensors_update()
 }
 
 
+static void sensors_recording()
+{
+    if (!gps_update && !bmx280lo_update && !bmx280hi_update && !mhz19_update && !scd4x_calibrate &&
+        !scd4x_update && !yys_update && !sps30_update && !adxl345_update && !qmc5883l_update) {
+        return;
+    }
+    bool log_values = (debug_main & 2) != 0;
+    uint16_t year;
+    uint8_t month;
+    uint8_t day;
+    uint8_t hour;
+    uint8_t min;
+    uint8_t sec;
+    get_current_date_time(&year, &month, &day, &hour, &min, &sec);
+    if (status.record_pos == 0) {
+        data[status.record_pos++] = DATA_HEADER_ID0;
+        data[status.record_pos++] = DATA_HEADER_ID1;
+        data[status.record_pos++] = DATA_HEADER_VERSION;
+        // Add current date
+        data[status.record_pos++] = E_SENSOR_DATE;
+        data[status.record_pos++] = year;
+        data[status.record_pos++] = month;
+        data[status.record_pos++] = day;
+    }
+    // Add current time
+    data[status.record_pos++] = E_SENSOR_TIME;
+    data[status.record_pos++] = hour;
+    data[status.record_pos++] = min;
+    data[status.record_pos++] = sec;
+    if (gps_update) {
+        data_add(E_SENSOR_GPS, &last_values.gps, sizeof(sensors_data_gps_t));
+        if (log_values) {
+            ESP_LOGI(TAG, "GPS: %s date=%lu time=%lu lat=%f %c lng=%f %c altitude=%f speed=%f mode_3d=%c sats=%d status=%d",
+                    gps_values.sat, gps_values.date, gps_values.time, gps_values.lat, gps_values.ns, gps_values.lng,
+                    gps_values.ew, gps_values.altitude, gps_values.speed, gps_values.mode_3d, gps_values.sats,
+                    gps_values.status);
+        }
+    }
+    if (bmx280lo_update) {
+        data_add(E_SENSOR_BMX280_LO, &last_values.bmx280lo, sizeof(sensors_data_bmx280_t));
+        if (log_values) {
+            sensors_data_bmx280_t *values = &last_values.bmx280lo;
+            ESP_LOGI(TAG, "BMX280LO: temp=%.1f °C  hum=%.1f  press=%.1f hPa  altitude=%.1f m",
+                    values->temperature, values->humidity, values->pressure, values->altitude);
+        }
+    }
+    if (bmx280hi_update) {
+        data_add(E_SENSOR_BMX280_HI, &last_values.bmx280hi, sizeof(sensors_data_bmx280_t));
+        if (log_values) {
+            sensors_data_bmx280_t *values = &last_values.bmx280hi;
+            ESP_LOGI(TAG, "BMX280HI: temp=%.1f °C  hum=%.1f  press=%.1f hPa  altitude=%.1f m",
+                    values->temperature, values->humidity, values->pressure, values->altitude);
+        }
+    }
+    if (mhz19_update) {
+        data_add(E_SENSOR_MHZ19, &last_values.mhz19, sizeof(sensors_data_mhz19_t));
+        if (log_values) {
+            sensors_data_mhz19_t *values = &last_values.mhz19;
+            ESP_LOGI(TAG, "MHZ19: co2=%d ppm  temp=%d °C  status=%d", values->co2, values->temp, values->status);
+        }
+    }
+    if (scd4x_calibrate) {
+        scd4x_cal_values_t values = {
+            .temperature_offset = scd4x->temperature_offset,
+            .altitude = scd4x->altitude,
+            .pressure =scd4x->pressure
+        };
+        data_add(E_SENSOR_SCD4XCAL, &values, sizeof(scd4x_cal_values_t));
+    }
+    if (scd4x_update) {
+        data_add(E_SENSOR_SCD4X, &last_values.scd4x, sizeof(sensors_data_scd4x_t));
+        if (log_values) {
+            sensors_data_scd4x_t *values = &last_values.scd4x;
+            ESP_LOGI(TAG, "SCD4X: co2=%d ppm  temp=%f °C  hum=%f %%", values->co2, values->temperature, values->humidity);
+        }
+    }
+    if (yys_update) {
+        data_add(E_SENSOR_YYS, &last_values.yys, sizeof(sensors_data_yys_t));
+    }
+    if (sps30_update) {
+        data_add(E_SENSOR_SPS30, &last_values.sps30, sizeof(sensors_data_sps30_t));
+    }
+    if (adxl345_update) {
+        data_add(E_SENSOR_ADXL345, &last_values.adxl345, sizeof(sensors_data_adxl345_t));
+    }
+    if (qmc5883l_update) {
+        data_add(E_SENSOR_QMC5883L, &last_values.qmc5883l, sizeof(sensors_data_qmc5883l_t));
+    }
+}
+
 void set_data_filename()
 {
-    if (gps->status.date != 0) {
-        uint32_t date = gps->status.date;
-        uint32_t time = gps->status.time;
-        uint32_t day = date / 10000;
-        uint32_t month = (date - day * 10000) / 100;
-        uint32_t year = date - day * 10000 - month * 100;
-        sprintf(status.filename, "%02d%02d%02d_%06ld.dat", (uint8_t)year, (uint8_t)month, (uint8_t)day, time);
-    } else {
-        // Fallback is RTC
-        ESP_LOGW(TAG, "No GPS date/time -> fallback to RTC");
-        struct tm t;
-        rtc_get_datetime(rtc->rtc, &t);
-        sprintf(status.filename, "%02d%02d%02d_%02d%02d%02d.dat",
-            t.tm_year, t.tm_mon, t.tm_mday,
-            t.tm_hour, t.tm_min, t.tm_sec);
-    }
+    uint16_t year;
+    uint8_t month;
+    uint8_t day;
+    uint8_t hour;
+    uint8_t min;
+    uint8_t sec;
+    get_current_date_time(&year, &month, &day, &hour, &min, &sec);
+    sprintf(status.filename, "%02d%02d%02d_%02d%02d%02d.dat", year, month, day, hour, min, sec);
     ESP_LOGI(TAG, "Data Filename=%s", status.filename);
+}
+
+
+uint32_t calculate_crc32(const uint8_t *data, size_t len)
+{
+    // Standard ZIP/PNG/zlib compatible CRC32
+    return esp_rom_crc32_le(0xFFFFFFFF, data, len) ^ 0xFFFFFFFF;
 }
 
 
@@ -493,31 +540,55 @@ static void update_task(void *arg)
     ui_set_label_text(ui->lbl_sd_card, buf);
     sprintf(buf, "%llu MB", bytes_free / (1024 * 1024));
     ui_set_label_text(ui->lbl_sd_free, buf);
-    int file_count = sd_get_file_count(MOUNT_POINT"/data");
-    sprintf(buf, "%d data files", file_count);
+    status.file_cnt = sd_get_file_count(MOUNT_POINT"/data");
+    sprintf(buf, "%d data files", status.file_cnt);
     ui_set_label_text(ui->lbl_sd_files, buf);
 
     while (true) {
         sensors_update();
+        if (status.recording) {
+            sensors_recording();
+        }
         ui_update();
 
         // Dump data for debugging
         dump_data();
 
+        // Reset update flags
+        gps_update = false;
+        bmx280lo_update = false;
+        bmx280hi_update = false;
+        mhz19_update = false;
+        scd4x_calibrate = false;
+        scd4x_update = false;
+        yys_update = false;
+        sps30_update = false;
+        adxl345_update = false;
+        qmc5883l_update = false;
+
         esp_task_wdt_reset();
 
-        if (status.record_pos > 65000) {
-            int pos = strlen(MOUNT_POINT);
+        if (status.record_pos > DATA_MAX_SIZE) {
+            // Write end marker and checksum
+            data[status.record_pos++] = DATA_HEADER_ID1;
+            data[status.record_pos++] = DATA_HEADER_ID0;
+            uint32_t cksum = calculate_crc32(data, status.record_pos);
+            data_add_uint32(cksum);
 
+            int pos = strlen(MOUNT_POINT);
             strcpy(buf, MOUNT_POINT);
             sprintf(&buf[pos], "/data/%s", status.filename);
-            ESP_LOGI(TAG, "Write Data to File %s", buf);
+            ESP_LOGI(TAG, "Write %d bytes to File %s", status.record_pos, buf);
             write_bin_file(buf, data, status.record_pos);
             status.record_pos = 0;
+            status.file_cnt++;
+            sprintf(buf, "%d data files", status.file_cnt);
+            ui_set_label_text(ui->lbl_sd_files, buf);
+            ui_set_label_text(ui->lbl_sd_fill, "0.0 %");
             set_data_filename();
-            ui_set_label_text(ui->lbl_sd_fill, "0 / 65000");
         } else {
-            sprintf(buf, "%d / 65000", status.record_pos);
+            float fill_level = 100.0 * (float) status.record_pos / (float)DATA_MAX_SIZE;
+            sprintf(buf, "%.1f %%", fill_level);
             ui_set_label_text(ui->lbl_sd_fill, buf);
             vTaskDelay(1000 / portTICK_PERIOD_MS);
         }

@@ -116,9 +116,9 @@ static void rx_task_mhz19_sensor(void *arg)
                     ESP_LOGI(TAG, "MHZ19 SET ABC=%d", buf[2]);
                     break;
                     case MHZ19_GET_TEMP_INT:
-                    sensor->co2 = buf[2] * 256 + buf[3];
-                    sensor->temp = buf[4] - 40;
-                    sensor->status = buf[5];
+                    sensor->values.co2 = buf[2] * 256 + buf[3];
+                    sensor->values.temp = buf[4] - 40;
+                    sensor->values.status = buf[5];
                     sensor->data_cnt++;
                     break;
                     case MHZ19_GET_FW_VERSION:
@@ -142,9 +142,9 @@ static void rx_task_mhz19_sensor(void *arg)
                     ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, response_cnt, ESP_LOG_INFO);
                 }
             } else {
-                sensor->co2 = -1;
-                sensor->temp = -1;
-                sensor->status = -1;
+                sensor->values.co2 = -1;
+                sensor->values.temp = -1;
+                sensor->values.status = -1;
                 ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, response_cnt, ESP_LOG_INFO);
             }
             if (sensor->pending > 0) sensor->pending--;
@@ -243,10 +243,10 @@ esp_err_t mhz19_init(mhz19_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint8_t
     mhz19_sensor->queue = xQueueCreate(6, 6);
     mhz19_sensor->pending = 0;
     mhz19_sensor->hw_serial = mhz19_serial;
-    mhz19_sensor->co2 = 0xffff;
-    mhz19_sensor->temp = 0xff;
+    mhz19_sensor->values.co2 = 0xffff;
+    mhz19_sensor->values.temp = 0xff;
+    mhz19_sensor->values.status = 0xff;
     mhz19_sensor->data_cnt = 0;
-    mhz19_sensor->status = 0xff;
     mhz19_sensor->range = MHZ19_RANGE_INVALID;
     mhz19_sensor->fw_version[0] = 0;
     mhz19_sensor->debug = 0;
@@ -269,6 +269,6 @@ esp_err_t mhz19_init(mhz19_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint8_t
 void mhz19_dump(mhz19_t *sensor)
 {
     if (sensor->debug & 1) {
-        ESP_LOGI(TAG, "co2=%d ppm  temp=%d °C", sensor->co2, sensor->temp);
+        ESP_LOGI(TAG, "co2=%d ppm  temp=%d °C  status=%d", sensor->values.co2, sensor->values.temp, sensor->values.status);
     }
 }

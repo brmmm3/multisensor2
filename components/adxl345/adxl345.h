@@ -17,13 +17,7 @@ extern "C" {
 #include <stdint.h>
 #include "driver/i2c_master.h"
 
-typedef struct adxl345_s {
-    // I2C master handle via port with configuration
-    i2c_master_dev_handle_t i2c_dev;
-    // I2C master configuration
-    i2c_device_config_t dev_cfg;
-    // I2C master handle via port
-    i2c_master_bus_handle_t bus_handle;
+typedef struct adxl345_values_s {
     float accel_x;  // [g]
     float accel_y;
     float accel_z;
@@ -31,6 +25,16 @@ typedef struct adxl345_s {
     float accel_offset_x;  // [g]
     float accel_offset_y;
     float accel_offset_z;
+} adxl345_values_t;
+
+typedef struct adxl345_s {
+    // I2C master handle via port with configuration
+    i2c_master_dev_handle_t i2c_dev;
+    // I2C master configuration
+    i2c_device_config_t dev_cfg;
+    // I2C master handle via port
+    i2c_master_bus_handle_t bus_handle;
+    adxl345_values_t values;
     uint8_t moving_cnt;
     uint8_t accel_range;
     uint8_t device_id;

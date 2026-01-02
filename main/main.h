@@ -69,7 +69,9 @@ extern ui_t *ui;
 extern led_strip_handle_t led_strip;
 
 typedef enum {
-    E_SENSOR_GPS = 0,
+    E_SENSOR_DATE = 0x0F,
+    E_SENSOR_TIME,
+    E_SENSOR_GPS,
     E_SENSOR_BMX280_LO,
     E_SENSOR_BMX280_HI,
     E_SENSOR_MHZ19,
@@ -81,9 +83,59 @@ typedef enum {
     E_SENSOR_QMC5883L
 } sensors_enum_t;
 
+typedef struct gps_values_s {
+    const char *sat;
+    uint32_t date;
+    uint32_t time;
+    float lat;
+    uint8_t ns;
+    float lng;
+    uint8_t ew;
+    float altitude;
+    float speed;
+    uint8_t mode_3d;
+    uint8_t sats;
+    uint8_t status;
+} gps_values_t;
+
+typedef struct scd4x_cal_values_s {
+    float temperature_offset;
+    uint16_t altitude;
+    uint16_t pressure;
+} scd4x_cal_values_t;
+
+typedef gps_values_t sensors_data_gps_t;
+
+typedef bmx280_values_t sensors_data_bmx280_t;
+
+typedef mhz19_values_t sensors_data_mhz19_t;
+
+typedef scd4x_values_t sensors_data_scd4x_t;
+
+typedef yys_values_t sensors_data_yys_t;
+
+typedef sps30_values_t sensors_data_sps30_t;
+
+typedef adxl345_values_t sensors_data_adxl345_t;
+
+typedef qmc5883l_values_t sensors_data_qmc5883l_t;
+
+typedef struct sensors_data_s {
+    sensors_data_gps_t gps;
+    sensors_data_bmx280_t bmx280lo;
+    sensors_data_bmx280_t bmx280hi;
+    sensors_data_mhz19_t mhz19;
+    sensors_data_scd4x_t scd4x;
+    sensors_data_yys_t yys;
+    sensors_data_sps30_t sps30;
+    sensors_data_adxl345_t adxl345;
+    sensors_data_qmc5883l_t qmc5883l;
+} sensors_data_t;
+
 typedef struct status_s {
     bool recording;
     uint16_t record_pos;
+    uint16_t file_cnt;
     char filename[32];
 } status_t;
 
@@ -98,6 +150,11 @@ extern bool yys_update;
 extern bool sps30_update;
 extern bool adxl345_update;
 extern bool qmc5883l_update;
+
+// Debug flags for main file
+// Bit 0: Force sensor update flags to true
+// Bit 1: Log new sensor values
+extern uint32_t debug_main;
 
 void set_data_filename();
 

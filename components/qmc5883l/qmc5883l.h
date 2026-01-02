@@ -34,6 +34,14 @@ extern "C" {
 #define QMC5883L_OSR_64          0b11000000
 
 
+typedef struct qmc5883l_values_s {
+    float mag_x;  // [Gauss]
+    float mag_y;
+    float mag_z;
+    float range;
+    uint8_t status;
+} qmc5883l_values_t;
+
 typedef struct qmc5883l_s {
     // I2C master handle via port with configuration
     i2c_master_dev_handle_t i2c_dev;
@@ -41,11 +49,7 @@ typedef struct qmc5883l_s {
     i2c_device_config_t dev_cfg;
     // I2C master handle via port
     i2c_master_bus_handle_t bus_handle;
-    float mag_x;  // [Gauss]
-    float mag_y;
-    float mag_z;
-    float range;
-    uint8_t status;
+    qmc5883l_values_t values;
     uint32_t device_id;
     uint8_t debug;
 } qmc5883l_t;
