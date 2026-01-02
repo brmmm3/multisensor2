@@ -24,7 +24,7 @@ esp_err_t write_text_file(const char *path, char *data)
     ESP_LOGI(TAG, "Write text file %s", path);
     FILE *f = fopen(path, "w");
     if (f == NULL) {
-        ESP_LOGE(TAG, "Failed to open file for writing");
+        ESP_LOGE(TAG, "Failed to open file for writing: %s (errno=%d)", strerror(errno), errno);
         return ESP_FAIL;
     }
     fwrite(data, strlen(data), 1, f);
@@ -37,7 +37,7 @@ esp_err_t read_text_file(const char *path, char *buf, uint16_t size)
     ESP_LOGI(TAG, "Read text file %s", path);
     FILE *f = fopen(path, "r");
     if (f == NULL) {
-        ESP_LOGE(TAG, "Failed to open file for reading");
+        ESP_LOGE(TAG, "Failed to open file for reading: %s (errno=%d)", strerror(errno), errno);
         return ESP_FAIL;
     }
     fgets(buf, size, f);
@@ -50,7 +50,7 @@ esp_err_t write_bin_file(const char *path, void *data, uint16_t size)
     ESP_LOGI(TAG, "Write binary file %s", path);
     FILE *f = fopen(path, "wb");
     if (f == NULL) {
-        ESP_LOGE(TAG, "Failed to open file for writing");
+        ESP_LOGE(TAG, "Failed to open file for writing: %s (errno=%d)", strerror(errno), errno);
         return ESP_FAIL;
     }
     fwrite(data, size, 1, f);
@@ -63,7 +63,7 @@ esp_err_t read_bin_file(const char *path, void *buf, uint16_t size)
     ESP_LOGI(TAG, "Read bin file %s", path);
     FILE *f = fopen(path, "rb");
     if (f == NULL) {
-        ESP_LOGE(TAG, "Failed to open file for reading");
+        ESP_LOGE(TAG, "Failed to open file for reading: %s (errno=%d)", strerror(errno), errno);
         return ESP_FAIL;
     }
     if (buf != NULL) {
@@ -225,7 +225,8 @@ int sd_get_file_count(const char *path)
 esp_err_t ensure_dir(const char *path)
 {
     struct stat st;
-    
+
+    ESP_LOGI(TAG, "ensure_dir %s", path);
     if (stat(path, &st) == 0) {
         // Path exists
         if (S_ISDIR(st.st_mode)) {

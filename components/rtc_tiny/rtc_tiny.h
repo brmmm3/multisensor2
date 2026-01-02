@@ -15,10 +15,15 @@ extern "C" {
 
 #include <stdint.h>
 #include "driver/i2c_types.h"
+#include "rtci2c/rtci2c.h"
 
 typedef struct rtc_s {
     void *rtc;
 } rtc_t;
+
+esp_err_t rtc_set_datetime(rtci2c_context *rtc, struct tm *timeinfo);
+
+esp_err_t rtc_get_datetime(rtci2c_context *rtc, struct tm *timeinfo);
 
 esp_err_t rtc_init(rtc_t **rtc_ptr, i2c_master_bus_handle_t *bus_handle);
 

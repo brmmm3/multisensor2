@@ -84,7 +84,7 @@ typedef enum {
 typedef struct status_s {
     bool recording;
     uint16_t record_pos;
-    uint64_t start_time;
+    char filename[32];
 } status_t;
 
 extern status_t status;
@@ -98,6 +98,8 @@ extern bool yys_update;
 extern bool sps30_update;
 extern bool adxl345_update;
 extern bool qmc5883l_update;
+
+void set_data_filename();
 
 #ifdef __cplusplus
 };

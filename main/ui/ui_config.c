@@ -156,10 +156,9 @@ static void sw_sd_record_cb(lv_event_t *e)
     if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
         status.recording = true;
         status.record_pos = 0;
-        status.start_time = ((uint64_t)gps->status.date) << 32 | (uint64_t)gps->status.time;
-        ESP_LOGI(TAG, "Data Filename=%llu.dat", status.start_time);
+        set_data_filename();
         ui_set_tab_color(4, LV_PALETTE_GREEN);
-        ui_set_label_text(ui->lbl_sd_fill, "0 / 65536");
+        ui_set_label_text(ui->lbl_sd_fill, "0 / 65000");
     } else {
         status.recording = false;
         ui_set_tab_color(4, LV_PALETTE_GREY);

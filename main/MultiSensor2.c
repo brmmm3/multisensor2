@@ -5,6 +5,7 @@
 #include "main.h"
 #include "misc/lv_palette.h"
 #include "nvs_flash.h"
+#include "rtc_tiny.h"
 #include "scd4x.h"
 #include "sdcard.h"
 #include "ui/include/ui_config.h"
@@ -109,6 +110,8 @@ bool yys_update = false;
 bool sps30_update = false;
 bool adxl345_update = false;
 bool qmc5883l_update = false;
+
+uint8_t sps30_not_ready_cnt = 0;
 
 // Measurement data
 uint8_t data[65536];
@@ -357,12 +360,13 @@ static void update_sps30()
         ESP_LOGE("SPS30", "Failed to read status");
     }
     if (sps30_read_data_ready(sps30)) {
+        sps30_not_ready_cnt = 0;
         if ((err = sps30_read_measurement(sps30)) == ESP_OK) {
             sps30_update = true;
         } else {
             ESP_LOGE("SPS30", "Failed to read measurement values with error %d", err);
         }
-    } else {
+    } else if (sps30_not_ready_cnt++ > 5) {
         ESP_LOGE("SPS30", "not ready");
     }
 }
@@ -453,15 +457,38 @@ static void sensors_update()
     }
 }
 
+
+void set_data_filename()
+{
+    if (gps->status.date != 0) {
+        uint32_t date = gps->status.date;
+        uint32_t time = gps->status.time;
+        uint32_t day = date / 10000;
+        uint32_t month = (date - day * 10000) / 100;
+        uint32_t year = date - day * 10000 - month * 100;
+        sprintf(status.filename, "%02d%02d%02d_%06ld.dat", (uint8_t)year, (uint8_t)month, (uint8_t)day, time);
+    } else {
+        // Fallback is RTC
+        ESP_LOGW(TAG, "No GPS date/time -> fallback to RTC");
+        struct tm t;
+        rtc_get_datetime(rtc->rtc, &t);
+        sprintf(status.filename, "%02d%02d%02d_%02d%02d%02d.dat",
+            t.tm_year, t.tm_mon, t.tm_mday,
+            t.tm_hour, t.tm_min, t.tm_sec);
+    }
+    ESP_LOGI(TAG, "Data Filename=%s", status.filename);
+}
+
+
 static void update_task(void *arg)
 {
+    char buf[64];
+    uint64_t bytes_total, bytes_free;
+
     ESP_LOGI(TAG, "Start main loop.");
     esp_task_wdt_add(NULL);
-
     // Update SD-Card info
     ensure_dir(MOUNT_POINT"/data");
-    char buf[32];
-    uint64_t bytes_total, bytes_free;
     sd_get_info(buf, &bytes_total, &bytes_free);
     ui_set_label_text(ui->lbl_sd_card, buf);
     sprintf(buf, "%llu MB", bytes_free / (1024 * 1024));
@@ -480,17 +507,18 @@ static void update_task(void *arg)
         esp_task_wdt_reset();
 
         if (status.record_pos > 65000) {
-            char buf[32];
             int pos = strlen(MOUNT_POINT);
 
             strcpy(buf, MOUNT_POINT);
-            sprintf(&buf[pos], "/data/%llu.dat", status.start_time);
+            sprintf(&buf[pos], "/data/%s", status.filename);
             ESP_LOGI(TAG, "Write Data to File %s", buf);
             write_bin_file(buf, data, status.record_pos);
             status.record_pos = 0;
-            status.start_time = ((uint64_t)gps->status.date) << 32 | (uint64_t)gps->status.time;
-            ESP_LOGI(TAG, "Data Filename=%llu.dat", status.start_time);
+            set_data_filename();
+            ui_set_label_text(ui->lbl_sd_fill, "0 / 65000");
         } else {
+            sprintf(buf, "%d / 65000", status.record_pos);
+            ui_set_label_text(ui->lbl_sd_fill, buf);
             vTaskDelay(1000 / portTICK_PERIOD_MS);
         }
     }
