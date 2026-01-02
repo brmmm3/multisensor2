@@ -56,6 +56,7 @@ typedef struct ui_s {
     lv_obj_t *lbl_sd_card;
     lv_obj_t *lbl_sd_free;
     lv_obj_t *lbl_sd_files;
+    lv_obj_t *lbl_sd_fill;
     // Tab Config
     lv_obj_t *tab_cfg;
     lv_obj_t *lbl_adxl345;

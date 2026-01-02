@@ -6,18 +6,26 @@
 
 static const char *TAG = "CFG";
 
-config_t *config;
+config_t *config = NULL;
 
 esp_err_t config_read(void)
 {
     esp_err_t err;
     nvs_handle_t handle;
 
-    config = calloc(1, sizeof(config_t));
+    ESP_LOGI(TAG, "Read config file.");
+    if (config == NULL) {
+        config = calloc(1, sizeof(config_t));
+    }
     // First read config file from SD-Card
     err = read_bin_file(MOUNT_POINT"/config.dat", config, sizeof(config_t));
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read config.dat: %s", esp_err_to_name(err));
+        config_write();
+    }
+    if (config->cfg_version != CONFIG_VERSION) {
+        ESP_LOGE(TAG, "Ignore old config");
+        memset(config, 0, sizeof(config_t));
         config_write();
     }
     // Then read sensitive data from NVS
@@ -43,8 +51,9 @@ esp_err_t config_write(void)
     nvs_handle_t handle;
     nvs_config_t nvs = {0};
 
-    memcpy(&config->nvs, &nvs, sizeof(nvs_config_t));
-    memset(&config->nvs, 0, sizeof(nvs_config_t));
+    ESP_LOGI(TAG, "Write config file.");
+    config->cfg_version = CONFIG_VERSION;
+    memcpy(&nvs, &config->nvs, sizeof(nvs_config_t));
     // First write sensitive data to NVS
     if ((err = nvs_open("config", NVS_READWRITE, &handle)) != ESP_OK) {
         ESP_LOGE(TAG, "Error (%s) opening NVS handle!", esp_err_to_name(err));

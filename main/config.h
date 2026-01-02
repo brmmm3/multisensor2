@@ -17,6 +17,8 @@ extern "C" {
 #include <stdbool.h>
 #include "esp_err.h"
 
+#define CONFIG_VERSION 1
+
 typedef struct wifi_networks_s {
     // Connection info for up to 4 SSIDs and their passwords
     char ssid[4][32];
@@ -31,6 +33,7 @@ typedef struct nvs_config_s {
 typedef struct config_s {
     uint8_t cfg_version;  // Configuration version
     uint8_t auto_connect; // 0 base index of SSID to connect to in the known networks list. If index >3 then do not connect.
+    bool auto_record;
     nvs_config_t nvs;
 } config_t;
 

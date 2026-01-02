@@ -7,6 +7,7 @@
 #include "esp_event.h"
 #include "include/wifi_sntp.h"
 #include "config.h"
+#include "misc/lv_palette.h"
 #include "ui/include/ui.h"
 #include "ui/include/ui_config.h"
 #include "include/wifi.h"
@@ -92,12 +93,19 @@ void wifi_init_sta(void)
     ESP_LOGI(TAG,"wifi_init_sta DONE");
 }
 
+void wifi_disconnect()
+{
+    esp_wifi_disconnect();             // break connection to AP
+    ui_set_label_text(ui->lbl_wifi_status1, "Disconnected");
+    ui_set_label_text(ui->lbl_wifi_status2, "-");
+}
+
 void wifi_deinit_sta(void)
 {
     ESP_LOGI(TAG,"wifi_deinit_sta");
     esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &instance_any_id);
     esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &instance_got_ip);
-    esp_wifi_disconnect();             // break connection to AP
+    wifi_disconnect();                 // break connection to AP
     esp_wifi_stop();                   // shut down the wifi radio
     esp_wifi_deinit();                 // release wifi resources
     esp_netif_destroy_default_wifi(netif);
@@ -145,6 +153,7 @@ esp_err_t wifi_connect(const char *ssid, const char *password)
         esp_netif_ip_info_t ip_info;
 
         ui_set_label_text(ui->lbl_wifi_status1, ssid);
+        ui_set_tab_color(3, LV_PALETTE_GREEN);
         ESP_LOGI(TAG, "Connected to SSID:%s", ssid);
         err = esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info);
         if (err == ESP_OK && ip_info.ip.addr != 0) {
@@ -160,6 +169,8 @@ esp_err_t wifi_connect(const char *ssid, const char *password)
             setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1);
             tzset();
             sntp_obtain_time();
+        } else {
+            ui_set_tab_color(3, LV_PALETTE_RED);
         }
         return ESP_OK;
     }
@@ -168,15 +179,16 @@ esp_err_t wifi_connect(const char *ssid, const char *password)
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT %x", bits);
     }
+    ui_set_tab_color(3, LV_PALETTE_RED);
     return ESP_FAIL;
 }
 
-esp_err_t wifi_init()
+esp_err_t wifi_init(bool scan)
 {
     ESP_LOGI(TAG, "Initialize WiFi");
     wifi_init_sta();
     ui_set_switch_state(ui->sw_wifi_enable, true);
-    wifi_scan();
+    if (scan) wifi_scan();
 
     uint8_t auto_connect = config->auto_connect;
     if (auto_connect < 4) {
@@ -194,6 +206,7 @@ void wifi_uninit()
 {
     ESP_LOGI(TAG, "Uninitialize WiFi");
     wifi_deinit_sta();
+    ui_set_tab_color(3, LV_PALETTE_GREY);
     ui_set_switch_state(ui->sw_wifi_enable, false);
     ui_set_label_text(ui->lbl_wifi_status1, "-");
     ui_set_label_text(ui->lbl_wifi_status2, "-");

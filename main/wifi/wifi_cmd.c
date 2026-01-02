@@ -20,12 +20,10 @@
 
 const static char *TAG = "WIFI";
 
-static int s_reconnect_times = 0;
-
 
 static int initialize_wifi(int argc, char **argv)
 {
-    wifi_init();
+    wifi_init(true);
     return 0;
 }
 
@@ -133,7 +131,8 @@ static void register_wifi_set_ap(void)
 typedef struct {
     struct arg_str *ssid;
     struct arg_str *password;
-    struct arg_int *channel;
+    struct arg_int *index;         // Index for array of known networks. Will be saved in config.
+    struct arg_int *auto_connect;  // Connect to this network automatically.
     struct arg_end *end;
 } sta_connect_args_t;
 static sta_connect_args_t connect_args;
@@ -162,14 +161,26 @@ static int cmd_do_sta_connect(int argc, char **argv)
         memcpy((char *) wifi_config.sta.password, pass, sizeof(wifi_config.sta.password));
         wifi_config.sta.threshold.authmode = WIFI_AUTH_WEP;
     }
-    if (connect_args.channel->count > 0) {
-        wifi_config.sta.channel = (uint8_t)(connect_args.channel->ival[0]);
+    if (connect_args.index->count > 0) {
+        uint8_t index = (uint8_t)connect_args.index->ival[0];
+        ESP_LOGI(TAG, "index=%d", index);
+        if (index < 4) {
+            strcpy(config->nvs.wifi.ssid[index], ssid);
+            strcpy(config->nvs.wifi.password[index], pass);
+        }
+        if (connect_args.auto_connect->count > 0) {
+            uint8_t auto_connect = (uint8_t)connect_args.auto_connect->ival[0];
+            ESP_LOGI(TAG, "auto_connect=%d", auto_connect);
+            if (auto_connect) {
+                config->auto_connect = index;
+                wifi_init(false);
+                return 0;
+            }
+        }
     }
-
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_LOGI(TAG, "Connecting to %s...", ssid);
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    s_reconnect_times = 0;
     esp_err_t err = esp_wifi_connect();
     ESP_LOGI(TAG, "WIFI_CONNECT_START, ret: 0x%x", err);
     return 0;
@@ -179,8 +190,9 @@ static void register_wifi_connect(void)
 {
     connect_args.ssid = arg_str1(NULL, NULL, "<ssid>", "SSID of AP");
     connect_args.password = arg_str0(NULL, NULL, "<pass>", "password of AP");
-    connect_args.channel = arg_int0("n", "channel", "<channel>", "channel of AP");
-    connect_args.end = arg_end(3);
+    connect_args.index = arg_int0("i", "index", "<int>", "Array index 0-3");
+    connect_args.auto_connect = arg_int0("a", "auto", "<int>", "Autoconnect");
+    connect_args.end = arg_end(4);
     const esp_console_cmd_t cmd = {
         .command = "wifi_connect",
         .help = "WiFi is station mode, join specified soft-AP",
@@ -191,6 +203,44 @@ static void register_wifi_connect(void)
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
+
+typedef struct {
+    struct arg_int *index;         // Index for array of known networks. Will be saved in config.
+    struct arg_end *end;
+} sta_auto_connect_args_t;
+static sta_auto_connect_args_t auto_connect_args;
+
+
+static int cmd_do_sta_auto_connect(int argc, char **argv)
+{
+    int nerrors = arg_parse(argc, argv, (void **) &auto_connect_args);
+
+    if (nerrors != 0) {
+        arg_print_errors(stderr, auto_connect_args.end, argv[0]);
+        return 1;
+    }
+
+    if (auto_connect_args.index->count > 0) {
+        uint8_t index = (uint8_t)auto_connect_args.index->ival[0];
+        config->auto_connect = index;
+        wifi_init(false);
+    }
+    return 0;
+}
+
+static void register_wifi_auto_connect(void)
+{
+    auto_connect_args.index = arg_int0(NULL, NULL, "<int>", "Array index 0-3");
+    auto_connect_args.end = arg_end(1);
+    const esp_console_cmd_t cmd = {
+        .command = "wifi_autoconnect",
+        .help = "Set autoconnect index",
+        .hint = NULL,
+        .func = &cmd_do_sta_auto_connect,
+        .argtable = &auto_connect_args
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
 
 typedef struct {
     struct arg_int *type;
@@ -290,13 +340,37 @@ static void register_wifi_scan(void)
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
+static int cmd_do_wifi_show(int argc, char **argv)
+{
+    for (uint8_t i = 0; i < 4; i++) {
+        ESP_LOGI(TAG, "%d: <%s>", i, config->nvs.wifi.ssid[i]);
+    }
+    ESP_LOGI(TAG, "Auto connect: %d", config->auto_connect);
+    return 0;
+}
+
+
+static void register_wifi_show(void)
+{
+    const esp_console_cmd_t cmd = {
+        .command = "wifi_show",
+        .help = "Show configures WiFi networks",
+        .hint = NULL,
+        .func = &cmd_do_wifi_show,
+        .argtable = NULL,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
 void register_wifi_cmd(void)
 {
     register_wifi_init();
     register_wifi_uninit();
     register_wifi_set_ap();
     register_wifi_connect();
+    register_wifi_auto_connect();
     register_wifi_light_sleep();
     register_wifi_powersave();
     register_wifi_scan();
+    register_wifi_show();
 }

@@ -145,14 +145,15 @@ static void wifi_selected_cb(lv_event_t *e)
     lv_obj_t *btn = lv_event_get_target(e);
     lv_obj_t *list = lv_obj_get_parent(btn);
     if (selected_btn && selected_btn != btn) {
-        lv_obj_remove_style(selected_btn, &style_selected, 0);
+        ui_remove_style(selected_btn, &style_selected);
     }
     if (selected_btn == btn) {
-        lv_obj_remove_style(btn, &style_selected, 0);
+        ui_remove_style(btn, &style_selected);
         selected_btn = NULL;
         selected_ssid = NULL;
-        wifi_uninit();
+        wifi_disconnect();
     } else {
+        lv_lock_acquire();
         if (!style_initialized) {
             lv_style_init(&style_selected);
             lv_style_set_bg_color(&style_selected, lv_palette_main(LV_PALETTE_BLUE));  // Your color
@@ -162,12 +163,14 @@ static void wifi_selected_cb(lv_event_t *e)
             style_initialized = true;
         }
         lv_obj_add_style(btn, &style_selected, 0);
+        lv_lock_release();
         selected_btn = btn;
         selected_ssid = lv_list_get_button_text(list, btn);
         config->auto_connect = 0;
         while (config->auto_connect < 4) {
+            ESP_LOGI(TAG,"Try %i %s", config->auto_connect, config->nvs.wifi.ssid[config->auto_connect]);
             if (strcmp(selected_ssid, config->nvs.wifi.ssid[config->auto_connect]) == 0) {
-                if (wifi_init() == ESP_OK) {
+                if (wifi_init(false) == ESP_OK) {
                     config_write();
                 }
                 break;
@@ -187,7 +190,8 @@ void wifi_scan(void)
 
     ui_list_clear(ui->lst_wifi);
     selected_ssid = NULL;
-    if (!wifi_initialized()) wifi_init();
+    selected_btn = NULL;
+    if (!wifi_initialized()) wifi_init(false);
     ui_set_label_text(ui->lbl_wifi_status1, "Scanning...");
     ESP_LOGI(TAG, "Start WiFi scan");
     set_scanning(true);

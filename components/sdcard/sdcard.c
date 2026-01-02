@@ -147,7 +147,17 @@ int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t mis
     ESP_LOGI(TAG, "Mounting filesystem");
     // IMPORTANT WORKAROUND: Comment out "SDMMC_INIT_STEP(is_spi, sdmmc_init_spi_crc);" in sdmmc_init.c
     err = esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_config, &card);
-    if (err != ESP_OK) {
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Filesystem mounted");
+
+        // Card has been initialized, print its properties
+        sdmmc_card_print_info(stdout, card);
+
+        ESP_LOGI(TAG, "Get FAT Info");
+        uint64_t bytes_total, bytes_free;
+        esp_vfs_fat_info(MOUNT_POINT, &bytes_total, &bytes_free);
+        ESP_LOGI(TAG, "FAT FS: %" PRIu64 " kB total, %" PRIu64 " kB free", bytes_total / 1024, bytes_free / 1024);
+    } else {
         if (err == ESP_FAIL) {
             ESP_LOGE(TAG, "Failed to mount filesystem. "
                      "If you want the card to be formatted, set the CONFIG_EXAMPLE_FORMAT_IF_MOUNT_FAILED menuconfig option.");
@@ -155,18 +165,13 @@ int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t mis
             ESP_LOGE(TAG, "Failed to initialize the card (%s). "
                      "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(err));
         }
-        return -1;
     }
-    ESP_LOGI(TAG, "Filesystem mounted");
-
-    // Card has been initialized, print its properties
-    sdmmc_card_print_info(stdout, card);
-
-    ESP_LOGI(TAG, "Get FAT Info");
-    uint64_t bytes_total, bytes_free;
-    esp_vfs_fat_info(MOUNT_POINT, &bytes_total, &bytes_free);
-    ESP_LOGI(TAG, "FAT FS: %" PRIu64 " kB total, %" PRIu64 " kB free", bytes_total / 1024, bytes_free / 1024);
     return host.slot;
+}
+
+int sd_card_mounted()
+{
+    return card != NULL;
 }
 
 esp_err_t sd_get_info(char *buf, uint64_t *bytes_total, uint64_t *bytes_free)

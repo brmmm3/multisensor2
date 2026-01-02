@@ -20,11 +20,13 @@ extern "C" {
 #include "wifi_sntp.h"
 #include "wifi_scan.h"
 
-esp_err_t wifi_init();
+esp_err_t wifi_init(bool scan);
 
 void wifi_uninit();
 
 bool wifi_initialized();
+
+void wifi_disconnect();
 
 void set_scanning(bool scanning);
 

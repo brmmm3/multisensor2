@@ -289,6 +289,8 @@ lv_obj_t *add_page_sd(ui_t *ui)
     ui->lbl_sd_free = add_label(lv_obj_get_child(sec_sd_free, 0), 8, 0);
     lv_obj_t *sec_sd_files = add_section(tab, 0, 120, 320, 30, 64, "Files");
     ui->lbl_sd_files = add_label(lv_obj_get_child(sec_sd_files, 0), 8, 0);
+    lv_obj_t *sec_sd_fill = add_section(tab, 0, 150, 320, 30, 64, "FillLvl");
+    ui->lbl_sd_fill = add_label(lv_obj_get_child(sec_sd_fill, 0), 8, 0);
     return tab;
 }
 

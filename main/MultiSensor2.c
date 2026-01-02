@@ -3,6 +3,7 @@
 #include "gps.h"
 #include "lcd.h"
 #include "main.h"
+#include "misc/lv_palette.h"
 #include "nvs_flash.h"
 #include "scd4x.h"
 #include "sdcard.h"
@@ -75,17 +76,21 @@ static const char *TAG = "MS2";
 
 #define UPDATE_TASK_PRIORITY 3
 
+#define DATA_HEADER_ID0     0xAA
+#define DATA_HEADER_ID1     0x55
+#define DATA_HEADER_VERSION 1
+
 rtc_t *rtc = NULL;
 gps_sensor_t *gps = NULL;
 gps_status_t *gps_status = NULL;
 bmx280_t *bmx280lo = NULL;
 bmx280_t *bmx280hi = NULL;
-adxl345_t *adxl345 = NULL;
 mhz19_t *mhz19 = NULL;
 scd4x_t *scd4x = NULL;
 sps30_t *sps30 = NULL;
-qmc5883l_t *qmc5883l = NULL;
 yys_sensor_t *yys_sensor = NULL;
+adxl345_t *adxl345 = NULL;
+qmc5883l_t *qmc5883l = NULL;
 wdt_hal_context_t rtc_wdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
 i2c_master_bus_handle_t bus_handle;
 int spi_host_id;
@@ -93,17 +98,129 @@ lv_display_t *lcd;
 ui_t *ui;
 led_strip_handle_t led_strip;
 
+status_t status = {0};
+
 bool gps_update = false;
-bool sps30_update = false;
 bool bmx280lo_update = false;
 bool bmx280hi_update = false;
-bool scd4x_update = false;
 bool mhz19_update = false;
+bool scd4x_update = false;
 bool yys_update = false;
-bool qmc5883l_update = false;
+bool sps30_update = false;
 bool adxl345_update = false;
+bool qmc5883l_update = false;
+
+// Measurement data
+uint8_t data[65536];
 
 void dump_data();
+
+
+void data_add_uint16(uint16_t value)
+{
+    data[status.record_pos++] = value & 0xff;
+    data[status.record_pos++] = (value >> 8) & 0xff;
+}
+
+
+void data_add_uint32(uint32_t value)
+{
+    data[status.record_pos++] = value & 0xff;
+    data[status.record_pos++] = (value >> 8) & 0xff;
+    data[status.record_pos++] = (value >> 16) & 0xff;
+    data[status.record_pos++] = (value >> 24) & 0xff;
+}
+
+
+void data_add_gps()
+{
+    // Write up to 38 bytes
+    data[status.record_pos++] = E_SENSOR_GPS;
+    status.record_pos += sprintf((char *)&data[status.record_pos], "%s", gps->status.sat);
+    status.record_pos++;
+    data_add_uint32(gps->status.date);
+    data_add_uint32(gps->status.time);
+    data_add_uint32((uint32_t)gps->status.lat);
+    data[status.record_pos++] = gps->status.ns;
+    data_add_uint32((uint32_t)gps->status.lng);
+    data[status.record_pos++] = gps->status.ew;
+    data_add_uint32((uint32_t)gps->status.altitude);
+    data_add_uint32((uint32_t)gps->status.speed);
+    data[status.record_pos++] = gps->status.mode_3d;
+    data[status.record_pos++] = gps->status.sats;
+    data[status.record_pos++] = gps->status.status;
+}
+
+
+void data_add_bmx280(uint8_t id, bmx280_t *bmx280)
+{
+    // Write 17 bytes
+    data[status.record_pos++] = id;
+    data_add_uint32((uint32_t)bmx280->values.temperature);
+    data_add_uint32((uint32_t)bmx280->values.humidity);
+    data_add_uint32((uint32_t)bmx280->values.pressure);
+    data_add_uint32((uint32_t)bmx280->values.altitude);
+}
+
+
+void data_add_mhz19()
+{
+    // Write 4 bytes
+    data[status.record_pos++] = E_SENSOR_MHZ19;
+    data_add_uint16(mhz19->co2);
+    data[status.record_pos++] = mhz19->temp;
+}
+
+
+void data_add_yys()
+{
+    // Write 9 bytes
+    data[status.record_pos++] = E_SENSOR_YYS;
+    data_add_uint16(yys_sensor->co);
+    data_add_uint16(yys_sensor->o2);
+    data_add_uint16(yys_sensor->h2s);
+    data_add_uint16(yys_sensor->ch4);
+}
+
+
+void data_add_sps30()
+{
+    // Write 41 bytes
+    data[status.record_pos++] = E_SENSOR_SPS30;
+    data_add_uint32((uint32_t)sps30->values.mc_1p0);
+    data_add_uint32((uint32_t)sps30->values.mc_2p5);
+    data_add_uint32((uint32_t)sps30->values.mc_4p0);
+    data_add_uint32((uint32_t)sps30->values.mc_10p0);
+    data_add_uint32((uint32_t)sps30->values.nc_0p5);
+    data_add_uint32((uint32_t)sps30->values.nc_1p0);
+    data_add_uint32((uint32_t)sps30->values.nc_2p5);
+    data_add_uint32((uint32_t)sps30->values.nc_4p0);
+    data_add_uint32((uint32_t)sps30->values.nc_10p0);
+    data_add_uint32((uint32_t)sps30->values.typical_particle_size);
+}
+
+
+void data_add_adxl345()
+{
+    // Write 25 bytes
+    data[status.record_pos++] = E_SENSOR_ADXL345;
+    data_add_uint32((uint32_t)adxl345->accel_x);
+    data_add_uint32((uint32_t)adxl345->accel_y);
+    data_add_uint32((uint32_t)adxl345->accel_z);
+    data_add_uint32((uint32_t)adxl345->accel_offset_x);
+    data_add_uint32((uint32_t)adxl345->accel_offset_y);
+    data_add_uint32((uint32_t)adxl345->accel_offset_z);
+}
+
+
+void data_add_qmc5883l()
+{
+    // Write 13 bytes
+    data[status.record_pos++] = E_SENSOR_QMC5883L;
+    data_add_uint32((uint32_t)qmc5883l->mag_x);
+    data_add_uint32((uint32_t)qmc5883l->mag_y);
+    data_add_uint32((uint32_t)qmc5883l->mag_z);
+}
 
 
 esp_err_t nvs_init()
@@ -200,12 +317,24 @@ static void update_scd4x()
         scd4x_set_temperature_offset(scd4x, temp_offset);
         scd4x_set_sensor_altitude(scd4x, bmx280->values.altitude);
         scd4x_set_ambient_pressure(scd4x, bmx280->values.pressure);
+        if (status.recording) {
+            data[status.record_pos++] = E_SENSOR_SCD4XCAL;
+            data_add_uint32((uint32_t)scd4x->temperature_offset);
+            data_add_uint16(scd4x->altitude);
+            data_add_uint16(scd4x->pressure);
+        }
         ESP_LOGI("SCD4X", "Adjust: TempOffset=%f °C  Alt=%f m  Press=%f hPa",
                     temp_offset, bmx280->values.altitude, bmx280->values.pressure);
     }
     if (scd4x_get_data_ready_status(scd4x)) {
         if ((err = scd4x_read_measurement(scd4x)) == ESP_OK) {
             scd4x_update = true;
+            if (status.recording) {
+                data[status.record_pos++] = E_SENSOR_SCD4X;
+                data_add_uint16(scd4x->values.co2);
+                data_add_uint32((uint32_t)scd4x->values.temperature);
+                data_add_uint32((uint32_t)scd4x->values.humidity);
+            }
         }
         err = scd4x_start_periodic_measurement(scd4x);
     } else if (scd4x->enabled) {
@@ -242,47 +371,13 @@ static void sensors_update()
 {
     esp_err_t err;
     uint16_t v16;
+    bool recording = status.recording;
 
     // Update/Read data
-    if (bmx280lo != NULL) {
-        if ((err = bmx280_readout(bmx280lo)) == ESP_OK) {
-            bmx280lo_update = true;
-        } else {
-            ESP_LOGE("BME280LO", "Error=%d", err);
-        }
-    }
-    if (bmx280hi != NULL) {
-        if ((err = bmx280_readout(bmx280hi)) == ESP_OK) {
-            bmx280hi_update = true;
-        } else {
-            ESP_LOGE("BME280HI", "Error=%d", err);
-        }
-    }
-    if (scd4x != NULL) {
-        update_scd4x();
-    }
-    if (mhz19 != NULL) {
-        mhz19_update = mhz19_data_ready(mhz19);
-    }
-    if (yys_sensor != NULL) {
-        yys_update = yys_data_ready(yys_sensor);
-    }
-    if (sps30 != NULL) {
-        update_sps30();
-    }
-    if (qmc5883l != NULL) {
-        if ((err = qmc5883l_read_data(qmc5883l)) == ESP_OK) {
-            qmc5883l_update = true;
-        } else {
-            ESP_LOGE("QMC5883L", "Error=%d", err);
-        }
-    }
-    if (adxl345 != NULL) {
-        if ((err = adxl345_read_data(adxl345)) == ESP_OK) {
-            adxl345_update = true;
-        } else {
-            ESP_LOGE("ADXL345", "Error=%d", err);
-        }
+    if (recording && status.record_pos == 0) {
+        data[status.record_pos++] = DATA_HEADER_ID0;
+        data[status.record_pos++] = DATA_HEADER_ID1;
+        data[status.record_pos++] = DATA_HEADER_VERSION;
     }
     if (gps != NULL) {
         gps_update = gps_data_ready(gps);
@@ -290,6 +385,70 @@ static void sensors_update()
             if (gps->debug & 1) {
                 ESP_LOGI("GPS", "%04X", v16);
             }
+        }
+        if (gps_update && recording) {
+            data_add_gps();
+        }
+    }
+    if (bmx280lo != NULL) {
+        if ((err = bmx280_readout(bmx280lo)) == ESP_OK) {
+            bmx280lo_update = true;
+            if (recording) {
+                data_add_bmx280(E_SENSOR_BMX280_LO, bmx280lo);
+            }
+        } else {
+            ESP_LOGE("BME280LO", "Error=%d", err);
+        }
+    }
+    if (bmx280hi != NULL) {
+        if ((err = bmx280_readout(bmx280hi)) == ESP_OK) {
+            bmx280hi_update = true;
+            if (recording) {
+                data_add_bmx280(E_SENSOR_BMX280_HI, bmx280hi);
+            }
+        } else {
+            ESP_LOGE("BME280HI", "Error=%d", err);
+        }
+    }
+    if (mhz19 != NULL) {
+        mhz19_update = mhz19_data_ready(mhz19);
+        if (mhz19_update && recording) {
+            data_add_mhz19();
+        }
+    }
+    if (scd4x != NULL) {
+        update_scd4x();
+    }
+    if (yys_sensor != NULL) {
+        yys_update = yys_data_ready(yys_sensor);
+        if (yys_update && recording) {
+            data_add_yys();
+        }
+    }
+    if (sps30 != NULL) {
+        update_sps30();
+        if (sps30_update && recording) {
+            data_add_sps30();
+        }
+    }
+    if (adxl345 != NULL) {
+        if ((err = adxl345_read_data(adxl345)) == ESP_OK) {
+            adxl345_update = true;
+            if (recording) {
+                data_add_adxl345();
+            }
+        } else {
+            ESP_LOGE("ADXL345", "Error=%d", err);
+        }
+    }
+    if (qmc5883l != NULL) {
+        if ((err = qmc5883l_read_data(qmc5883l)) == ESP_OK) {
+            qmc5883l_update = true;
+            if (recording) {
+                data_add_qmc5883l();
+            }
+        } else {
+            ESP_LOGE("QMC5883L", "Error=%d", err);
         }
     }
 }
@@ -320,7 +479,20 @@ static void update_task(void *arg)
 
         esp_task_wdt_reset();
 
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        if (status.record_pos > 65000) {
+            char buf[32];
+            int pos = strlen(MOUNT_POINT);
+
+            strcpy(buf, MOUNT_POINT);
+            sprintf(&buf[pos], "/data/%llu.dat", status.start_time);
+            ESP_LOGI(TAG, "Write Data to File %s", buf);
+            write_bin_file(buf, data, status.record_pos);
+            status.record_pos = 0;
+            status.start_time = ((uint64_t)gps->status.date) << 32 | (uint64_t)gps->status.time;
+            ESP_LOGI(TAG, "Data Filename=%llu.dat", status.start_time);
+        } else {
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        }
     }
 }
 
@@ -368,7 +540,11 @@ void app_main(void)
     sensors_init();
     rtc_init(&rtc, &bus_handle);
     if (config->auto_connect < 4) {
-        wifi_init();
+        wifi_init(false);
+    }
+
+    if (!sd_card_mounted()) {
+        ui_set_tab_color(4, LV_PALETTE_RED);
     }
 
     xTaskCreate(update_task, "update_task", 4096, NULL, UPDATE_TASK_PRIORITY, NULL);

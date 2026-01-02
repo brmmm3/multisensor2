@@ -22,6 +22,8 @@ int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t mis
 
 esp_err_t sd_get_info(char *buf, uint64_t *bytes_total, uint64_t *bytes_free);
 
+int sd_card_mounted();
+
 int sd_get_file_count(const char *path);
 
 esp_err_t ensure_dir(const char *path);
