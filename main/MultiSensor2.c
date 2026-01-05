@@ -458,7 +458,7 @@ static void sensors_recording()
     if (gps_update) {
         data_add(E_SENSOR_GPS, &last_values.gps, sizeof(sensors_data_gps_t));
         if (log_values || (debug_main & 4) != 0) {
-            ESP_LOGI(TAG, "GPS: %s date=%lu time=%lu lat=%f %c lng=%f %c alt=%f spd=%f mode_3d=%c sats=%d st=%d pdop=%f hdop=%f vdop=%f",
+            ESP_LOGI(TAG, "GPS: %s date=%lu time=%lu lat=%f %c lng=%f %c alt=%.1f spd=%.1f mode_3d=%c sats=%d st=%d pdop=%.1f hdop=%.1f vdop=%.1f",
                     gps_values.sat, gps_values.date, gps_values.time, gps_values.lat, gps_values.ns, gps_values.lng,
                     gps_values.ew, gps_values.altitude, gps_values.speed, gps_values.mode_3d, gps_values.sats,
                     gps_values.status, gps_values.pdop, gps_values.hdop, gps_values.vdop);
@@ -502,13 +502,13 @@ static void sensors_recording()
         data_add(E_SENSOR_SCD4X, &last_values.scd4x, sizeof(sensors_data_scd4x_t));
         if (log_values || (debug_main & 16) != 0) {
             sensors_data_scd4x_t *values = &last_values.scd4x;
-            ESP_LOGI(TAG, "SCD4X: co2=%d ppm  temp=%f °C  hum=%f %%", values->co2, values->temperature, values->humidity);
+            ESP_LOGI(TAG, "SCD4X: co2=%d ppm  temp=%.1f °C  hum=%.1f %%", values->co2, values->temperature, values->humidity);
         }
     }
     if (yys_update) {
         data_add(E_SENSOR_YYS, &last_values.yys, sizeof(sensors_data_yys_t));
         if (log_values || (debug_main & 32) != 0) {
-            ESP_LOGI(TAG, "YYS: o2=%f %%  co=%f ppm  h2s=%f ppm  ch4=%f ppm",
+            ESP_LOGI(TAG, "YYS: o2=%.1f %%  co=%.1f ppm  h2s=%.1f ppm  ch4=%.1f ppm",
                     yys_get_o2(yys_sensor), yys_get_co(yys_sensor),
                     yys_get_h2s(yys_sensor), yys_get_ch4(yys_sensor));
         }
@@ -574,7 +574,7 @@ static void update_task(void *arg)
     char buf[64];
     uint64_t bytes_total, bytes_free;
 
-    ESP_LOGI(TAG, "Start main loop.");
+    ESP_LOGI(TAG, "Start update_task");
     esp_task_wdt_add(NULL);
     // Update SD-Card info
     ensure_dir(MOUNT_POINT"/data");
@@ -591,7 +591,8 @@ static void update_task(void *arg)
         if (status.recording) {
             sensors_recording();
         }
-        ui_update();
+        ui_update(status.force_update);
+        status.force_update = false;
 
         // Dump data for debugging
         dump_data();
@@ -632,7 +633,10 @@ static void update_task(void *arg)
             float fill_level = 100.0 * (float) status.record_pos / (float)DATA_MAX_SIZE;
             sprintf(buf, "%.1f %%", fill_level);
             ui_set_label_text(ui->lbl_sd_fill, buf);
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            for (int i = 0; i < 10; i++) {
+                if (status.force_update) break;
+                vTaskDelay(100 / portTICK_PERIOD_MS);
+            }
         }
     }
 }
@@ -652,15 +656,15 @@ void dump_data()
 
 void app_main(void)
 {
-    // Wait 500ms to give sensors time to power up.
+    // Wait 100ms to give sensors time to power up.
     vTaskDelay(pdMS_TO_TICKS(100));
 
-    esp_task_wdt_config_t twdt_config = {
-        .timeout_ms     = 5000,     // 5 seconds is safe
-        .idle_core_mask = 0,        // don’t watch idle task on C6 (single core)
+    /*esp_task_wdt_config_t twdt_config = {
+        .timeout_ms     = 8000,     // 8 seconds is safe
+        .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,  // Subscribe all idle cores (ESP32-C6 is single-core, so 1)
         .trigger_panic  = true,
     };
-    esp_task_wdt_reconfigure(&twdt_config);
+    esp_task_wdt_reconfigure(&twdt_config);*/
     //esp_task_wdt_deinit();
 
     ESP_ERROR_CHECK(nvs_init());
@@ -675,7 +679,6 @@ void app_main(void)
     lcd = lcd_init(spi_host_id, LCD_PIN_NUM_CS, LCD_PIN_NUM_DC, LCD_PIN_NUM_RST, LCD_PIN_NUM_LED, LCD_PIN_NUM_T_CS);
     ui = ui_init(lcd);
     ui_register_callbacks(ui);
-    lcd_start();
 
     led_init();
     sensors_init();
@@ -687,8 +690,8 @@ void app_main(void)
     if (!sd_card_mounted()) {
         ui_set_tab_color(4, LV_PALETTE_RED);
     }
+    console_init();
 
     xTaskCreate(update_task, "update_task", 4096, NULL, UPDATE_TASK_PRIORITY, NULL);
-
-    console_init();
+    //update_task(NULL);
 }

@@ -16,30 +16,30 @@
 #define LED_STRIP_RMT_RES_HZ  (10 * 1000 * 1000)
 
 
-void update_air_tab()
+void update_air_tab(bool force_update)
 {
     char buf[100];
-    if (bmx280lo_update) {
+    if (bmx280lo_update || force_update) {
         sprintf(buf, "P=%.1f hPa  A=%.1f m\nT=%.1f °C  H=%.1f %%",
                 bmx280lo->values.pressure, bmx280lo->values.altitude, bmx280lo->values.temperature, bmx280lo->values.humidity);
         lv_label_set_text(ui->lbl_bmx280lo, buf);
     }
-    if (bmx280hi_update) {
+    if (bmx280hi_update || force_update) {
         sprintf(buf, "P=%.1f hPa  A=%.1f m\nT=%.1f °C  H=%.1f %%",
                 bmx280hi->values.pressure, bmx280hi->values.altitude, bmx280hi->values.temperature, bmx280hi->values.humidity);
         lv_label_set_text(ui->lbl_bmx280hi, buf);
     }
-    if (scd4x_update) {
+    if (scd4x_update || force_update) {
         scd4x_values_t *scd4x_values = &scd4x->values;
 
         sprintf(buf, "CO2=%d ppm\nT=%.1f °C  H=%.1f %%", scd4x_values->co2, scd4x_values->temperature, scd4x_values->humidity);
         lv_label_set_text(ui->lbl_scd4x, buf);
     }
-    if (mhz19_update) {
+    if (mhz19_update || force_update) {
         sprintf(buf, "CO2=%d ppm\nT=%d °C ", mhz19->values.co2, mhz19->values.temp);
         lv_label_set_text(ui->lbl_mhz19, buf);
     }
-    if (yys_update) {
+    if (yys_update || force_update) {
         sprintf(buf, "O2=%.1f %%  CO=%d ppm\nH2S=%.1f ppm  CH4=%d ppm",
             yys_get_o2(yys_sensor), yys_get_co_raw(yys_sensor),
             yys_get_h2s(yys_sensor), yys_get_ch4_raw(yys_sensor));
@@ -47,9 +47,9 @@ void update_air_tab()
     }
 }
 
-void update_dust_tab()
+void update_dust_tab(bool force_update)
 {
-    if (sps30_update) {
+    if (sps30_update || force_update) {
         char buf[100];
         sps30_values_t *sps30_values = &sps30->values;
 
@@ -68,9 +68,9 @@ void update_dust_tab()
     }
 }
 
-void update_gps_tab()
+void update_gps_tab(bool force_update)
 {
-    if (gps_update) {
+    if (gps_update || force_update) {
         char buf[100];
         uint32_t day;
         uint32_t month;
@@ -104,48 +104,48 @@ void update_gps_tab()
     }
 }
 
-void update_wifi_tab()
+void update_wifi_tab(bool force_update)
 {
 }
 
-void update_sd_tab()
+void update_sd_tab(bool force_update)
 {
 }
 
-void update_cfg_tab()
+void update_cfg_tab(bool force_update)
 {
     char buf[100];
 
     // Update QMC5883L
-    if (qmc5883l_update) {
+    if (qmc5883l_update || force_update) {
         sprintf(buf, "X=%5.2f  Y=%5.2f  Z=%5.2f", qmc5883l->values.mag_x, qmc5883l->values.mag_y, qmc5883l->values.mag_z);
         lv_label_set_text(ui->lbl_qmc5883L, buf);
     }
     // Update ADXL345
-    if (adxl345_update) {
+    if (adxl345_update || force_update) {
         sprintf(buf, "%5.2f g  Moving=%d", adxl345->values.accel_abs, adxl345->moving_cnt);
         lv_label_set_text(ui->lbl_adxl345, buf);
     }
 }
 
-void ui_update()
+void ui_update(bool force_update)
 {
-    lv_lock_acquire();
+    lvgl_port_lock(-1);
 
     uint32_t tab_idx = lv_tabview_get_tab_active(ui->tbv_main);
 
     if (tab_idx == 0) {
-        update_air_tab();
+        update_air_tab(force_update);
     } else if (tab_idx == 1) {
-        update_dust_tab();
+        update_dust_tab(force_update);
     } else if (tab_idx == 2) {
-        update_gps_tab();
+        update_gps_tab(force_update);
     } else if (tab_idx == 3) {
-        update_wifi_tab();
+        update_wifi_tab(force_update);
     } else if (tab_idx == 4) {
-        update_sd_tab();
+        update_sd_tab(force_update);
     } else if (tab_idx == 5) {
-        update_cfg_tab();
+        update_cfg_tab(force_update);
     }
-    lv_lock_release();
+    lvgl_port_unlock();
 }

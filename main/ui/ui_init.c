@@ -322,6 +322,7 @@ ui_t *ui_init(lv_display_t *disp)
     lv_obj_t *scr = lv_display_get_screen_active(disp);
     ui_t *ui = malloc(sizeof(ui_t));
 
+    lvgl_port_lock(-1);
     init_styles();
     ESP_LOGI(TAG, "Add Tab main");
     ui->tbv_main = add_tabiew(scr, 0, 0);
@@ -337,6 +338,7 @@ ui_t *ui_init(lv_display_t *disp)
     ui->tab_sd = add_page_sd(ui);
     ESP_LOGI(TAG, "Add Tab cfg");
     ui->tab_cfg = add_page_cfg(ui);
+    lvgl_port_unlock();
     ESP_LOGI(TAG, "DONE");
     return ui;
 }

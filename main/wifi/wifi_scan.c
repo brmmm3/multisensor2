@@ -153,7 +153,7 @@ static void wifi_selected_cb(lv_event_t *e)
         selected_ssid = NULL;
         wifi_disconnect();
     } else {
-        lv_lock_acquire();
+        lvgl_port_lock(-1);
         if (!style_initialized) {
             lv_style_init(&style_selected);
             lv_style_set_bg_color(&style_selected, lv_palette_main(LV_PALETTE_BLUE));  // Your color
@@ -163,7 +163,7 @@ static void wifi_selected_cb(lv_event_t *e)
             style_initialized = true;
         }
         lv_obj_add_style(btn, &style_selected, 0);
-        lv_lock_release();
+        lvgl_port_unlock();
         selected_btn = btn;
         selected_ssid = lv_list_get_button_text(list, btn);
         config->auto_connect = 0;

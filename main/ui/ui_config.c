@@ -9,8 +9,9 @@
 #include <string.h>
 #include <esp_log.h>
 #include <esp_wifi.h>
-#include "esp_err.h"
-#include "misc/lv_types.h"
+#include <esp_err.h>
+#include <misc/lv_types.h>
+#include <esp_lvgl_port.h>
 #include "main.h"
 #include "include/ui.h"
 
@@ -24,71 +25,71 @@ static lv_style_t tab_styles[6];
 
 void ui_set_label_text(lv_obj_t *obj, const char *text)
 {
-    lv_lock_acquire();
+    lvgl_port_lock(-1);
     lv_label_set_text(obj, text);
-    lv_lock_release();
+    lvgl_port_unlock();
 }
 
 
 void ui_set_switch_state(lv_obj_t *obj, bool enabled)
 {
-    lv_lock_acquire();
+    lvgl_port_lock(-1);
     if (enabled) {
         lv_obj_add_state(obj, LV_STATE_CHECKED);
     } else {
         lv_obj_remove_state(obj, LV_STATE_CHECKED);
     }
-    lv_lock_release();
+    lvgl_port_unlock();
 }
 
 
 void ui_set_text_color(lv_obj_t *obj, int color)
 {
     static lv_style_t style;
-    lv_lock_acquire();
+    lvgl_port_lock(-1);
     lv_style_init(&style);
     //lv_style_set_text_opa(&style, LV_OPA_COVER);
     lv_style_set_text_color(&style, lv_palette_main(color));  // Any color
     lv_obj_add_style(obj, &style, 0);
-    lv_lock_release();
+    lvgl_port_unlock();
 }
 
 
 void ui_set_tab_color(int index, int color)
 {
     lv_style_t *style = &tab_styles[index];
-    lv_lock_acquire();
+    lvgl_port_lock(-1);
     lv_style_init(style);
     //lv_style_set_text_opa(&style, LV_OPA_COVER);
     lv_style_set_text_color(style, lv_palette_main(color));  // Any color
     lv_obj_t *tab_bar = lv_tabview_get_tab_bar(ui->tbv_main);
     lv_obj_t *btn = lv_obj_get_child(tab_bar, index);
     lv_obj_add_style(btn, style, 0);
-    lv_lock_release();
+    lvgl_port_unlock();
 }
 
 
 void ui_remove_style(lv_obj_t *obj, lv_style_t *style)
 {
-    lv_lock_acquire();
+    lvgl_port_lock(-1);
     lv_obj_remove_style(obj, style, 0);
-    lv_lock_release();
+    lvgl_port_unlock();
 }
 
 
 void ui_list_clear(lv_obj_t *obj)
 {
-    lv_lock_acquire();
+    lvgl_port_lock(-1);
     lv_obj_clean(obj);
-    lv_lock_release();
+    lvgl_port_unlock();
 }
 
 
 lv_obj_t *ui_list_add(lv_obj_t *obj, const char *symbol, const char *text)
 {
-    lv_lock_acquire();
+    lvgl_port_lock(-1);
     obj = lv_list_add_button(obj, symbol, text);
-    lv_lock_release();
+    lvgl_port_unlock();
     return obj;
 }
 
@@ -201,9 +202,9 @@ static void sw_scd4x_pwr_cb(lv_event_t *e)
     }
 }
 
-static void tabview_event_cb(lv_event_t * e)
+static void tabview_event_cb(lv_event_t *e)
 {
-    ui_update();
+    status.force_update = true;
 }
 
 void ui_register_callbacks(ui_t *ui)

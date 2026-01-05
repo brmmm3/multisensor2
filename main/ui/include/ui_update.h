@@ -9,11 +9,13 @@
 
 #pragma once
 
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void ui_update();
+void ui_update(bool force_update);
 
 #ifdef __cplusplus
 };

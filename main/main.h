@@ -136,6 +136,7 @@ typedef struct sensors_data_s {
 } sensors_data_t;
 
 typedef struct status_s {
+    bool force_update;
     bool recording;
     uint16_t record_pos;
     uint16_t file_cnt;
