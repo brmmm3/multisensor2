@@ -143,10 +143,18 @@ typedef struct status_s {
     char filename[32];
 } status_t;
 
+extern gps_sensor_t *gps;
+extern gps_values_t gps_values;
+extern gps_status_t *gps_status;
 extern status_t status;
 extern bmx280_t *bmx280lo;
 extern bmx280_t *bmx280hi;
+extern mhz19_t *mhz19;
 extern scd4x_t *scd4x;
+extern sps30_t *sps30;
+extern yys_sensor_t *yys_sensor;
+extern adxl345_t *adxl345;
+extern qmc5883l_t *qmc5883l;
 
 extern bool gps_update;
 extern bool bmx280lo_update;

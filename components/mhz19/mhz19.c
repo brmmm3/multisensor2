@@ -247,6 +247,7 @@ esp_err_t mhz19_init(mhz19_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint8_t
     mhz19_sensor->values.temp = 0xff;
     mhz19_sensor->values.status = 0xff;
     mhz19_sensor->data_cnt = 0;
+    mhz19_sensor->error_cnt = 0;
     mhz19_sensor->range = MHZ19_RANGE_INVALID;
     mhz19_sensor->fw_version[0] = 0;
     mhz19_sensor->debug = 0;
@@ -269,6 +270,7 @@ esp_err_t mhz19_init(mhz19_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint8_t
 void mhz19_dump(mhz19_t *sensor)
 {
     if (sensor->debug & 1) {
-        ESP_LOGI(TAG, "co2=%d ppm  temp=%d °C  status=%d", sensor->values.co2, sensor->values.temp, sensor->values.status);
+        mhz19_values_t *values = &sensor->values;
+        ESP_LOGI(TAG, "co2=%d ppm  temp=%d °C  status=%d", values->co2, values->temp, values->status);
     }
 }

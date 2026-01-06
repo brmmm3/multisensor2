@@ -5,6 +5,7 @@
 #include "include/led_cmd.h"
 #include "include/pwr_cmd.h"
 #include "include/bme_cmd.h"
+#include "include/mhz19_cmd.h"
 #include "include/scd4x_cmd.h"
 #include "include/wifi_cmd.h"
 
@@ -22,6 +23,7 @@ esp_err_t console_init()
     register_pwr_cmd();
     register_led_cmd();
     register_bme_cmd();
+    register_mhz19_cmd();
     register_scd4x_cmd();
     register_wifi_cmd();
     register_config_cmd();
