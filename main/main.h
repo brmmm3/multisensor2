@@ -144,6 +144,9 @@ typedef struct status_s {
 } status_t;
 
 extern status_t status;
+extern bmx280_t *bmx280lo;
+extern bmx280_t *bmx280hi;
+extern scd4x_t *scd4x;
 
 extern bool gps_update;
 extern bool bmx280lo_update;

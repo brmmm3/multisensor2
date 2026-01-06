@@ -65,10 +65,8 @@ void register_pwr_cmd()
 {
     pwr_cmd_args.lcd = arg_int0("l", "lcd", "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) LCD");
     pwr_cmd_args.gps = arg_int0("g", "gps", "<0-3>", "Set power mode (0=full speed, 1=low power, 2=sleep) GPS");
-    pwr_cmd_args.bme = arg_int0("b", "bme", "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) BME280");
     pwr_cmd_args.scd = arg_int0("s", "scd", "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) SCD41");
     pwr_cmd_args.mhz = arg_int0("m", "mhz", "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) MHZ19");
-    pwr_cmd_args.yys = arg_int0("y", "yys", "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) YYS");
     pwr_cmd_args.sps = arg_int0("p", "sps", "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) SPS30");
     pwr_cmd_args.qmc = arg_int0("q", "qmc", "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) QMC5883L");
     pwr_cmd_args.adx = arg_int0("a", "adx", "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) ADXL345");
