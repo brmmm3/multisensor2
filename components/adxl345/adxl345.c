@@ -222,14 +222,14 @@ esp_err_t adxl345_device_init(adxl345_t *sensor)
     return err;
 }
 
-esp_err_t adxl345_init(adxl345_t **sensor, i2c_master_bus_handle_t bus_handle)
+esp_err_t adxl345_init(adxl345_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
 {
     uint8_t addr = ADXL345_I2C_ADDR;
     esp_err_t err;
 
     ESP_LOGI(TAG, "Initialized ADXL345");
-    *sensor = adxl345_create_master(bus_handle);
-    if (!*sensor) {
+    adxl345_t *sensor = adxl345_create_master(bus_handle);
+    if (sensor == NULL) {
         ESP_LOGE(TAG, "Could not create ADXL345 driver.");
         return ESP_FAIL;
     }
@@ -237,19 +237,21 @@ esp_err_t adxl345_init(adxl345_t **sensor, i2c_master_bus_handle_t bus_handle)
     ESP_LOGI(TAG, "Probing for ADXL345");
     if ((err = i2c_master_probe(bus_handle, addr, CONFIG_ADXL345_PROBE_TIMEOUT)) != ESP_OK) return err;
     ESP_LOGI(TAG, "Found ADXL345 on I2C address 0x%02X", addr);
-    if ((err = adxl345_device_create(*sensor, addr)) != ESP_OK) return err;
+    if ((err = adxl345_device_create(sensor, addr)) != ESP_OK) return err;
     // Initialize device
-    if ((err = adxl345_device_init(*sensor)) != ESP_OK) return err;
+    if ((err = adxl345_device_init(sensor)) != ESP_OK) return err;
     ESP_LOGI(TAG, "ADXL345 initialized");
-    if ((err = adxl345_calibrate_offset(*sensor)) != ESP_OK) return err;
+    if ((err = adxl345_calibrate_offset(sensor)) != ESP_OK) return err;
     ESP_LOGI(TAG, "ADXL345 offsets calibrated");
+    *sensor_ptr = sensor;
     return ESP_OK;
 }
 
-void adxl345_dump(adxl345_t *sensor)
+void adxl345_dump_values(adxl345_t *sensor, bool force)
 {
-    if (sensor->debug & 1) {
+    if (force || sensor->debug & 1) {
         adxl345_values_t *values = &sensor->values;
+
         ESP_LOGI(TAG, "x=%f g  y=%f g  z=%f g  abs=%f g  offsets=%f %f %f  moving_cnt=%d",
                  values->accel_x, values->accel_y, values->accel_z, values->accel_abs,
                  values->accel_offset_x, values->accel_offset_y, values->accel_offset_z,

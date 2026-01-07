@@ -47,7 +47,7 @@ extern "C" {
 /** The fan speed is out of range */
 #define SPS30_DEVICE_FAN_SPEED_WRN(s)   ((s & (1 << 21)) != 0)
 
-typedef struct sps30_values_s {
+typedef struct __attribute__((packed)) sps30_values_s {
     float mc_1p0;
     float mc_2p5;
     float mc_4p0;
@@ -72,7 +72,7 @@ typedef struct sps30_s {
     char device_info[SPS30_DEV_INFO_MAX_LEN + 1];
     // Serial number
     char serial[SPS30_SERIAL_MAX_LEN + 1];
-    uint16_t firmware_version;
+    uint16_t fw_version;
     // Auto cleaning interval
     uint32_t autoclean_interval;
     sps30_values_t values;
@@ -90,7 +90,9 @@ esp_err_t sps30_device_init(sps30_t** sensor_ptr, i2c_master_bus_handle_t bus_ha
 
 void sps30_close(sps30_t *sensor);
 
-void sps30_dump(sps30_t *sensor);
+void sps30_dump_info(sps30_t *sensor);
+
+void sps30_dump_values(sps30_t *sensor, bool force);
 
 /**
  * sps30_get_driver_version() - Return the driver version

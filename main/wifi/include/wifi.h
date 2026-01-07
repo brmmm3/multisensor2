@@ -20,15 +20,28 @@ extern "C" {
 #include "wifi_sntp.h"
 #include "wifi_scan.h"
 
+typedef struct wifi_network_s {
+    const char *ssid;
+    const char *password;
+} wifi_network_t;
+
+extern bool wifi_connected;
+
+const char *wifi_ip();
+
 esp_err_t wifi_init(bool scan);
 
 void wifi_uninit();
 
 bool wifi_initialized();
 
+esp_err_t wifi_connect(const char *ssid, const char *password);
+
 void wifi_disconnect();
 
 void set_scanning(bool scanning);
+
+esp_err_t wifi_set_pwr_mode(uint8_t mode);
 
 #ifdef __cplusplus
 };

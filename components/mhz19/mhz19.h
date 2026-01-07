@@ -34,7 +34,7 @@ enum MHZ19_RANGE {
     MHZ19_RANGE_INVALID
 };
 
-typedef struct mhz19_values_s {
+typedef struct __attribute__((packed)) mhz19_values_s {
     uint16_t co2;
     uint8_t temp;
     uint8_t status;
@@ -75,7 +75,7 @@ esp_err_t mhz19_set_range(mhz19_t *sensor, enum MHZ19_RANGE range);
 
 esp_err_t mhz19_reset(mhz19_t *sensor);
 
-void mhz19_dump(mhz19_t *sensor);
+void mhz19_dump_values(mhz19_t *sensor, bool force);
 
 #ifdef __cplusplus
 };

@@ -1,3 +1,4 @@
+#include "esp_err.h"
 #include "esp_rom_crc.h"
 #include "bmx280.h"
 #include "config.h"
@@ -5,10 +6,12 @@
 #include "lcd.h"
 #include "main.h"
 #include "misc/lv_palette.h"
+#include "mqtt.h"
 #include "nvs_flash.h"
 #include "rtc_tiny.h"
 #include "scd4x.h"
 #include "sdcard.h"
+#include "tcp_server.h"
 #include "ui/include/ui_config.h"
 #include "ui/include/ui_update.h"
 #include "wifi/include/wifi.h"
@@ -83,7 +86,12 @@ static const char *TAG = "MS2";
 #define DATA_HEADER_VERSION 1
 #define DATA_MAX_SIZE       65000
 
+wdt_hal_context_t rtc_wdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
+i2c_master_bus_handle_t bus_handle;
+int spi_host_id;
+
 rtc_t *rtc = NULL;
+
 gps_sensor_t *gps = NULL;
 gps_values_t gps_values = {0};
 gps_status_t *gps_status = NULL;
@@ -95,12 +103,10 @@ sps30_t *sps30 = NULL;
 yys_sensor_t *yys_sensor = NULL;
 adxl345_t *adxl345 = NULL;
 qmc5883l_t *qmc5883l = NULL;
-wdt_hal_context_t rtc_wdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
-i2c_master_bus_handle_t bus_handle;
-int spi_host_id;
+
+led_strip_handle_t led_strip;
 lv_display_t *lcd;
 ui_t *ui;
-led_strip_handle_t led_strip;
 
 status_t status = {0};
 
@@ -125,7 +131,7 @@ sensors_data_t last_values = {0};
 // Recorded measurement data
 uint8_t data[65536];
 
-void dump_data();
+void dump_values(bool force);
 
 
 void get_current_date_time(uint16_t *year, uint8_t *month, uint8_t *day, uint8_t *hour, uint8_t *min, uint8_t *sec)
@@ -239,24 +245,99 @@ void led_init(void)
 void sensors_init()
 {
     ESP_LOGI(TAG, "Initialize Sensors");
-    ESP_ERROR_CHECK(gps_init(&gps, GPS_UART_NUM, GPS_PIN_NUM_RX, GPS_PIN_NUM_TX));
+    // This will never fail here
+    gps_init(&gps, GPS_UART_NUM, GPS_PIN_NUM_RX, GPS_PIN_NUM_TX);
     gps_status = &gps->status;
-    ESP_ERROR_CHECK(adxl345_init(&adxl345, bus_handle));
-    ESP_ERROR_CHECK(bmx280_init(&bmx280lo, bus_handle, false));
-    ESP_ERROR_CHECK(bmx280_init(&bmx280hi, bus_handle, true));
-    ESP_ERROR_CHECK(mhz19_init(&mhz19, MHZ19_UART_NUM, MHZ19_PIN_NUM_RX, MHZ19_PIN_NUM_TX));
-    ESP_ERROR_CHECK(scd4x_device_init(&scd4x, bus_handle));
-    ESP_ERROR_CHECK(yys_init(&yys_sensor, YYS_PIN_NUM_RX, YYS_PIN_NUM_TX));
-    ESP_ERROR_CHECK(qmc5883l_init(&qmc5883l, bus_handle));
-    //ESP_ERROR_CHECK(tlv493_init(&tlv493, bus_handle));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(bmx280_init(&bmx280lo, bus_handle, false));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(bmx280_init(&bmx280hi, bus_handle, true));
+    // This will never fail here
+    mhz19_init(&mhz19, MHZ19_UART_NUM, MHZ19_PIN_NUM_RX, MHZ19_PIN_NUM_TX);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_init(&scd4x, bus_handle));
+    // This will never fail here
+    yys_init(&yys_sensor, YYS_PIN_NUM_RX, YYS_PIN_NUM_TX);
+    //ESP_ERROR_CHECK_WITHOUT_ABORT(tlv493_init(&tlv493, bus_handle));
     //ESP_LOGI("TLV493D", "ChipId = %d", tlv493->device_id);
-    ESP_ERROR_CHECK(sps30_init(&sps30, bus_handle));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(sps30_init(&sps30, bus_handle));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(adxl345_init(&adxl345, bus_handle));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(qmc5883l_init(&qmc5883l, bus_handle));
 }
 
-static void update_scd4x()
+static bool update_gps()
+{
+    uint16_t v16;
+    bool force_update = (debug_main & 1) != 0;
+
+    if (gps_data_ready(gps)) {
+        gps_values.sat = gps->status.sat;
+        gps_values.date = gps->status.date;
+        gps_values.time = gps->status.time;
+        gps_values.lat = gps->status.lat;
+        gps_values.ns = gps->status.ns;
+        gps_values.lng = gps->status.lng;
+        gps_values.ew = gps->status.ew;
+        gps_values.altitude = gps->status.altitude;
+        gps_values.speed = gps->status.speed;
+        gps_values.mode_3d = gps->status.mode_3d;
+        gps_values.sats = gps->status.sats;
+        gps_values.status = gps->status.status;
+        gps_values.pdop = gps->gsa.pdop;
+        gps_values.hdop = gps->gsa.hdop;
+        gps_values.vdop = gps->gsa.vdop;
+        if (force_update || memcmp(&last_values.gps, &gps_values, sizeof(sensors_data_gps_t)) != 0) {
+            memcpy(&last_values.gps, &gps_values, sizeof(sensors_data_gps_t));
+            return true;
+        }
+    }
+    if (xQueueReceive(gps->queue, &v16, 1)) {
+        if (gps->debug & 1) {
+            ESP_LOGI(TAG, "GPS v16=%04X", v16);
+        }
+    }
+    return false;
+}
+
+static bool update_bmx280(int num, bmx280_t **sensor, sensors_data_bmx280_t *last_values)
+{
+    if (sensor == NULL) {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(bmx280_init(sensor, bus_handle, num != 0));
+        if (*sensor == NULL) return false;
+    }
+
+    esp_err_t err;
+    bool force_update = (debug_main & 1) != 0;
+
+    if ((err = bmx280_readout(*sensor)) != ESP_OK) {
+        ESP_LOGE(TAG, "BME280_%d: err=%d", num, err);
+        return false;
+    }
+    if (force_update || memcmp(last_values, &(*sensor)->values, sizeof(sensors_data_bmx280_t)) != 0) {
+        memcpy(last_values, &(*sensor)->values, sizeof(sensors_data_bmx280_t));
+        return true;
+    }
+    return false;
+}
+
+static bool update_mhz19()
+{
+    bool force_update = (debug_main & 1) != 0;
+
+    if (mhz19_data_ready(mhz19)) {
+        if (force_update || memcmp(&last_values.mhz19, &mhz19->values, sizeof(sensors_data_mhz19_t)) != 0) {
+            memcpy(&last_values.mhz19, &mhz19->values, sizeof(sensors_data_mhz19_t));
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool update_scd4x()
 {
     esp_err_t err;
 
+    if (scd4x == NULL) {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_init(&scd4x, bus_handle));
+        if (scd4x == NULL) return false;
+    }
     if (scd4x->auto_adjust > 0 && scd4x->auto_adjust-- == 1) {
         bmx280_t *bmx280;
 
@@ -270,26 +351,51 @@ static void update_scd4x()
         scd4x_set_sensor_altitude(scd4x, bmx280->values.altitude);
         scd4x_set_ambient_pressure(scd4x, bmx280->values.pressure);
         scd4x_calibrate = true;
-        ESP_LOGI("SCD4X", "Adjust: TempOffset=%f °C  Alt=%f m  Press=%f hPa",
+        ESP_LOGI(TAG, "SCD4X Adjust: TempOffset=%f °C  Alt=%f m  Press=%f hPa",
                     temp_offset, bmx280->values.altitude, bmx280->values.pressure);
     }
-    if (scd4x_get_data_ready_status(scd4x)) {
-        if ((err = scd4x_read_measurement(scd4x)) == ESP_OK) {
-            scd4x_update = true;
-        }
-        err = scd4x_start_periodic_measurement(scd4x);
-    } else if (scd4x->enabled) {
-        err = scd4x_start_periodic_measurement(scd4x);
+    if (!scd4x_get_data_ready_status(scd4x)) {
+        return false;
     }
+    if ((err = scd4x_read_measurement(scd4x)) != ESP_OK) {
+        ESP_LOGE(TAG, "SCD4X read error %d", err);
+        return false;
+    }
+
+    bool force_update = (debug_main & 1) != 0;
+
+    if (force_update || memcmp(&last_values.scd4x, &scd4x->values, sizeof(sensors_data_scd4x_t)) != 0) {
+        memcpy(&last_values.scd4x, &scd4x->values, sizeof(sensors_data_scd4x_t));
+        return true;
+    }
+    return false;
 }
 
-static void update_sps30()
+static bool update_yys()
 {
+    bool force_update = (debug_main & 1) != 0;
+
+    if (yys_data_ready(yys_sensor)) {
+        if (force_update || memcmp(&last_values.yys, &yys_sensor->values, sizeof(sensors_data_yys_t)) != 0) {
+            memcpy(&last_values.yys, &yys_sensor->values, sizeof(sensors_data_yys_t));
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool update_sps30()
+{
+    if (sps30 == NULL) {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(sps30_init(&sps30, bus_handle));
+        if (sps30 == NULL) return false;
+    }
+    if (!sps30->enabled) {
+        return false;
+    }
+
     esp_err_t err;
 
-    if (!sps30->enabled) {
-        return;
-    }
     if ((err = sps30_read_device_status_register(sps30)) == ESP_OK) {
         if (sps30->values.status != 0) {
             ESP_LOGW("SPS30", "STATUS=%08X", (unsigned int)sps30->values.status);
@@ -297,125 +403,83 @@ static void update_sps30()
     } else {
         ESP_LOGE("SPS30", "Failed to read status");
     }
-    if (sps30_read_data_ready(sps30)) {
-        sps30_not_ready_cnt = 0;
-        if ((err = sps30_read_measurement(sps30)) == ESP_OK) {
-            sps30_update = true;
-        } else {
-            ESP_LOGE("SPS30", "Failed to read measurement values with error %d", err);
+    if (!sps30_read_data_ready(sps30)) {
+        if (sps30_not_ready_cnt++ > 5) {
+            ESP_LOGE(TAG, "SPS30: not ready");
         }
-    } else if (sps30_not_ready_cnt++ > 5) {
-        ESP_LOGE("SPS30", "not ready");
+        return false;
     }
+    sps30_not_ready_cnt = 0;
+    if ((err = sps30_read_measurement(sps30)) != ESP_OK) {
+        ESP_LOGE(TAG, "SPS30: Failed to read measurement values err=%d", err);
+        return false;
+    }
+
+    bool force_update = (debug_main & 1) != 0;
+
+    if (force_update || memcmp(&last_values.sps30, &sps30->values, sizeof(sensors_data_sps30_t)) != 0) {
+        memcpy(&last_values.sps30, &sps30->values, sizeof(sensors_data_sps30_t));
+        return true;
+    }
+    return true;
+}
+
+static bool update_adxl345()
+{
+    esp_err_t err;
+
+    if (adxl345 == NULL) {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(adxl345_init(&adxl345, bus_handle));
+        if (adxl345 == NULL) return false;
+    }
+    if ((err = adxl345_read_data(adxl345)) != ESP_OK) {
+        ESP_LOGE(TAG, "ADXL345 read error %d", err);
+        return false;
+    }
+
+    bool force_update = (debug_main & 1) != 0;
+
+    if (force_update || memcmp(&last_values.adxl345, &adxl345->values, sizeof(sensors_data_adxl345_t)) != 0) {
+        memcpy(&last_values.adxl345, &adxl345->values, sizeof(sensors_data_adxl345_t));
+        return true;
+    }
+    return false;
+}
+
+static bool update_qmc5883l()
+{
+    esp_err_t err;
+
+    if (qmc5883l == NULL) {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(qmc5883l_init(&qmc5883l, bus_handle));
+        if (qmc5883l == NULL) return false;
+    }
+    if ((err = qmc5883l_read_data(qmc5883l)) != ESP_OK) {
+        ESP_LOGE(TAG, "ADXL345 read error %d", err);
+        return false;
+    }
+
+    bool force_update = (debug_main & 1) != 0;
+
+    if (force_update || memcmp(&last_values.qmc5883l, &qmc5883l->values, sizeof(sensors_data_qmc5883l_t)) != 0) {
+        memcpy(&last_values.qmc5883l, &qmc5883l->values, sizeof(sensors_data_qmc5883l_t));
+        return true;
+    }
+    return false;
 }
 
 static void sensors_update()
 {
-    esp_err_t err;
-    uint16_t v16;
-    bool force_update = (debug_main & 1) != 0;
-
     // Update/Read data
-    if (gps != NULL) {
-        if (gps_data_ready(gps)) {
-            gps_values.sat = gps->status.sat;
-            gps_values.date = gps->status.date;
-            gps_values.time = gps->status.time;
-            gps_values.lat = gps->status.lat;
-            gps_values.ns = gps->status.ns;
-            gps_values.lng = gps->status.lng;
-            gps_values.ew = gps->status.ew;
-            gps_values.altitude = gps->status.altitude;
-            gps_values.speed = gps->status.speed;
-            gps_values.mode_3d = gps->status.mode_3d;
-            gps_values.sats = gps->status.sats;
-            gps_values.status = gps->status.status;
-            gps_values.pdop = gps->gsa.pdop;
-            gps_values.hdop = gps->gsa.hdop;
-            gps_values.vdop = gps->gsa.vdop;
-            if (force_update || memcmp(&last_values.gps, &gps_values, sizeof(sensors_data_gps_t)) != 0) {
-                memcpy(&last_values.gps, &gps_values, sizeof(sensors_data_gps_t));
-                gps_update = true;
-            }
-        }
-        if (xQueueReceive(gps->queue, &v16, 1)) {
-            if (gps->debug & 1) {
-                ESP_LOGI("GPS", "%04X", v16);
-            }
-        }
-    }
-    if (bmx280lo != NULL) {
-        if ((err = bmx280_readout(bmx280lo)) == ESP_OK) {
-            if (force_update || memcmp(&last_values.bmx280lo, &bmx280lo->values, sizeof(sensors_data_bmx280_t)) != 0) {
-                memcpy(&last_values.bmx280lo, &bmx280lo->values, sizeof(sensors_data_bmx280_t));
-                bmx280lo_update = true;
-            }
-        } else {
-            ESP_LOGE("BME280LO", "Error=%d", err);
-        }
-    }
-    if (bmx280hi != NULL) {
-        if ((err = bmx280_readout(bmx280hi)) == ESP_OK) {
-            if (force_update || memcmp(&last_values.bmx280hi, &bmx280hi->values, sizeof(sensors_data_bmx280_t)) != 0) {
-                memcpy(&last_values.bmx280lo, &bmx280lo->values, sizeof(sensors_data_bmx280_t));
-                bmx280hi_update = true;
-            }
-        } else {
-            ESP_LOGE("BME280HI", "Error=%d", err);
-        }
-    }
-    if (mhz19 != NULL) {
-        if (mhz19_data_ready(mhz19)) {
-            if (force_update || memcmp(&last_values.mhz19, &mhz19->values, sizeof(sensors_data_mhz19_t)) != 0) {
-                memcpy(&last_values.mhz19, &mhz19->values, sizeof(sensors_data_mhz19_t));
-                mhz19_update = true;
-            }
-        }
-    }
-    if (scd4x != NULL) {
-        update_scd4x();
-        if (scd4x_update && (force_update || memcmp(&last_values.scd4x, &scd4x->values, sizeof(sensors_data_scd4x_t)) != 0)) {
-            memcpy(&last_values.scd4x, &scd4x->values, sizeof(sensors_data_scd4x_t));
-        } else {
-            scd4x_update = false;
-        }
-    }
-    if (yys_sensor != NULL) {
-        if (yys_data_ready(yys_sensor)) {
-            if (force_update || memcmp(&last_values.yys, &yys_sensor->values, sizeof(sensors_data_yys_t)) != 0) {
-                memcpy(&last_values.yys, &yys_sensor->values, sizeof(sensors_data_yys_t));
-                yys_update = true;
-            }
-        }
-    }
-    if (sps30 != NULL) {
-        update_sps30();
-        if (sps30_update && (force_update || memcmp(&last_values.sps30, &sps30->values, sizeof(sensors_data_sps30_t)) != 0)) {
-            memcpy(&last_values.sps30, &sps30->values, sizeof(sensors_data_sps30_t));
-        } else {
-            sps30_update = false;
-        }
-    }
-    if (adxl345 != NULL) {
-        if ((err = adxl345_read_data(adxl345)) == ESP_OK) {
-            if (force_update || memcmp(&last_values.adxl345, &adxl345->values, sizeof(sensors_data_adxl345_t)) != 0) {
-                memcpy(&last_values.adxl345, &adxl345->values, sizeof(sensors_data_adxl345_t));
-                adxl345_update = true;
-            }
-        } else {
-            ESP_LOGE("ADXL345", "Error=%d", err);
-        }
-    }
-    if (qmc5883l != NULL) {
-        if ((err = qmc5883l_read_data(qmc5883l)) == ESP_OK) {
-            if (force_update || memcmp(&last_values.qmc5883l, &qmc5883l->values, sizeof(sensors_data_qmc5883l_t)) != 0) {
-                memcpy(&last_values.qmc5883l, &qmc5883l->values, sizeof(sensors_data_qmc5883l_t));
-                qmc5883l_update = true;
-            }
-        } else {
-            ESP_LOGE("QMC5883L", "Error=%d", err);
-        }
-    }
+    gps_update |= update_gps();
+    bmx280lo_update |= update_bmx280(0, &bmx280lo, &last_values.bmx280lo);
+    bmx280hi_update |= update_bmx280(1, &bmx280hi, &last_values.bmx280hi);
+    mhz19_update |= update_mhz19();
+    scd4x_update |= update_scd4x();
+    yys_update |= update_yys();
+    sps30_update |= update_sps30();
+    adxl345_update |= update_adxl345();
+    qmc5883l_update |= update_qmc5883l();
 }
 
 
@@ -594,8 +658,20 @@ static void update_task(void *arg)
         ui_update(status.force_update);
         status.force_update = false;
 
+        /*if (wifi_connected) {
+            if (!mqtt_connected && config->mqtt_connect) {
+                mqtt_start();
+            }
+            if (mqtt_connected) {
+                mqtt_publish_values();
+            }
+        }*/
+        if (wifi_connected && tcp_server_running && tcp_client_cnt > 0) {
+            tcp_server_publish_values();
+        }
+
         // Dump data for debugging
-        dump_data();
+        dump_values(false);
 
         // Reset update flags
         gps_update = false;
@@ -641,17 +717,17 @@ static void update_task(void *arg)
     }
 }
 
-void dump_data()
+void dump_values(bool force)
 {
-    gps_dump(gps);
-    bmx280_dump(bmx280lo);
-    bmx280_dump(bmx280hi);
-    scd4x_dump(scd4x);
-    mhz19_dump(mhz19);
-    yys_dump(yys_sensor);
-    sps30_dump(sps30);
-    qmc5883l_dump(qmc5883l);
-    adxl345_dump(adxl345);
+    if (gps != NULL) gps_dump_values(gps, force);
+    if (bmx280lo != NULL) bmx280_dump_values(bmx280lo, force);
+    if (bmx280hi != NULL) bmx280_dump_values(bmx280hi, force);
+    if (scd4x != NULL) scd4x_dump_values(scd4x, force);
+    if (mhz19 != NULL) mhz19_dump_values(mhz19, force);
+    if (yys_sensor != NULL) yys_dump_values(yys_sensor, force);
+    if (sps30 != NULL) sps30_dump_values(sps30, force);
+    if (qmc5883l != NULL) qmc5883l_dump_values(qmc5883l, force);
+    if (adxl345 != NULL) adxl345_dump_values(adxl345, force);
 }
 
 void app_main(void)
@@ -691,6 +767,12 @@ void app_main(void)
         ui_set_tab_color(4, LV_PALETTE_RED);
     }
     console_init();
+
+    ESP_ERROR_CHECK_WITHOUT_ABORT(ui_lcd_set_pwr_mode(config->lcd_pwr));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(ui_gps_set_pwr_mode(config->gps_pwr));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(ui_scd4x_set_pwr_mode(config->scd4x_pwr));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(ui_wifi_set_pwr_mode(config->wifi_pwr));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(ui_mode_set_pwr_mode(config->mode_pwr));
 
     xTaskCreate(update_task, "update_task", 4096, NULL, UPDATE_TASK_PRIORITY, NULL);
     //update_task(NULL);

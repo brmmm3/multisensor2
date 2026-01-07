@@ -1,5 +1,5 @@
 /**
- * LCD
+ * WiFi
  *
  * MIT License
  *
@@ -15,11 +15,7 @@ extern "C" {
 
 #include <stdint.h>
 
-#include "esp_lvgl_port.h"
-
-lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t reset_pin, uint8_t led_pin, uint8_t t_cs_pin);
-
-esp_err_t lcd_set_bg_pwr(uint8_t mode);
+void register_config_cmd();
 
 #ifdef __cplusplus
 };

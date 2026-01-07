@@ -17,7 +17,7 @@ extern "C" {
 #include <stdint.h>
 #include "driver/i2c_master.h"
 
-typedef struct adxl345_values_s {
+typedef struct __attribute__((packed)) adxl345_values_s {
     float accel_x;  // [g]
     float accel_y;
     float accel_z;
@@ -51,7 +51,7 @@ esp_err_t adxl345_calibrate_offset(adxl345_t *sensor);
 
 esp_err_t adxl345_init(adxl345_t **sensor, i2c_master_bus_handle_t bus_handle);
 
-void adxl345_dump(adxl345_t *sensor);
+void adxl345_dump_values(adxl345_t *sensor, bool force);
 
 #ifdef __cplusplus
 };

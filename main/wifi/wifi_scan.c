@@ -168,8 +168,8 @@ static void wifi_selected_cb(lv_event_t *e)
         selected_ssid = lv_list_get_button_text(list, btn);
         config->auto_connect = 0;
         while (config->auto_connect < 4) {
-            ESP_LOGI(TAG,"Try %i %s", config->auto_connect, config->nvs.wifi.ssid[config->auto_connect]);
-            if (strcmp(selected_ssid, config->nvs.wifi.ssid[config->auto_connect]) == 0) {
+            ESP_LOGI(TAG,"Try %i %s", config->auto_connect, config_nvs->wifi.ssid[config->auto_connect]);
+            if (strcmp(selected_ssid, config_nvs->wifi.ssid[config->auto_connect]) == 0) {
                 if (wifi_init(false) == ESP_OK) {
                     config_write();
                 }

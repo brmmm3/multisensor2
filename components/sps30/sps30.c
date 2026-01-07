@@ -217,7 +217,7 @@ esp_err_t sps30_get_firmware_version(sps30_t *sensor)
         ESP_LOGE(TAG, "Checksum error of received I2C data for firmware version");
         return ESP_FAIL;
     }
-    sensor->firmware_version = ((uint16_t)buffer[0] << 8) | (uint16_t)buffer[1];
+    sensor->fw_version = ((uint16_t)buffer[0] << 8) | (uint16_t)buffer[1];
     return err;
 }
 
@@ -364,22 +364,27 @@ esp_err_t sps30_init(sps30_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     if (err != ESP_OK) return err;
-    ESP_LOGI(TAG, "DevInfo = %s", sensor->device_info);
-    ESP_LOGI(TAG, "Serial = %s", sensor->serial);
-    ESP_LOGI(TAG, "Firmware Version = %d.%d", sensor->firmware_version >> 8, sensor->firmware_version & 0xff);
-    if (strncmp(sensor->device_info, "00080000", 8)) {
-        ESP_LOGE("SPS30", "returned invalid DevInfo");
-    }
+    sps30_dump_info(sensor);
     *sensor_ptr = sensor;
     ESP_LOGI(TAG, "SPS30 initialized");
     return ESP_OK;
 }
 
-void sps30_dump(sps30_t *sensor)
+void sps30_dump_info(sps30_t *sensor)
 {
-    sps30_values_t *values = &sensor->values;
+    ESP_LOGI(TAG, "DevInfo=%s  Serial=%s  FW=%d.%d",
+        sensor->device_info, sensor->serial,
+        sensor->fw_version >> 8, sensor->fw_version & 0xff);
+    if (strncmp(sensor->device_info, "00080000", 8)) {
+        ESP_LOGE(TAG, "returned invalid DevInfo");
+    }
+}
 
-    if (sensor->debug & 1) {
+void sps30_dump_values(sps30_t *sensor, bool force)
+{
+    if (force || sensor->debug & 1) {
+        sps30_values_t *values = &sensor->values;
+
         ESP_LOGI(TAG, "STATUS=%08X", (unsigned int)sensor->values.status);
         ESP_LOGI(TAG, "PM0.5 =%.1f #/cm3", values->nc_0p5);
         ESP_LOGI(TAG, "PM1.0 =%.1f ug/cm3 P1.0 =%.1f #/cm3", values->mc_1p0, values->nc_1p0);

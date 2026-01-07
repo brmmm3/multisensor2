@@ -173,7 +173,7 @@ int gps_set_power_mode(gps_sensor_t *sensor, uint8_t mode);
 
 int gps_power_off(gps_sensor_t *sensor);
 
-void gps_dump(gps_sensor_t *sensor);
+void gps_dump_values(gps_sensor_t *sensor, bool force);
 
 #ifdef __cplusplus
 };

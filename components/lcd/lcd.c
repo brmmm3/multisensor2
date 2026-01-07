@@ -84,16 +84,19 @@ static void lvgl_touch_cb(lv_indev_t *indev, lv_indev_data_t *data)
     }
 }
 
-void lcd_set_bg_pwr(uint8_t mode)
+esp_err_t lcd_set_bg_pwr(uint8_t mode)
 {
-    bk_gpio_config.mode = mode < 3 ? GPIO_MODE_INPUT : GPIO_MODE_OUTPUT;
-    bk_gpio_config.pull_up_en = mode > 0 && mode < 3 ? GPIO_PULLUP_ENABLE : GPIO_PULLUP_DISABLE;
-    bk_gpio_config.pull_down_en = mode == 1 ? GPIO_PULLDOWN_ENABLE : GPIO_PULLDOWN_DISABLE;
+    esp_err_t err;
+
+    // Modes: 0 - 3, 0=Max Power, 3=OFF
+    bk_gpio_config.mode = mode > 0 ? GPIO_MODE_INPUT : GPIO_MODE_OUTPUT;
+    bk_gpio_config.pull_up_en = mode == 1 || mode == 2 ? GPIO_PULLUP_ENABLE : GPIO_PULLUP_DISABLE;
+    bk_gpio_config.pull_down_en = mode == 2 ? GPIO_PULLDOWN_ENABLE : GPIO_PULLDOWN_DISABLE;
 
     ESP_LOGI(TAG, "lcd_set_bg_pwr %d mode=%d pull_up_en=%d pull_down_en=%d", mode,
         bk_gpio_config.mode, bk_gpio_config.pull_up_en, bk_gpio_config.pull_down_en);
-    gpio_config(&bk_gpio_config);
-    gpio_set_level(bk_led_pin, mode > 2);
+    if ((err = gpio_config(&bk_gpio_config)) != ESP_OK) return err;
+    return gpio_set_level(bk_led_pin, mode == 0);
 }
 
 lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t reset_pin, uint8_t led_pin, uint8_t t_cs_pin)

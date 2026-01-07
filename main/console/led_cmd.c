@@ -33,9 +33,9 @@ int process_led_cmd(int argc, char **argv)
 
 void register_led_cmd()
 {
-    led_cmd_args.red = arg_int1("r", "red", "<int>", "Red value for LED");
-    led_cmd_args.green = arg_int1("g", "green", "<int>", "Green value for LED");
-    led_cmd_args.blue = arg_int1("b", "blue", "<int>", "Blue value for LED");
+    led_cmd_args.red = arg_int1("r", NULL, "<int>", "Red value for LED");
+    led_cmd_args.green = arg_int1("g", NULL, "<int>", "Green value for LED");
+    led_cmd_args.blue = arg_int1("b", NULL, "<int>", "Blue value for LED");
     led_cmd_args.end = arg_end(3);
 
     const esp_console_cmd_t cmd = {

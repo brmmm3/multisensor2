@@ -6,14 +6,12 @@
 
 // This demo UI is adapted from LVGL official example: https://docs.lvgl.io/master/examples.html#loader-with-arc
 
-#include <string.h>
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <esp_err.h>
 #include <misc/lv_types.h>
 #include <esp_lvgl_port.h>
 #include "main.h"
-#include "include/ui.h"
 
 static const char *TAG = "UIC";
 
@@ -93,54 +91,66 @@ lv_obj_t *ui_list_add(lv_obj_t *obj, const char *symbol, const char *text)
     return obj;
 }
 
-
-static void btn_calibrate_pressed(lv_event_t *e)
+esp_err_t ui_lcd_set_pwr_mode(uint8_t mode)
 {
     esp_err_t err;
-    uint16_t frc;
-    const char *key = lv_event_get_user_data(e);
 
-    if (!strcmp(key, "CAL")) {
-        ESP_LOGI(TAG, "Calibrating sensors...");
-        if ((err = mhz19_calibrate_zero(mhz19)) != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to calibrate MHZ19 with error %d", err);
-        }
-        if ((err = scd4x_stop_periodic_measurement(scd4x)) != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to stop SCD41 with error %d", err);
-        } else {
-            vTaskDelay(pdMS_TO_TICKS(500));
-            frc = scd4x_perform_forced_recalibration(scd4x, mhz19->values.co2);
-            ESP_LOGI(TAG, "FRC=%d", frc);
-            vTaskDelay(pdMS_TO_TICKS(400));
-            if ((err = scd4x_start_periodic_measurement(scd4x)) != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to start SCD41 with error %d", err);
-            }
-        }
-        ESP_LOGI(TAG, "Calibrating sensors DONE");
+    if ((err = lcd_set_pwr_mode(mode)) != ESP_OK) {
+        return err;
     }
+    lv_slider_set_value(ui->sl_lcd_pwr, config->lcd_pwr, LV_ANIM_OFF);
+    return ESP_OK;
 }
 
-static void sw_lcd_pwr_cb(lv_event_t * e)
+esp_err_t ui_gps_set_pwr_mode(uint8_t mode)
 {
-    lv_obj_t * obj = lv_event_get_target(e);
+    esp_err_t err;
 
-    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-        lcd_set_bg_pwr(1);
-    } else {
-        lcd_set_bg_pwr(2);
+    if ((err = gps_set_pwr_mode(mode)) != ESP_OK) {
+        return err;
     }
+    lv_slider_set_value(ui->sl_gps_pwr, config->gps_pwr, LV_ANIM_OFF);
+    return ESP_OK;
 }
 
-static void sw_gps_pwr_cb(lv_event_t *e)
+esp_err_t ui_scd4x_set_pwr_mode(uint8_t mode)
 {
-    lv_obj_t * obj = lv_event_get_target(e);
+    esp_err_t err;
 
-    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-        gps_set_power_mode(gps, 0);
-    } else {
-        gps_set_power_mode(gps, 2);
+    if ((err = scd4x_set_pwr_mode(mode)) != ESP_OK) {
+        return err;
     }
+    lv_slider_set_value(ui->sl_scd4x_pwr, config->scd4x_pwr, LV_ANIM_OFF);
+    return ESP_OK;
 }
+
+esp_err_t ui_wifi_set_pwr_mode(uint8_t mode)
+{
+    esp_err_t err;
+
+    if (mode > 2) {
+        mode = 2;
+    }
+    if ((err = wifi_set_pwr_mode(mode)) != ESP_OK) {
+        return err;
+    }
+    lv_slider_set_value(ui->sl_wifi_pwr, config->wifi_pwr, LV_ANIM_OFF);
+    return ESP_OK;
+}
+
+esp_err_t ui_mode_set_pwr_mode(uint8_t mode)
+{
+    esp_err_t err;
+
+    if (mode < 4) {
+        if ((err = ui_lcd_set_pwr_mode(mode)) != ESP_OK) return err;
+        if ((err = ui_gps_set_pwr_mode(mode)) != ESP_OK) return err;
+        if ((err = ui_scd4x_set_pwr_mode(mode)) != ESP_OK) return err;
+        if ((err = ui_wifi_set_pwr_mode(mode)) != ESP_OK) return err;
+    }
+    return ESP_OK;
+}
+
 
 static void sw_wifi_pwr_cb(lv_event_t *e)
 {
@@ -180,25 +190,81 @@ static void sw_sd_auto_record_cb(lv_event_t *e)
     }
 }
 
-static void sw_sps30_pwr_cb(lv_event_t *e)
+static void sl_lcd_pwr_cb(lv_event_t *e)
 {
-    lv_obj_t * obj = lv_event_get_target(e);
+    lv_obj_t *obj = lv_event_get_target(e);
+    int32_t mode = lv_slider_get_value(obj);
 
-    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-        sps30_stop_measurement(sps30);
-    } else {
-        sps30_start_measurement(sps30);
-    }
+    lcd_set_bg_pwr(mode);
 }
 
-static void sw_scd4x_pwr_cb(lv_event_t *e)
+static void sl_gps_pwr_cb(lv_event_t *e)
 {
-    lv_obj_t * obj = lv_event_get_target(e);
+    lv_obj_t *obj = lv_event_get_target(e);
+    int32_t mode = lv_slider_get_value(obj);
 
-    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-        scd4x_power_down(scd4x);
+    gps_set_pwr_mode(mode);
+}
+
+static void sl_scd4x_pwr_cb(lv_event_t *e)
+{
+    lv_obj_t *obj = lv_event_get_target(e);
+    int32_t mode = lv_slider_get_value(obj);
+
+    scd4x_set_pwr_mode(mode);
+}
+
+static void sl_wifi_pwr_cb(lv_event_t *e)
+{
+    lv_obj_t *obj = lv_event_get_target(e);
+    int32_t mode = lv_slider_get_value(obj);
+
+    wifi_set_pwr_mode(mode);
+}
+
+static void sl_mode_pwr_cb(lv_event_t *e)
+{
+    lv_obj_t *obj = lv_event_get_target(e);
+    int32_t mode = lv_slider_get_value(obj);
+
+    ui_lcd_set_pwr_mode(mode);
+    ui_gps_set_pwr_mode(mode);
+    ui_scd4x_set_pwr_mode(mode);
+    ui_wifi_set_pwr_mode(mode > 2 ? 2 : mode);
+    config->mode_pwr = mode;
+}
+
+static void btn_calibrate_pressed(lv_event_t *e)
+{
+    esp_err_t err;
+    uint16_t frc;
+
+    ESP_LOGI(TAG, "Calibrating sensors...");
+    if ((err = mhz19_calibrate_zero(mhz19)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to calibrate MHZ19 with error %d", err);
+    }
+    if ((err = scd4x_stop_periodic_measurement(scd4x)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to stop SCD41 with error %d", err);
     } else {
-        scd4x_device_init_do(scd4x);
+        vTaskDelay(pdMS_TO_TICKS(500));
+        frc = scd4x_perform_forced_recalibration(scd4x, mhz19->values.co2);
+        ESP_LOGI(TAG, "FRC=%d", frc);
+        vTaskDelay(pdMS_TO_TICKS(400));
+        if ((err = scd4x_start_periodic_measurement(scd4x)) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to start SCD4x err=%d", err);
+        }
+    }
+    ESP_LOGI(TAG, "Calibrating sensors DONE");
+}
+
+static void btn_save_config_pressed(lv_event_t *e)
+{
+    esp_err_t err;
+
+    if ((err = config_write()) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to write config err=%d", err);
+    } else {
+        ESP_LOGI(TAG, "Config written");
     }
 }
 
@@ -216,9 +282,11 @@ void ui_register_callbacks(ui_t *ui)
     lv_obj_add_event_cb(ui->sw_record, sw_sd_record_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(ui->sw_auto_record, sw_sd_auto_record_cb, LV_EVENT_VALUE_CHANGED, NULL);
     // Tab CFG
-    lv_obj_add_event_cb(ui->sw_lcd_pwr, sw_lcd_pwr_cb, LV_EVENT_VALUE_CHANGED, NULL);
-    lv_obj_add_event_cb(ui->sw_gps_pwr, sw_gps_pwr_cb, LV_EVENT_VALUE_CHANGED, NULL);
-    lv_obj_add_event_cb(ui->sw_sps30_pwr, sw_sps30_pwr_cb, LV_EVENT_VALUE_CHANGED, NULL);
-    lv_obj_add_event_cb(ui->sw_scd4x_pwr, sw_scd4x_pwr_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(ui->sl_lcd_pwr, sl_lcd_pwr_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(ui->sl_gps_pwr, sl_gps_pwr_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(ui->sl_scd4x_pwr, sl_scd4x_pwr_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(ui->sl_wifi_pwr, sl_wifi_pwr_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(ui->sl_mode_pwr, sl_mode_pwr_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(ui->btn_calibrate, btn_calibrate_pressed, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(ui->btn_save_config, btn_save_config_pressed, LV_EVENT_CLICKED, NULL);
 }

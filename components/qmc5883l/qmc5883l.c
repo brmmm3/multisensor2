@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include <string.h>
-#include <math.h>
 #include "driver/i2c_master.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
@@ -203,6 +202,7 @@ esp_err_t qmc5883l_device_init(qmc5883l_t *sensor)
     }
     ESP_LOGI(TAG, "Device ID=%02lX", sensor->device_id);
     if (sensor->device_id != 0xFF) {
+        // TODO
     }
     // 0x40 (OSR=256) | 0x00 (Range +/- 2g) | 0x00 (ODR 10Hz) | 0x01 (Continuous)
     // 0x40 (OSR=256) | 0x01 (Range +/- 8g) | 0x00 (ODR 10Hz) | 0x01 (Continuous)
@@ -210,32 +210,34 @@ esp_err_t qmc5883l_device_init(qmc5883l_t *sensor)
     return ESP_OK;
 }
 
-esp_err_t qmc5883l_init(qmc5883l_t **sensor, i2c_master_bus_handle_t bus_handle)
+esp_err_t qmc5883l_init(qmc5883l_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
 {
     uint8_t addr = QMC5883L_I2C_ADDR;
     esp_err_t err;
 
     ESP_LOGI(TAG, "Initialized QMC5883L");
-    *sensor = qmc5883l_create_master(bus_handle);
-    if (!*sensor) {
+    qmc5883l_t *sensor = qmc5883l_create_master(bus_handle);
+    if (sensor == NULL) {
         ESP_LOGE(TAG, "Could not create QMC5883L driver.");
         return ESP_FAIL;
     }
     // Probe and create device
     ESP_LOGI(TAG, "Probing for QMC5883L");
-    if ((err = i2c_master_probe(bus_handle, addr, CONFIG_TLV493_PROBE_TIMEOUT)) != ESP_OK) return err;
+    if ((err = i2c_master_probe(bus_handle, addr, CONFIG_QMC5883L_PROBE_TIMEOUT)) != ESP_OK) return err;
     ESP_LOGI(TAG, "Found TLV493 on I2C address 0x%02X", addr);
-    if ((err = qmc5883l_device_create(*sensor, addr)) != ESP_OK) return err;
+    if ((err = qmc5883l_device_create(sensor, addr)) != ESP_OK) return err;
     // Initialize device
-    if ((err = qmc5883l_device_init(*sensor)) != ESP_OK) return err;
+    if ((err = qmc5883l_device_init(sensor)) != ESP_OK) return err;
     ESP_LOGI(TAG, "QMC5883L initialized");
+    *sensor_ptr = sensor;
     return ESP_OK;
 }
 
-void qmc5883l_dump(qmc5883l_t *sensor)
+void qmc5883l_dump_values(qmc5883l_t *sensor, bool force)
 {
-    if (sensor->debug & 1) {
+    if (force || sensor->debug & 1) {
         qmc5883l_values_t *values = &sensor->values;
+
         ESP_LOGI(TAG, "x=%f gauss  y=%f gauss  z=%f gauss  range=%d  status=%d",
             values->mag_x, values->mag_y, values->mag_z, values->range, values->status);
     }

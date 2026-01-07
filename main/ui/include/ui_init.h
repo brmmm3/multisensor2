@@ -48,6 +48,8 @@ typedef struct ui_s {
     lv_obj_t *sw_wifi_enable;
     lv_obj_t *lbl_wifi_status1;
     lv_obj_t *lbl_wifi_status2;
+    lv_obj_t *lbl_mqtt_status;
+    lv_obj_t *lbl_ftp_status;
     lv_obj_t *lst_wifi;
     // Tab SD-Card
     lv_obj_t *tab_sd;
@@ -61,11 +63,13 @@ typedef struct ui_s {
     lv_obj_t *tab_cfg;
     lv_obj_t *lbl_adxl345;
     lv_obj_t *lbl_qmc5883L;
-    lv_obj_t *sw_lcd_pwr;
-    lv_obj_t *sw_gps_pwr;
-    lv_obj_t *sw_sps30_pwr;
-    lv_obj_t *sw_scd4x_pwr;
+    lv_obj_t *sl_lcd_pwr;
+    lv_obj_t *sl_gps_pwr;
+    lv_obj_t *sl_scd4x_pwr;
+    lv_obj_t *sl_wifi_pwr;
+    lv_obj_t *sl_mode_pwr;
     lv_obj_t *btn_calibrate;
+    lv_obj_t *btn_save_config;
 } ui_t;
 
 ui_t *ui_init(lv_display_t *disp);  //, void(*btn_pressed)(lv_event_t *));

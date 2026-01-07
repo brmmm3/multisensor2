@@ -16,16 +16,11 @@ struct {
 
 static void show_bmx280_status(int num, bmx280_t *sensor)
 {
-    bmx280_config_t *config = &sensor->config;
-    bmx280_values_t *values = &sensor->values;
-
+    if (sensor == NULL) return;
     bmx280_getMode(sensor);
-    ESP_LOGI(TAG, "BME280 %d (addr=%02X  devid=%02X  mode=%d  sampling=%d):", num,
-        sensor->address, sensor->device_id, sensor->mode, bmx280_isSampling(sensor));
-    ESP_LOGI(TAG, "pOvs=%d  tOvs=%d  hOvs=%d  flt=%d  stdBy=%d",
-            config->p_sampling, config->t_sampling, config->h_sampling, config->iir_filter, config->t_standby);
-    ESP_LOGI(TAG, "temp=%.1f °C  hum=%.1f  press=%.1f hPa  altitude=%.1f m",
-            values->temperature, values->humidity, values->pressure, values->altitude);
+    ESP_LOGI(TAG, "BME280 %d:", num);
+    bmx280_dump_info(sensor);
+    bmx280_dump_values(sensor, true);
 }
 
 static void cmd_bmx280_configure(bmx280_t *sensor)

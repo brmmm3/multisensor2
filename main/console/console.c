@@ -7,7 +7,13 @@
 #include "include/bme_cmd.h"
 #include "include/mhz19_cmd.h"
 #include "include/scd4x_cmd.h"
+#include "include/sps30_cmd.h"
 #include "include/wifi_cmd.h"
+#include "include/rtc_cmd.h"
+#include "include/ftp_cmd.h"
+#include "include/tcp_cmd.h"
+//#include "include/mqtt_cmd.h"
+#include "include/config_cmd.h"
 
 static const char *TAG = "CMD";
 
@@ -25,7 +31,12 @@ esp_err_t console_init()
     register_bme_cmd();
     register_mhz19_cmd();
     register_scd4x_cmd();
+    register_sps30_cmd();
     register_wifi_cmd();
+    register_rtc_cmd();
+    register_ftp_cmd();
+    register_tcp_cmd();
+    //register_mqtt_cmd();
     register_config_cmd();
 
     repl_config.prompt = "MS>";

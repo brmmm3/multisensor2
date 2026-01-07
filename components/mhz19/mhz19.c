@@ -226,10 +226,10 @@ esp_err_t mhz19_reset(mhz19_t *sensor)
     return ESP_FAIL;
 }
 
-esp_err_t mhz19_init(mhz19_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin)
+esp_err_t mhz19_init(mhz19_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin)
 {
     hw_serial_t *mhz19_serial = malloc(sizeof(hw_serial_t));
-    mhz19_t *mhz19_sensor = malloc(sizeof(mhz19_t));
+    mhz19_t *sensor = malloc(sizeof(mhz19_t));
 
     ESP_LOGI(TAG, "Initialize MHZ19");
     // Serial
@@ -239,37 +239,37 @@ esp_err_t mhz19_init(mhz19_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint8_t
     mhz19_serial->baudrate = 9600;
     mhz19_serial->queue = NULL;
     // Sensor
-    mhz19_sensor->name = "CO2";
-    mhz19_sensor->queue = xQueueCreate(6, 6);
-    mhz19_sensor->pending = 0;
-    mhz19_sensor->hw_serial = mhz19_serial;
-    mhz19_sensor->values.co2 = 0xffff;
-    mhz19_sensor->values.temp = 0xff;
-    mhz19_sensor->values.status = 0xff;
-    mhz19_sensor->data_cnt = 0;
-    mhz19_sensor->error_cnt = 0;
-    mhz19_sensor->range = MHZ19_RANGE_INVALID;
-    mhz19_sensor->fw_version[0] = 0;
-    mhz19_sensor->debug = 0;
-    *sensor = mhz19_sensor;
+    sensor->name = "CO2";
+    sensor->queue = xQueueCreate(6, 6);
+    sensor->pending = 0;
+    sensor->hw_serial = mhz19_serial;
+    sensor->values.co2 = 0xffff;
+    sensor->values.temp = 0xff;
+    sensor->values.status = 0xff;
+    sensor->data_cnt = 0;
+    sensor->error_cnt = 0;
+    sensor->range = MHZ19_RANGE_INVALID;
+    sensor->fw_version[0] = 0;
+    sensor->debug = 0;
+    *sensor_ptr = sensor;
 
     uart_init(mhz19_serial->uart_num, mhz19_serial->rx_pin, mhz19_serial->tx_pin);
 
     // Send initialization sequence
-    mhz19_set_auto_calibration(mhz19_sensor, false);
-    xQueueSend(mhz19_sensor->queue, &cmd_get_fw_version, 1);
-    mhz19_set_range(mhz19_sensor, MHZ19_RANGE_5000);
-    xQueueSend(mhz19_sensor->queue, &cmd_get_range, 1);
+    mhz19_set_auto_calibration(sensor, false);
+    xQueueSend(sensor->queue, &cmd_get_fw_version, 1);
+    mhz19_set_range(sensor, MHZ19_RANGE_5000);
+    xQueueSend(sensor->queue, &cmd_get_range, 1);
 
-    xTaskCreate(rx_task_mhz19_sensor, "rx_task_mhz19_sensor", 4096, (void *)mhz19_sensor, configMAX_PRIORITIES - 1, NULL);
+    xTaskCreate(rx_task_mhz19_sensor, "rx_task_mhz19_sensor", 4096, (void *)sensor, configMAX_PRIORITIES - 1, NULL);
 
     ESP_LOGI(TAG, "MHZ19 initialized");
     return ESP_OK;
 }
 
-void mhz19_dump(mhz19_t *sensor)
+void mhz19_dump_values(mhz19_t *sensor, bool force)
 {
-    if (sensor->debug & 1) {
+    if (force || sensor->debug & 1) {
         mhz19_values_t *values = &sensor->values;
         ESP_LOGI(TAG, "co2=%d ppm  temp=%d °C  status=%d", values->co2, values->temp, values->status);
     }

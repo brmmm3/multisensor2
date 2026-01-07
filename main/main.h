@@ -48,7 +48,8 @@ extern "C" {
 #include "yys.h"
 #include "adxl345.h"
 #include "qmc5883l.h"
-
+//#include "mqtt.h"
+#include "tcp_server.h"
 
 extern rtc_t *rtc;
 extern gps_sensor_t *gps;
@@ -69,6 +70,9 @@ extern ui_t *ui;
 extern led_strip_handle_t led_strip;
 
 typedef enum {
+    E_SENSOR_INFO = 0,
+    E_SENSOR_STATUS,
+    E_SENSOR_UNITS,
     E_SENSOR_DATE = 0x0F,
     E_SENSOR_TIME,
     E_SENSOR_GPS,
@@ -160,6 +164,7 @@ extern bool gps_update;
 extern bool bmx280lo_update;
 extern bool bmx280hi_update;
 extern bool mhz19_update;
+extern bool scd4x_calibrate;
 extern bool scd4x_update;
 extern bool yys_update;
 extern bool sps30_update;
@@ -175,6 +180,8 @@ extern bool qmc5883l_update;
 // Bit 5: Log SPS30 sensor values
 // Bit 6: Log ADXL345 ad QMC5883L sensor values
 extern uint32_t debug_main;
+
+void get_current_date_time(uint16_t *year, uint8_t *month, uint8_t *day, uint8_t *hour, uint8_t *min, uint8_t *sec);
 
 void set_data_filename();
 

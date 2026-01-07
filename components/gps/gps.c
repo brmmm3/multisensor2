@@ -441,10 +441,10 @@ bool gps_data_ready(gps_sensor_t *sensor)
     return sensor->status.status == 0;
 }
 
-esp_err_t gps_init(gps_sensor_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin)
+esp_err_t gps_init(gps_sensor_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin)
 {
     hw_serial_t *gps_serial = malloc(sizeof(hw_serial_t));
-    gps_sensor_t *gps_sensor = calloc(1, sizeof(gps_sensor_t));
+    gps_sensor_t *sensor = calloc(1, sizeof(gps_sensor_t));
 
     ESP_LOGI(TAG, "Initialize GPS");
    // Serial
@@ -454,19 +454,19 @@ esp_err_t gps_init(gps_sensor_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint
     gps_serial->baudrate = 9600;
     gps_serial->queue = xQueueCreate(128, 1);
     // Sensor
-    gps_sensor->name = "GPS";
-    gps_sensor->buffer = calloc(UART_BUFFER_SIZE + 1, 1);
-    gps_sensor-> cnt = 0;
-    gps_sensor->queue = xQueueCreate(128, 1);
-    gps_sensor->serial = gps_serial;
-    gps_sensor->messages = NULL;
-    gps_sensor->msg_size = 0;
-    gps_sensor->status.sat = "?";
-    *sensor = gps_sensor;
+    sensor->name = "GPS";
+    sensor->buffer = calloc(UART_BUFFER_SIZE + 1, 1);
+    sensor-> cnt = 0;
+    sensor->queue = xQueueCreate(128, 1);
+    sensor->serial = gps_serial;
+    sensor->messages = NULL;
+    sensor->msg_size = 0;
+    sensor->status.sat = "?";
+    *sensor_ptr = sensor;
 
     uart_init(gps_serial->uart_num, gps_serial->rx_pin, gps_serial->tx_pin);
 
-    xTaskCreate(rx_task_gps_sensor, "rx_task_gps_sensor", 4096, gps_sensor, configMAX_PRIORITIES - 1, NULL);
+    xTaskCreate(rx_task_gps_sensor, "rx_task_gps_sensor", 4096, sensor, configMAX_PRIORITIES - 1, NULL);
 
     ESP_LOGI(TAG, "GPS initialized");
     return ESP_OK;
@@ -478,7 +478,7 @@ int gps_set_power_mode(gps_sensor_t *sensor, uint8_t mode)
     char buf[sizeof(ubxPSM) + 4];
 
     ESP_LOGI(TAG, "gps_set_power_mode %d", mode);
-    if (mode == 0) return gps_power_off(sensor);
+    if (mode > 1) return gps_power_off(sensor);
     buf[0] = 0xB5;
     buf[1] = 0x62;
     if (mode == 1) memcpy(&buf[2], ubxEM, sizeof(ubxEM));
@@ -497,23 +497,25 @@ int gps_power_off(gps_sensor_t *sensor)
     return uart_write_bytes(sensor->serial->uart_num, ubxSleep, sizeof(ubxSleep));
 }
 
-void gps_dump(gps_sensor_t *sensor)
+void gps_dump_values(gps_sensor_t *sensor, bool force)
 {
-    gps_rmc_t *rmc = &sensor->rmc;
-    gps_gll_t *gll = &sensor->gll;
-    gps_gsa_t *gsa = &sensor->gsa;
-    uint8_t *gsa_sats = gsa->sats;
-    gps_gsv_t *gsv = &sensor->gsv;
-    gps_gga_t *gga = &sensor->gga;
-    gps_vtg_t *vtg = &sensor->vtg;
-    gps_zda_t *zda = &sensor->zda;
-    gps_status_t *status = &sensor->status;
+    if (force || sensor->debug & 1) {
+        gps_status_t *status = &sensor->status;
 
-    if (sensor->debug & 1) {
         ESP_LOGI(TAG, "%s date=%lu time=%lu lat=%f %c lng=%f %c altitude=%f speed=%f mode_3d=%c sats=%d status=%d errors=%d",
                  status->sat, status->date, status->time, status->lat, status->ns, status->lng, status->ew, status->altitude,
                  status->speed, status->mode_3d, status->sats, status->status, status->error_cnt);
-    } else if (sensor->debug & 2) {
+    }
+    if (force || sensor->debug & 2) {
+        gps_rmc_t *rmc = &sensor->rmc;
+        gps_gll_t *gll = &sensor->gll;
+        gps_gsa_t *gsa = &sensor->gsa;
+        uint8_t *gsa_sats = gsa->sats;
+        gps_gsv_t *gsv = &sensor->gsv;
+        gps_gga_t *gga = &sensor->gga;
+        gps_vtg_t *vtg = &sensor->vtg;
+        gps_zda_t *zda = &sensor->zda;
+
         // RMC - Recommended Minimum Navigation Information
         ESP_LOGI(TAG, "RMC: %d date=%lu time=%lu status=%c lat=%f %c lng=%f %c speed=%f course=%f mv=%f %c",
                 rmc->cnt, rmc->date, (uint32_t)rmc->time, rmc->status, rmc->lat, rmc->ns, rmc->lng, rmc->ew, rmc->speed, rmc->course, rmc->mv, rmc->mv_ew);

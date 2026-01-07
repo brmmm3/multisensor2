@@ -1,5 +1,6 @@
 #include "gps.h"
 #include "main.h"
+#include "ui/include/ui_config.h"
 
 #include "include/pwr_cmd.h"
 
@@ -8,14 +9,9 @@ static const char *TAG = "CMD";
 struct {
     struct arg_int *lcd;    // Power mode (0=full speed, 1=low power, 2=sleep) LCD
     struct arg_int *gps;    // Power mode (0=full speed, 1=low power, 2=sleep) GPS
-    struct arg_int *bme;    // Power mode (0=full speed, 1=low power, 2=sleep) BME280
-    struct arg_int *scd;    // Power mode (0=full speed, 1=low power, 2=sleep) SCD41
-    struct arg_int *mhz;    // Power mode (0=full speed, 1=low power, 2=sleep) MHZ19
-    struct arg_int *yys;    // Power mode (0=full speed, 1=low power, 2=sleep) YYS
-    struct arg_int *sps;    // Power mode (0=full speed, 1=low power, 2=sleep) SPS30
-    struct arg_int *qmc;    // Power mode (0=full speed, 1=low power, 2=sleep) QMC5883L
-    struct arg_int *adx;    // Power mode (0=full speed, 1=low power, 2=sleep) ADXL345
-    struct arg_int *mode;   // Power mode (0=full speed, 1=low power, 2=sleep) ADXL345
+    struct arg_int *scd;    // Power mode (0=full speed, 1=low power, 2=sleep) SCD4x
+    struct arg_int *wifi;   // Power mode (0=full speed, 1=low power, 2=sleep, 3=deep sleep) WiFi
+    struct arg_int *mode;   // Power mode (0=full speed, 1=low power, 2=sleep) Mode
     struct arg_end *end;
 } pwr_cmd_args;
 
@@ -29,31 +25,27 @@ int process_pwr_cmd(int argc, char **argv)
         return 1;
     }
     if (pwr_cmd_args.lcd->count == 1) {
-        lcd_set_bg_pwr(pwr_cmd_args.lcd->ival[0]);
+        ui_lcd_set_pwr_mode(pwr_cmd_args.lcd->ival[0]);
+        config->mode_pwr = 4;
     } else if (pwr_cmd_args.gps->count == 1) {
-        uint8_t mode = pwr_cmd_args.gps->ival[0];
-
-        if (mode == 0) {
-            gps_power_off(gps);
-        } else {
-            gps_set_power_mode(gps, mode);
-        }
+        ui_gps_set_pwr_mode(pwr_cmd_args.gps->ival[0]);
+        config->mode_pwr = 4;
     } else if (pwr_cmd_args.scd->count == 1) {
-        if (pwr_cmd_args.scd->ival[0] > 0) {
-            scd4x_device_init_do(scd4x);
-        } else {
-            scd4x_power_down(scd4x);
-        }
+        ui_scd4x_set_pwr_mode(pwr_cmd_args.scd->ival[0]);
+        config->mode_pwr = 4;
+    } else if (pwr_cmd_args.wifi->count == 1) {
+        ui_wifi_set_pwr_mode(pwr_cmd_args.wifi->ival[0]);
+        config->mode_pwr = 4;
     } else if (pwr_cmd_args.mode->count == 1) {
         uint8_t mode = pwr_cmd_args.mode->ival[0];
 
-        lcd_set_bg_pwr(mode);
-        gps_set_power_mode(gps, mode);
-        if (mode > 0) {
-            scd4x_device_init_do(scd4x);
-        } else {
-            scd4x_power_down(scd4x);
+        if (mode < 4) {
+            ui_lcd_set_pwr_mode(pwr_cmd_args.lcd->ival[0]);
+            ui_gps_set_pwr_mode(pwr_cmd_args.gps->ival[0]);
+            ui_scd4x_set_pwr_mode(pwr_cmd_args.scd->ival[0]);
+            ui_wifi_set_pwr_mode(pwr_cmd_args.wifi->ival[0]);
         }
+        config->mode_pwr = mode;
     } else {
         ESP_LOGE(TAG, "no valid arguments");
         return 1;
@@ -63,14 +55,11 @@ int process_pwr_cmd(int argc, char **argv)
 
 void register_pwr_cmd()
 {
-    pwr_cmd_args.lcd = arg_int0("l", "lcd", "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) LCD");
-    pwr_cmd_args.gps = arg_int0("g", "gps", "<0-3>", "Set power mode (0=full speed, 1=low power, 2=sleep) GPS");
-    pwr_cmd_args.scd = arg_int0("s", "scd", "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) SCD41");
-    pwr_cmd_args.mhz = arg_int0("m", "mhz", "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) MHZ19");
-    pwr_cmd_args.sps = arg_int0("p", "sps", "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) SPS30");
-    pwr_cmd_args.qmc = arg_int0("q", "qmc", "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) QMC5883L");
-    pwr_cmd_args.adx = arg_int0("a", "adx", "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) ADXL345");
-    pwr_cmd_args.mode = arg_int0("M", "mode", "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) ADXL345");
+    pwr_cmd_args.lcd = arg_int0("l", NULL, "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) LCD");
+    pwr_cmd_args.gps = arg_int0("g", NULL, "<0-3>", "Set power mode (0=full speed, 1=low power, 2=sleep) GPS");
+    pwr_cmd_args.scd = arg_int0("s", NULL, "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) SCD4x");
+    pwr_cmd_args.wifi = arg_int0("w", NULL, "<0-3>", "Set power mode (0=full speed, 1=low power, 2=sleep) WiFi");
+    pwr_cmd_args.mode = arg_int0("m", NULL, "<0-3>", "Set power mode (0=full speed, 1=low power, 2=sleep) Mode");
     pwr_cmd_args.end = arg_end(9);
 
     const esp_console_cmd_t cmd = {

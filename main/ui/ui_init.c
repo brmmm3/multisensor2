@@ -171,6 +171,18 @@ lv_obj_t *add_switch(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, int32_t h)
     return obj;
 }
 
+lv_obj_t *add_slider(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, int32_t value, int32_t max)
+{
+    lv_obj_t *obj = lv_slider_create(scr);
+
+    lv_slider_set_mode(obj, LV_SLIDER_MODE_NORMAL);
+    lv_slider_set_range(obj, 0, max);
+    lv_slider_set_value(obj, value, LV_ANIM_OFF);
+    lv_obj_set_pos(obj, x, y);
+    lv_obj_set_width(obj, w);
+    return obj;
+}
+
 lv_obj_t *add_section(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, int32_t h, int32_t w0, const char *text)
 {
     lv_obj_t *obj1 = add_rectangle(scr, x, y, w, h);
@@ -270,8 +282,12 @@ lv_obj_t *add_page_wifi(ui_t *ui)
     ui->lbl_wifi_status1 = add_label(lv_obj_get_child(sec_wifi_status1, 0), 8, 0);
     lv_obj_t *sec_wifi_status2 = add_section(tab, 0, 60, 320, 30, 64, "IP");
     ui->lbl_wifi_status2 = add_label(lv_obj_get_child(sec_wifi_status2, 0), 8, 0);
+    lv_obj_t *sec_mqtt_status = add_section(tab, 0, 90, 320, 30, 64, "MQTT");
+    ui->lbl_mqtt_status = add_label(lv_obj_get_child(sec_mqtt_status, 0), 8, 0);
+    lv_obj_t *sec_ftp_status = add_section(tab, 0, 120, 320, 30, 64, "FTP");
+    ui->lbl_ftp_status = add_label(lv_obj_get_child(sec_ftp_status, 0), 8, 0);
     ui->lst_wifi = lv_list_create(tab);
-    lv_obj_set_pos(ui->lst_wifi, 0, 90);
+    lv_obj_set_pos(ui->lst_wifi, 0, 150);
     lv_obj_set_size(ui->lst_wifi, 320, 120);
     return tab;
 }
@@ -300,18 +316,22 @@ lv_obj_t *add_page_cfg(ui_t *ui)
     lv_obj_t *sec_qmc5883L = add_section(tab, 0, 0, 320, 30, 72, "QMC5883L");
     lv_obj_t *sec_adxl345 = add_section(tab, 0, 30, 320, 30, 72, "ADXL345");
 
-    add_label_text(tab, 0, 60, "LCD Backlight", lv_color_black());
-    add_label_text(tab, 0, 90, "GPS Low Power", lv_color_black());
-    add_label_text(tab, 0, 120, "SPS30 Idle", lv_color_black());
-    add_label_text(tab, 0, 140, "SCD4x Idle", lv_color_black());
+    add_label_text(tab, 0, 70, "Power Mode", lv_color_black());
+    add_label_text(tab, 0, 90, "LCD", lv_color_black());
+    add_label_text(tab, 0, 130, "GPS", lv_color_black());
+    add_label_text(tab, 0, 170, "SCD4x", lv_color_black());
+    add_label_text(tab, 0, 210, "WiFi", lv_color_black());
+    add_label_text(tab, 0, 250, "Mode", lv_color_black());
 
     ui->lbl_qmc5883L = add_label(lv_obj_get_child(sec_qmc5883L, 0), 8, 0);
     ui->lbl_adxl345 = add_label(lv_obj_get_child(sec_adxl345, 0), 8, 0);
-    ui->sw_lcd_pwr = add_switch(tab, 260, 60, 60, 30);
-    ui->sw_gps_pwr = add_switch(tab, 260, 90, 60, 30);
-    ui->sw_sps30_pwr = add_switch(tab, 260, 120, 60, 30);
-    ui->sw_scd4x_pwr = add_switch(tab, 260, 150, 60, 30);
-    ui->btn_calibrate = add_button(tab, 0, 160, 0, 0, "Calibrate Sensors");
+    ui->sl_lcd_pwr = add_slider(tab, 120, 90, 180, 0,2);
+    ui->sl_gps_pwr = add_slider(tab, 120, 130, 180, 0, 3);
+    ui->sl_scd4x_pwr = add_slider(tab, 120, 170, 180, 0, 3);
+    ui->sl_wifi_pwr = add_slider(tab, 120, 210, 180, 0, 2);
+    ui->sl_mode_pwr = add_slider(tab, 120, 250, 180, 0, 4);
+    ui->btn_calibrate = add_button(tab, 0, 290, 200, 0, "Calibrate Sensors");
+    ui->btn_save_config = add_button(tab, 0, 340, 200, 0, "Save Config");
     return tab;
 }
 

@@ -6,6 +6,12 @@ menu "QMC5883L Options"
         help
             Set the I2C clock speed in Hz. Only applies to the new I2C Master driver.
 
+    config QMC5883L_PROBE_TIMEOUT
+        int "Probe Timeout"
+        default 500
+        help
+            Number of ticks to wait for I2C probe operation.
+
     config QMC5883L_TIMEOUT
         int "Read/Write Timeout"
         default 50
