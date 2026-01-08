@@ -641,6 +641,8 @@ static void update_task(void *arg)
 {
     char buf[64];
     uint64_t bytes_total, bytes_free;
+    uint32_t loop_cnt = 0;
+    bool old_wifi_connected = false;
     esp_err_t err;
 
     ESP_LOGI(TAG, "Start update_task");
@@ -656,6 +658,9 @@ static void update_task(void *arg)
     ui_set_label_text(ui->lbl_sd_files, buf);
 
     while (true) {
+        if (loop_cnt++ > 0 && !status.recording && config->auto_record) {
+            ui_sd_record_set_value(true);
+        }
         sensors_update();
         if (status.recording) {
             sensors_recording();
@@ -664,6 +669,10 @@ static void update_task(void *arg)
         status.force_update = false;
 
         if (wifi_connected) {
+            if (!old_wifi_connected) {
+                status.start_time = time(NULL);
+                old_wifi_connected = true;
+            }
             //mqtt_publish_values();
             tcp_server_publish_values();
             if (!ftp_running() && config->ftp_auto_start) {
@@ -739,6 +748,17 @@ void dump_values(bool force)
     if (adxl345 != NULL) adxl345_dump_values(adxl345, force);
 }
 
+esp_err_t update_startup_counter()
+{
+    char *path = MOUNT_POINT"/startup.cnt";
+    uint32_t cnt = 0;
+
+    read_bin_file(path, &cnt, sizeof(cnt));
+    cnt++;
+    ESP_LOGI(TAG, "Startup counter %d", cnt);
+    return write_bin_file(path, &cnt, sizeof(cnt));
+}
+
 void app_main(void)
 {
     // Wait 100ms to give sensors time to power up.
@@ -763,6 +783,7 @@ void app_main(void)
     spi_host_id = sd_card_init(SDCARD_PIN_NUM_CS, SPI_PIN_NUM_SCLK, SPI_PIN_NUM_MOSI, SPI_PIN_NUM_MISO);
 
     config_read();
+    update_startup_counter();
 
     // LCD (SPI Mode)
     lcd = lcd_init(spi_host_id, LCD_PIN_NUM_CS, LCD_PIN_NUM_DC, LCD_PIN_NUM_RST, LCD_PIN_NUM_LED, LCD_PIN_NUM_T_CS);
@@ -786,6 +807,8 @@ void app_main(void)
     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_scd4x_set_pwr_mode(config->scd4x_pwr));
     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_wifi_set_pwr_mode(config->wifi_pwr));
     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_mode_set_pwr_mode(config->mode_pwr));
+
+    status.start_time = time(NULL);
 
     xTaskCreate(update_task, "update_task", 4096, NULL, UPDATE_TASK_PRIORITY, NULL);
     //update_task(NULL);
