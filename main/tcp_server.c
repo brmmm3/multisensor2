@@ -213,11 +213,11 @@ static void tcp_server_task(void *pvParameters)
                 char *response = "OK\n";
 
                 if (strcmp(rx_buffer, "bye") == 0) break;
-                if (strcmp(rx_buffer, "values 1") == 0) {
+                if (strcmp(rx_buffer, "val 1") == 0) {
                     tcp_send_values = true;
                     update_all_cnt = 2;
                     force_update_all = true;
-                } else if (strcmp(rx_buffer, "values 0") == 0) tcp_send_values = false;
+                } else if (strcmp(rx_buffer, "val 0") == 0) tcp_send_values = false;
                 else if (strcmp(rx_buffer, "ls") == 0) {
                     // Show data files on SD-Card
                     if ((err = client_cmd_ls(client_sock)) != ESP_OK) {
@@ -334,6 +334,33 @@ static void tcp_server_task(void *pvParameters)
                         ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
                         response = "ERR\n";
                     }
+                } else if (strcmp(rx_buffer, "rtc") == 0) {
+                    // Get RTC date and time
+                    struct tm timeinfo;
+                    rtc_get_datetime(rtc->rtc, &timeinfo);
+                    int len = sprintf(rx_buffer, "%d.%02d.%02d %02d:%02d:%02d",
+                        timeinfo.tm_year, timeinfo.tm_mon, timeinfo.tm_mday,
+                        timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                } else if (strncmp(rx_buffer, "rtc ", 4) == 0) {
+                    // Set RTC date and time
+                    if (strlen(rx_buffer) != 21 || rx_buffer[12] != ' ') {
+                        ESP_LOGE(TAG, "Invalid argument");
+                        response = "ERR\n";
+                    } else {
+                        struct tm timeinfo;
+
+                        timeinfo.tm_year = atoi(&rx_buffer[4]);
+                        timeinfo.tm_mon = atoi(&rx_buffer[7]);
+                        timeinfo.tm_mday = atoi(&rx_buffer[10]);
+                        timeinfo.tm_hour = atoi(&rx_buffer[13]);
+                        timeinfo.tm_min = atoi(&rx_buffer[16]);
+                        timeinfo.tm_sec = atoi(&rx_buffer[19]);
+                        if ((err = rtc_set_datetime(rtc->rtc, &timeinfo)) != ESP_OK) {
+                            ESP_LOGE(TAG, "Failed to set RTC date/time: err=%d", err);
+                            response = "ERR\n";
+                        }
+                    }
                 } else {
                     ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
                     response = "ERR\n";
@@ -382,6 +409,9 @@ esp_err_t tcp_server_stop()
 
 void tcp_server_publish_values()
 {
+    if (!tcp_server_running && config->tcp_auto_start) {
+        if (tcp_server_start() != ESP_OK) return;
+    }
     if (tcp_server_task_handle == NULL) return;
     if (!wifi_connected || !tcp_server_running || !tcp_send_values || tcp_client_cnt == 0) return;
     if (!gps_update && !bmx280lo_update && !bmx280hi_update && !mhz19_update && !scd4x_calibrate &&
