@@ -756,6 +756,9 @@ void app_main(void)
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
     bus_handle = i2c_bus_init(I2C_PIN_NUM_SDA, I2C_PIN_NUM_SCL);
 
+    // We must call lvgl_port_init before initializing SD-Card, because sd_card driver uses LVGL lock.
+    ESP_ERROR_CHECK(lcd_lvgl_port_init());
+
     // SD-Card (SPI Mode)
     spi_host_id = sd_card_init(SDCARD_PIN_NUM_CS, SPI_PIN_NUM_SCLK, SPI_PIN_NUM_MOSI, SPI_PIN_NUM_MISO);
 

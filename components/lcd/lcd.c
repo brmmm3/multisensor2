@@ -95,6 +95,14 @@ esp_err_t lcd_set_bg_pwr(uint8_t mode)
     return gpio_set_level(bk_led_pin, mode == 0);
 }
 
+esp_err_t lcd_lvgl_port_init()
+{
+    /* Initialize LVGL port first (handles lv_init(), tick timer, task lock, etc.) */
+    ESP_LOGI(TAG, "Initialize LVGL port");
+    const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+    return lvgl_port_init(&lvgl_cfg);
+}
+
 lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t reset_pin, uint8_t led_pin, uint8_t t_cs_pin)
 {
     bk_led_pin = led_pin;
@@ -104,11 +112,6 @@ lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t 
     bk_gpio_config.pin_bit_mask = 1ULL << led_pin;
     ESP_ERROR_CHECK(gpio_config(&bk_gpio_config));
     gpio_set_level(led_pin, 0);  // Off initially
-
-    /* Initialize LVGL port first (handles lv_init(), tick timer, task lock, etc.) */
-    ESP_LOGI(TAG, "Initialize LVGL port");
-    const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
-    ESP_ERROR_CHECK(lvgl_port_init(&lvgl_cfg));
 
     /* LCD Panel IO (SPI) */
     esp_lcd_panel_io_handle_t io_handle = NULL;

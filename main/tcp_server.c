@@ -102,6 +102,22 @@ static esp_err_t send_data_file(int client_sock, char *path)
     return err;
 }
 
+static esp_err_t client_cmd_ls(int client_sock)
+{
+    DIR *dir = sd_open_data_dir();
+    if (dir == NULL) {
+        ESP_LOGE(TAG, "Failed to open data dir");
+        return ESP_FAIL;
+    }
+    while (true) {
+        int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE);
+        if (len == 0) break;
+        send_data_to_client(client_sock, (uint8_t *)rx_buffer,len);
+    }
+    sd_closedir(dir);
+    return ESP_OK;
+}
+
 static void tcp_server_task(void *pvParameters)
 {
     char addr_str[128];
@@ -194,6 +210,8 @@ static void tcp_server_task(void *pvParameters)
                 rx_buffer[len] = 0;
             }
             if (len > 0) {
+                char *response = "OK\n";
+
                 if (strcmp(rx_buffer, "bye") == 0) break;
                 if (strcmp(rx_buffer, "values 1") == 0) {
                     tcp_send_values = true;
@@ -202,34 +220,35 @@ static void tcp_server_task(void *pvParameters)
                 } else if (strcmp(rx_buffer, "values 0") == 0) tcp_send_values = false;
                 else if (strcmp(rx_buffer, "ls") == 0) {
                     // Show data files on SD-Card
-                    DIR *dir = sd_open_data_dir();
-                    if (dir == NULL) {
-                        ESP_LOGE(TAG, "Failed to open data dir");
-                        continue;
+                    if ((err = client_cmd_ls(client_sock)) != ESP_OK) {
+                        response = "ERR\n";
                     }
-                    while (true) {
-                        int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE);
-                        ESP_LOGI(TAG, "sd_read_dir %d", len);
-                        if (len == 0) break;
-                        send_data_to_client(client_sock, (uint8_t *)rx_buffer,len);
-                    }
-                    sd_closedir(dir);
                 } else if (strncmp(rx_buffer, "cp ", 3) == 0) {
                     // Download data file and keep it on SD-Card
                     char path[32];
                     strcpy(path, &rx_buffer[3]);
-                    send_data_file(client_sock, path);
+                    if ((err = send_data_file(client_sock, path)) != ESP_OK) {
+                        response = "ERR\n";
+                    }
                 } else if (strncmp(rx_buffer, "mv ", 3) == 0) {
                     // Download data file and remove it on SD-Card
                     char path[32];
                     strcpy(path, &rx_buffer[3]);
-                    send_data_file(client_sock, path);
-                    remove_data_file(path);
+                    if ((err = send_data_file(client_sock, path)) == ESP_OK) {
+                        if ((err = remove_data_file(path)) != ESP_OK) {
+                            response = "ERR\n";
+                        }
+                    } else {
+                        ESP_LOGE(TAG, "Failed to send file");
+                        response = "ERR\n";
+                    }
                 } else if (strncmp(rx_buffer, "rm ", 3) == 0) {
                     // Remove file on SD-Card
                     char path[32];
                     strcpy(path, &rx_buffer[3]);
-                    remove_data_file(path);
+                    if ((err = remove_data_file(path)) != ESP_OK) {
+                        response = "ERR\n";
+                    }
                 } else if (strcmp(rx_buffer, "rec 1") == 0) {
                     ui_set_switch_state(ui->sw_record, true);
                     ui_sd_record_set_value(true);
@@ -284,8 +303,7 @@ static void tcp_server_task(void *pvParameters)
                         ESP_ERROR_CHECK_WITHOUT_ABORT(ui_mode_set_pwr_mode(config->mode_pwr));
                     } else {
                         ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
-                        send_data_to_client(client_sock, (uint8_t *)"ERR\n", 4);
-                        continue;
+                        response = "ERR\n";
                     }
                 } else if (strncmp(rx_buffer, "auto ", 5) == 0) {
                     // Set auto configs
@@ -299,15 +317,13 @@ static void tcp_server_task(void *pvParameters)
                         config->ftp_auto_start = rx_buffer[5] - '0';
                     } else {
                         ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
-                        send_data_to_client(client_sock, (uint8_t *)"ERR\n", 4);
-                        continue;
+                        response = "ERR\n";
                     }
                 } else if (strcmp(rx_buffer, "save") == 0) {
                     // Save config
                     if ((err = config_write()) != ESP_OK) {
                         ESP_LOGE(TAG, "Writing config failed err=%d", err);
-                        send_data_to_client(client_sock, (uint8_t *)"ERR\n", 4);
-                        continue;
+                        response = "ERR\n";
                     }
                 } else if (strncmp(rx_buffer, "tab ", 4) == 0) {
                     // Set current tab
@@ -316,15 +332,13 @@ static void tcp_server_task(void *pvParameters)
                         lv_tabview_set_act(ui->tbv_main, tab, LV_ANIM_OFF);
                     } else {
                         ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
-                        send_data_to_client(client_sock, (uint8_t *)"ERR\n", 4);
-                        continue;
+                        response = "ERR\n";
                     }
                 } else {
                     ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
-                    send_data_to_client(client_sock, (uint8_t *)"ERR\n", 4);
-                    continue;
+                    response = "ERR\n";
                 }
-                send_data_to_client(client_sock, (uint8_t *)"OK\n", 3);
+                send_data_to_client(client_sock, (uint8_t *)response, strlen(response));
             }
 
             msg_t tx_data;
