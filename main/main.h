@@ -71,6 +71,7 @@ extern led_strip_handle_t led_strip;
 
 typedef enum {
     E_SENSOR_INFO = 0,
+    E_SENSOR_CONFIG,
     E_SENSOR_STATUS,
     E_SENSOR_UNITS,
     E_SENSOR_DATE = 0x0F,

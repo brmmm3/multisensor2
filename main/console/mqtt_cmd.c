@@ -25,7 +25,7 @@ int process_mqtt_cmd(int argc, char **argv)
             mqtt_stop();
         } else if (strcmp(cmd, "auto") == 0) {
             if (mqtt_cmd_args.auto_connect->count == 1) {
-                config->mqtt_connect = mqtt_cmd_args.auto_connect->ival[0] != 0;
+                config->mqtt_auto_connect = mqtt_cmd_args.auto_connect->ival[0] != 0;
             }
         } else {
             ESP_LOGE(TAG, "no valid arguments");

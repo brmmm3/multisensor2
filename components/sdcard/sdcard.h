@@ -14,6 +14,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "esp_err.h"
 #include <dirent.h>
 
@@ -29,11 +30,13 @@ sd_fat_info_t *sd_get_fat_info();
 
 int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t miso_pin);
 
-esp_err_t sd_get_info(char *buf, uint64_t *bytes_total, uint64_t *bytes_free);
+esp_err_t sd_card_get_info(char *buf, uint64_t *bytes_total, uint64_t *bytes_free);
 
-int sd_card_mounted();
+esp_err_t sd_card_mount_fs();
 
-int sd_get_file_count(const char *path);
+int sd_card_mounted(bool check);
+
+int sd_card_get_file_count(const char *path);
 
 esp_err_t ensure_dir(const char *path);
 

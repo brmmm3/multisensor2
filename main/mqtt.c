@@ -128,6 +128,9 @@ void mqtt_stop()
 
 void mqtt_publish_values()
 {
+    if (!mqtt_connected && config->mqtt_auto_connect) {
+        mqtt_start();
+    }
     if (!mqtt_connected) return;
     if (!gps_update && !bmx280lo_update && !bmx280hi_update && !mhz19_update && !scd4x_calibrate &&
         !scd4x_update && !yys_update && !sps30_update && !adxl345_update && !qmc5883l_update) {

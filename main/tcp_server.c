@@ -1,6 +1,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include "config.h"
 #include "mbedtls/base64.h"
 #include "adxl345.h"
 #include "esp_log.h"
@@ -194,9 +195,12 @@ static void tcp_server_task(void *pvParameters)
             }
             if (len > 0) {
                 if (strcmp(rx_buffer, "bye") == 0) break;
-                if (strcmp(rx_buffer, "values 1") == 0) tcp_send_values = true;
-                else if (strcmp(rx_buffer, "values 0") == 0) tcp_send_values = false;
-                else if (strcmp(rx_buffer, "list") == 0) {
+                if (strcmp(rx_buffer, "values 1") == 0) {
+                    tcp_send_values = true;
+                    update_all_cnt = 2;
+                    force_update_all = true;
+                } else if (strcmp(rx_buffer, "values 0") == 0) tcp_send_values = false;
+                else if (strcmp(rx_buffer, "ls") == 0) {
                     // Show data files on SD-Card
                     DIR *dir = sd_open_data_dir();
                     if (dir == NULL) {
@@ -222,7 +226,7 @@ static void tcp_server_task(void *pvParameters)
                     send_data_file(client_sock, path);
                     remove_data_file(path);
                 } else if (strncmp(rx_buffer, "rm ", 3) == 0) {
-                    // Remove it on SD-Card
+                    // Remove file on SD-Card
                     char path[32];
                     strcpy(path, &rx_buffer[3]);
                     remove_data_file(path);
@@ -234,13 +238,87 @@ static void tcp_server_task(void *pvParameters)
                     ui_sd_record_set_value(false);
                 } else if (strcmp(rx_buffer, "free") == 0) {
                     sd_fat_info_t *fat_info = sd_get_fat_info();
-                    len = sprintf(rx_buffer, "FAT FS: %" PRIu64 " MB total, %" PRIu64 " MB free\n",
-                        fat_info->bytes_total / (1024 * 1024), fat_info->bytes_free / (1024 * 1024));
+                    len = sprintf(rx_buffer, "fs: %" PRIu64 " MB\n", fat_info->bytes_free / (1024 * 1024));
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                     uint32_t free_heap = esp_get_free_heap_size();
-                    len = sprintf(rx_buffer, "Free heap: %.2f kB\n", (float)free_heap / 1024.0);
+                    len = sprintf(rx_buffer, "heap: %.2f kB\n", (float)free_heap / 1024.0);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                     ESP_LOGI(TAG, "%s", rx_buffer);
+                } else if (strcmp(rx_buffer, "config") == 0) {
+                    // Get config
+                    int len = sprintf(rx_buffer, "{id=%d,cfg_version=%d,auto_connect=%d,auto_record=%d,",
+                        E_SENSOR_CONFIG,
+                        config->cfg_version, config->auto_connect, config->auto_record);
+                    len += sprintf(&rx_buffer[len], "lcd_pwr=%d,gps_pwr=%d,scd4x_pwr=%d,wifi_pwr=%d,mode_pwr=%d,",
+                        config->lcd_pwr, config->gps_pwr, config->scd4x_pwr, config->wifi_pwr, config->mode_pwr);
+                    len += sprintf(&rx_buffer[len], "tcp_auto_start=%d,ftp_auto_start=%d", config->tcp_auto_start, config->ftp_auto_start);
+                    for (int i = 0; i < 4; i++) {
+                        if (strlen(config_nvs->wifi.ssid[i]) > 0) {
+                            len += sprintf(&rx_buffer[len], ",ssid%d=%s", i, config_nvs->wifi.ssid[i]);
+                        }
+                    }
+                    len += sprintf(&rx_buffer[len], "}\n");
+                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                } else if (strcmp(rx_buffer, "status") == 0) {
+                    // Get status
+                    int len = sprintf(rx_buffer, "{id=%d,force_update=%d,recording=%d,record_pos=%d,file_cnt=%d,filename=\"%s\"}\n",
+                        E_SENSOR_STATUS,
+                        status.force_update, status.recording, status.record_pos, status.file_cnt, status.filename);
+                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                } else if (strncmp(rx_buffer, "pwr ", 4) == 0) {
+                    // Set power status
+                    if (strncmp(&rx_buffer[4], "lcd ", 4) == 0) {
+                        config->lcd_pwr = rx_buffer[8] - '0';
+                        ESP_ERROR_CHECK_WITHOUT_ABORT(ui_lcd_set_pwr_mode(config->lcd_pwr));
+                    } else if (strncmp(&rx_buffer[4], "gps ", 4) == 0) {
+                        config->gps_pwr = rx_buffer[8] - '0';
+                        ESP_ERROR_CHECK_WITHOUT_ABORT(ui_gps_set_pwr_mode(config->gps_pwr));
+                    } else if (strncmp(&rx_buffer[4], "scd ", 4) == 0) {
+                        config->scd4x_pwr = rx_buffer[8] - '0';
+                        ESP_ERROR_CHECK_WITHOUT_ABORT(ui_scd4x_set_pwr_mode(config->scd4x_pwr));
+                    } else if (strncmp(&rx_buffer[4], "wifi ", 5) == 0) {
+                        config->wifi_pwr = rx_buffer[9] - '0';
+                        ESP_ERROR_CHECK_WITHOUT_ABORT(ui_wifi_set_pwr_mode(config->wifi_pwr));
+                    } else if (strncmp(&rx_buffer[4], "mode ", 5) == 0) {
+                        config->mode_pwr = rx_buffer[9] - '0';
+                        ESP_ERROR_CHECK_WITHOUT_ABORT(ui_mode_set_pwr_mode(config->mode_pwr));
+                    } else {
+                        ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
+                        send_data_to_client(client_sock, (uint8_t *)"ERR\n", 4);
+                        continue;
+                    }
+                } else if (strncmp(rx_buffer, "auto ", 5) == 0) {
+                    // Set auto configs
+                    if (strncmp(&rx_buffer[5], "con ", 4) == 0) {
+                        config->auto_connect = rx_buffer[9] - '0';
+                    } else if (strncmp(&rx_buffer[5], "rec ", 4) == 0) {
+                        config->auto_record = rx_buffer[5] - '0';
+                    } else if (strncmp(&rx_buffer[5], "tcp ", 4) == 0) {
+                        config->tcp_auto_start = rx_buffer[5] - '0';
+                    } else if (strncmp(&rx_buffer[5], "ftp ", 4) == 0) {
+                        config->ftp_auto_start = rx_buffer[5] - '0';
+                    } else {
+                        ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
+                        send_data_to_client(client_sock, (uint8_t *)"ERR\n", 4);
+                        continue;
+                    }
+                } else if (strcmp(rx_buffer, "save") == 0) {
+                    // Save config
+                    if ((err = config_write()) != ESP_OK) {
+                        ESP_LOGE(TAG, "Writing config failed err=%d", err);
+                        send_data_to_client(client_sock, (uint8_t *)"ERR\n", 4);
+                        continue;
+                    }
+                } else if (strncmp(rx_buffer, "tab ", 4) == 0) {
+                    // Set current tab
+                    uint32_t tab = rx_buffer[4] - '0';
+                    if (tab < 6) {
+                        lv_tabview_set_act(ui->tbv_main, tab, LV_ANIM_OFF);
+                    } else {
+                        ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
+                        send_data_to_client(client_sock, (uint8_t *)"ERR\n", 4);
+                        continue;
+                    }
                 } else {
                     ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
                     send_data_to_client(client_sock, (uint8_t *)"ERR\n", 4);
@@ -255,6 +333,7 @@ static void tcp_server_task(void *pvParameters)
                 vPortFree(tx_data.data);
             }
         }
+        tcp_send_values = false;
         tcp_client_cnt--;
 
         // Close client socket
@@ -282,6 +361,7 @@ esp_err_t tcp_server_stop()
         vQueueDelete(tx_queue);
         tx_queue = NULL;
     }
+    tcp_send_values = false;
     tcp_server_running = false;
     return ESP_OK;
 }

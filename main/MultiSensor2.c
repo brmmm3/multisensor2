@@ -2,6 +2,7 @@
 #include "esp_rom_crc.h"
 #include "bmx280.h"
 #include "config.h"
+#include "ftp.h"
 #include "gps.h"
 #include "lcd.h"
 #include "main.h"
@@ -183,35 +184,6 @@ void data_add(uint8_t id, void *values, size_t size)
 }
 
 
-esp_err_t nvs_init()
-{
-    ESP_LOGI(TAG, "Initialize NVS");
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        // NVS partition is truncated or version mismatch → erase and re-init
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    return ret;
-}
-
-i2c_master_bus_handle_t i2c_bus_init(uint8_t sda_io, uint8_t scl_io)
-{
-    ESP_LOGI(TAG, "Initialize I2C bus");
-    i2c_master_bus_config_t i2c_bus_config = {
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .i2c_port = I2C_PORT_AUTO,
-        .scl_io_num = scl_io,
-        .sda_io_num = sda_io,
-        .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,
-    };
-    i2c_master_bus_handle_t bus_handle;
-    ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_config, &bus_handle));
-    ESP_LOGI(TAG,"I2C master bus created");
-    return bus_handle;
-}
-
 void led_init(void)
 {
     ESP_LOGI(TAG, "Initialize LED");
@@ -242,6 +214,36 @@ void led_init(void)
 
     // LED Strip object handle
     led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip);
+}
+
+
+esp_err_t nvs_init()
+{
+    ESP_LOGI(TAG, "Initialize NVS");
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        // NVS partition is truncated or version mismatch → erase and re-init
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    return ret;
+}
+
+i2c_master_bus_handle_t i2c_bus_init(uint8_t sda_io, uint8_t scl_io)
+{
+    ESP_LOGI(TAG, "Initialize I2C bus");
+    i2c_master_bus_config_t i2c_bus_config = {
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .i2c_port = I2C_PORT_AUTO,
+        .scl_io_num = scl_io,
+        .sda_io_num = sda_io,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
+    };
+    i2c_master_bus_handle_t bus_handle;
+    ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_config, &bus_handle));
+    ESP_LOGI(TAG,"I2C master bus created");
+    return bus_handle;
 }
 
 void sensors_init()
@@ -639,16 +641,17 @@ static void update_task(void *arg)
 {
     char buf[64];
     uint64_t bytes_total, bytes_free;
+    esp_err_t err;
 
     ESP_LOGI(TAG, "Start update_task");
     esp_task_wdt_add(NULL);
     // Update SD-Card info
     ensure_dir(MOUNT_POINT"/data");
-    sd_get_info(buf, &bytes_total, &bytes_free);
+    sd_card_get_info(buf, &bytes_total, &bytes_free);
     ui_set_label_text(ui->lbl_sd_card, buf);
     sprintf(buf, "%llu MB", bytes_free / (1024 * 1024));
     ui_set_label_text(ui->lbl_sd_free, buf);
-    status.file_cnt = sd_get_file_count(MOUNT_POINT"/data");
+    status.file_cnt = sd_card_get_file_count(MOUNT_POINT"/data");
     sprintf(buf, "%d data files", status.file_cnt);
     ui_set_label_text(ui->lbl_sd_files, buf);
 
@@ -660,15 +663,16 @@ static void update_task(void *arg)
         ui_update(status.force_update);
         status.force_update = false;
 
-        /*if (wifi_connected) {
-            if (!mqtt_connected && config->mqtt_connect) {
-                mqtt_start();
+        if (wifi_connected) {
+            //mqtt_publish_values();
+            tcp_server_publish_values();
+            if (!ftp_running() && config->ftp_auto_start) {
+                ftp_start();
             }
-            if (mqtt_connected) {
-                mqtt_publish_values();
-            }
-        }*/
-        tcp_server_publish_values();
+        } else {
+            if (tcp_server_running) tcp_server_stop();
+            if (ftp_running()) ftp_stop();
+        }
 
         // Dump data for debugging
         dump_values(false);
@@ -698,13 +702,18 @@ static void update_task(void *arg)
             strcpy(buf, MOUNT_POINT);
             sprintf(&buf[pos], "/data/%s", status.filename);
             ESP_LOGI(TAG, "Write %d bytes to File %s", status.record_pos, buf);
-            write_bin_file(buf, data, status.record_pos);
-            status.record_pos = 0;
-            status.file_cnt++;
-            sprintf(buf, "%d data files", status.file_cnt);
-            ui_set_label_text(ui->lbl_sd_files, buf);
-            ui_set_label_text(ui->lbl_sd_fill, "0.0 %");
-            set_data_filename();
+            if ((err = write_bin_file(buf, data, status.record_pos)) == ESP_OK) {
+                status.record_pos = 0;
+                status.file_cnt++;
+                sprintf(buf, "%d data files", status.file_cnt);
+                ui_set_label_text(ui->lbl_sd_files, buf);
+                ui_set_label_text(ui->lbl_sd_fill, "0.0 %");
+                set_data_filename();
+            } else if (!sd_card_mounted(true)) {
+                ui_set_switch_state(ui->sw_record, false);
+                ui_sd_record_set_value(false);
+                ui_set_tab_color(4, LV_PALETTE_RED);
+            }
         } else {
             float fill_level = 100.0 * (float) status.record_pos / (float)DATA_MAX_SIZE;
             sprintf(buf, "%.1f %%", fill_level);
@@ -746,6 +755,7 @@ void app_main(void)
     ESP_ERROR_CHECK(nvs_init());
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
     bus_handle = i2c_bus_init(I2C_PIN_NUM_SDA, I2C_PIN_NUM_SCL);
+
     // SD-Card (SPI Mode)
     spi_host_id = sd_card_init(SDCARD_PIN_NUM_CS, SPI_PIN_NUM_SCLK, SPI_PIN_NUM_MOSI, SPI_PIN_NUM_MISO);
 
@@ -763,7 +773,7 @@ void app_main(void)
         wifi_init(false);
     }
 
-    if (!sd_card_mounted()) {
+    if (!sd_card_mounted(true)) {
         ui_set_tab_color(4, LV_PALETTE_RED);
     }
     console_init();

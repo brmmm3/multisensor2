@@ -216,6 +216,8 @@ int32_t ftp_get_maxstack(void);
 esp_err_t ftp_start();
 esp_err_t ftp_stop();
 
+bool ftp_running();
+
 #ifdef __cplusplus
 };
 #endif

@@ -35,7 +35,7 @@ int process_config_cmd(int argc, char **argv)
             ESP_LOGI(TAG, "wifi_pwr=%d", config->wifi_pwr);
             ESP_LOGI(TAG, "mode_pwr=%d", config->mode_pwr);
             ESP_LOGI(TAG, "mqtt_broker=%s", config->mqtt_broker);
-            ESP_LOGI(TAG, "mqtt_connect=%d", config->mqtt_connect);
+            ESP_LOGI(TAG, "mqtt_auto_connect=%d", config->mqtt_auto_connect);
         } else {
             ESP_LOGE(TAG, "no valid arguments");
             return 1;

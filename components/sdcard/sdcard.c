@@ -16,7 +16,12 @@ static const char *TAG = "SD";
 
 #define SDCARD_MAX_FREQ_KHZ 4000
 
-static sdmmc_card_t *card = NULL;
+static sdmmc_card_t *sd_card = NULL;
+// By default, SD card frequency is initialized to SDMMC_FREQ_DEFAULT (20MHz)
+// For setting a specific frequency, use host.max_freq_khz (range 400kHz - 20MHz for SDSPI)
+// Example: for fixed frequency of 10MHz, use host.max_freq_khz = 10000;
+static sdmmc_host_t sd_host = SDSPI_HOST_DEFAULT();
+static uint8_t sd_cs_pin = 0;
 
 
 esp_err_t write_text_file(const char *path, char *data)
@@ -50,7 +55,7 @@ esp_err_t write_bin_file(const char *path, void *data, uint32_t size)
     ESP_LOGI(TAG, "Write binary file %s", path);
     FILE *f = fopen(path, "wb");
     if (f == NULL) {
-        ESP_LOGE(TAG, "Failed to open file for writing: %s (errno=%d)", strerror(errno), errno);
+        ESP_LOGE(TAG, "Failed to open file for writing: err(%d)=%s", errno, strerror(errno));
         return ESP_FAIL;
     }
     fwrite(data, size, 1, f);
@@ -147,7 +152,7 @@ int sd_read_dir(DIR *dir, char *buf, int maxlen)
         buf[pos++] = '\n';
         if (pos >= maxlen) return pos;
     }
-    return 0;
+    return pos;
 }
 
 void sd_closedir(DIR *dir)
@@ -193,28 +198,10 @@ sd_fat_info_t *sd_get_fat_info()
     return &fat_info;
 }
 
-int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t miso_pin)
+esp_err_t spi_bus_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t miso_pin)
 {
-    esp_err_t err;
-    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
-        .format_if_mount_failed = true,
-        .max_files = 5,
-        .allocation_unit_size = 16 * 1024
-    };
-    const char mount_point[] = MOUNT_POINT;
-    ESP_LOGI(TAG, "Initializing SD card");
-
-    // Use settings defined above to initialize SD card and mount FAT filesystem.
-    // Note: esp_vfs_fat_sdmmc/sdspi_mount is all-in-one convenience functions.
-    // Please check its source code and implement error recovery when developing
-    // production applications.
-    ESP_LOGI(TAG, "Using SPI peripheral");
-
-    // By default, SD card frequency is initialized to SDMMC_FREQ_DEFAULT (20MHz)
-    // For setting a specific frequency, use host.max_freq_khz (range 400kHz - 20MHz for SDSPI)
-    // Example: for fixed frequency of 10MHz, use host.max_freq_khz = 10000;
-    sdmmc_host_t host = SDSPI_HOST_DEFAULT();
-    host.max_freq_khz = SDCARD_MAX_FREQ_KHZ;
+    ESP_LOGI(TAG, "Initialize SPI bus");
+    sd_host.max_freq_khz = SDCARD_MAX_FREQ_KHZ;
 
     spi_bus_config_t bus_cfg = {
         .mosi_io_num = mosi_pin,
@@ -225,24 +212,32 @@ int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t mis
         .max_transfer_sz = 38400,
     };
 
-    err = spi_bus_initialize(host.slot, &bus_cfg, SDSPI_DEFAULT_DMA);
+    esp_err_t err = spi_bus_initialize(sd_host.slot, &bus_cfg, SDSPI_DEFAULT_DMA);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize bus.");
-        return -1;
     }
+    return err;
+}
 
+esp_err_t sd_card_mount_fs()
+{
+    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
+        .format_if_mount_failed = false,
+        .max_files = 5,
+        .allocation_unit_size = 16 * 1024
+    };
     sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
 
-    slot_config.gpio_cs = cs_pin;
-    slot_config.host_id = host.slot;  // Card handle
+    slot_config.gpio_cs = sd_cs_pin;
+    slot_config.host_id = sd_host.slot;  // Card handle
 
     ESP_LOGI(TAG, "Mounting filesystem");
     // IMPORTANT WORKAROUND: Comment out "SDMMC_INIT_STEP(is_spi, sdmmc_init_spi_crc);" in sdmmc_init.c
-    err = esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_config, &card);
+    esp_err_t err = esp_vfs_fat_sdspi_mount(MOUNT_POINT, &sd_host, &slot_config, &mount_config, &sd_card);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Filesystem mounted");
         // Card has been initialized, print its properties
-        sdmmc_card_print_info(stdout, card);
+        sdmmc_card_print_info(stdout, sd_card);
         sd_get_fat_info();
     } else {
         if (err == ESP_FAIL) {
@@ -253,39 +248,61 @@ int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t mis
                      "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(err));
         }
     }
-    return host.slot;
+    return err;
 }
 
-int sd_card_mounted()
+int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t miso_pin)
 {
-    return card != NULL;
+    esp_err_t err;
+
+    if ((err = spi_bus_init(cs_pin, sclk_pin, mosi_pin, miso_pin)) != ESP_OK) return -1;
+
+    ESP_LOGI(TAG, "Initialize SD card");
+    sd_cs_pin = cs_pin;
+
+    if ((err = sd_card_mount_fs()) != ESP_OK) return -1;
+    return sd_host.slot;
 }
 
-esp_err_t sd_get_info(char *buf, uint64_t *bytes_total, uint64_t *bytes_free)
+int sd_card_mounted(bool check)
+{
+    if (!check) return sd_card != NULL;
+
+    DIR* dir = opendir(MOUNT_POINT);
+    if (dir != NULL) {
+        closedir(dir);
+        return true;
+    }
+    sd_card = NULL;
+    return false;
+}
+
+esp_err_t sd_card_get_info(char *buf, uint64_t *bytes_total, uint64_t *bytes_free)
 {
     const char* type;
 
-    if (card->is_sdio) {
+    if (sd_card == NULL) return ESP_FAIL;
+    if (sd_card->is_sdio) {
         type = "SDIO";
-    } else if (card->is_mmc) {
+    } else if (sd_card->is_mmc) {
         type = "MMC";
     } else {
-        if ((card->ocr & SD_OCR_SDHC_CAP) == 0) {
+        if ((sd_card->ocr & SD_OCR_SDHC_CAP) == 0) {
             type = "SDSC";
         } else {
-            if (card->ocr & SD_OCR_S18_RA) {
+            if (sd_card->ocr & SD_OCR_S18_RA) {
                 type = "SDHC/SDXC (UHS-I)";
             } else {
                 type = "SDHC";
             }
         }
     }
-    uint64_t size = ((uint64_t) card->csd.capacity) * card->csd.sector_size / (1024 * 1024 * 1024);
-    sprintf(buf, "%s (%s) %llu GB", card->cid.name, type, size);
+    uint64_t size = ((uint64_t) sd_card->csd.capacity) * sd_card->csd.sector_size / (1024 * 1024 * 1024);
+    sprintf(buf, "%s (%s) %llu GB", sd_card->cid.name, type, size);
     return esp_vfs_fat_info(MOUNT_POINT, bytes_total, bytes_free);
 }
 
-int sd_get_file_count(const char *path)
+int sd_card_get_file_count(const char *path)
 {
     int file_count = 0;
 
