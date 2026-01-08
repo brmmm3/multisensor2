@@ -123,6 +123,8 @@ bool qmc5883l_update = false;
 
 uint32_t debug_main = 0;
 
+bool force_update_all = false;
+
 uint8_t sps30_not_ready_cnt = 0;
 
 // Last sensor values
@@ -265,7 +267,7 @@ void sensors_init()
 static bool update_gps()
 {
     uint16_t v16;
-    bool force_update = (debug_main & 1) != 0;
+    bool force_update = force_update_all || (debug_main & 1) != 0;
 
     if (gps_data_ready(gps)) {
         gps_values.sat = gps->status.sat;
@@ -304,7 +306,7 @@ static bool update_bmx280(int num, bmx280_t **sensor, sensors_data_bmx280_t *las
     }
 
     esp_err_t err;
-    bool force_update = (debug_main & 1) != 0;
+    bool force_update = force_update_all || (debug_main & 1) != 0;
 
     if ((err = bmx280_readout(*sensor)) != ESP_OK) {
         ESP_LOGE(TAG, "BME280_%d: err=%d", num, err);
@@ -319,7 +321,7 @@ static bool update_bmx280(int num, bmx280_t **sensor, sensors_data_bmx280_t *las
 
 static bool update_mhz19()
 {
-    bool force_update = (debug_main & 1) != 0;
+    bool force_update = force_update_all || (debug_main & 1) != 0;
 
     if (mhz19_data_ready(mhz19)) {
         if (force_update || memcmp(&last_values.mhz19, &mhz19->values, sizeof(sensors_data_mhz19_t)) != 0) {
@@ -362,7 +364,7 @@ static bool update_scd4x()
         return false;
     }
 
-    bool force_update = (debug_main & 1) != 0;
+    bool force_update = force_update_all || (debug_main & 1) != 0;
 
     if (force_update || memcmp(&last_values.scd4x, &scd4x->values, sizeof(sensors_data_scd4x_t)) != 0) {
         memcpy(&last_values.scd4x, &scd4x->values, sizeof(sensors_data_scd4x_t));
@@ -373,7 +375,7 @@ static bool update_scd4x()
 
 static bool update_yys()
 {
-    bool force_update = (debug_main & 1) != 0;
+    bool force_update = force_update_all || (debug_main & 1) != 0;
 
     if (yys_data_ready(yys_sensor)) {
         if (force_update || memcmp(&last_values.yys, &yys_sensor->values, sizeof(sensors_data_yys_t)) != 0) {
@@ -415,7 +417,7 @@ static bool update_sps30()
         return false;
     }
 
-    bool force_update = (debug_main & 1) != 0;
+    bool force_update = force_update_all || (debug_main & 1) != 0;
 
     if (force_update || memcmp(&last_values.sps30, &sps30->values, sizeof(sensors_data_sps30_t)) != 0) {
         memcpy(&last_values.sps30, &sps30->values, sizeof(sensors_data_sps30_t));
@@ -437,7 +439,7 @@ static bool update_adxl345()
         return false;
     }
 
-    bool force_update = (debug_main & 1) != 0;
+    bool force_update = force_update_all || (debug_main & 1) != 0;
 
     if (force_update || memcmp(&last_values.adxl345, &adxl345->values, sizeof(sensors_data_adxl345_t)) != 0) {
         memcpy(&last_values.adxl345, &adxl345->values, sizeof(sensors_data_adxl345_t));
@@ -459,7 +461,7 @@ static bool update_qmc5883l()
         return false;
     }
 
-    bool force_update = (debug_main & 1) != 0;
+    bool force_update = force_update_all || (debug_main & 1) != 0;
 
     if (force_update || memcmp(&last_values.qmc5883l, &qmc5883l->values, sizeof(sensors_data_qmc5883l_t)) != 0) {
         memcpy(&last_values.qmc5883l, &qmc5883l->values, sizeof(sensors_data_qmc5883l_t));
@@ -666,9 +668,7 @@ static void update_task(void *arg)
                 mqtt_publish_values();
             }
         }*/
-        if (wifi_connected && tcp_server_running && tcp_client_cnt > 0) {
-            tcp_server_publish_values();
-        }
+        tcp_server_publish_values();
 
         // Dump data for debugging
         dump_values(false);

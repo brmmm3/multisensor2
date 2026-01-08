@@ -16,10 +16,6 @@ extern "C" {
 
 #include <stdint.h>
 #include <limits.h>
-#include <assert.h>
-#include "sdkconfig.h"
-
-#include "driver/i2c_master.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 

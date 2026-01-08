@@ -45,18 +45,11 @@
 
 #include "freertos/event_groups.h"
 
-#include "esp_system.h"
 //#include "esp_spi_flash.h" // ESP-IDF V4
 #include "freertos/idf_additions.h"
-#include "rom/esp_flash.h" // ESP-IDF V5
-#include "nvs_flash.h"
 #include "esp_log.h"
 
-#include "esp_wifi.h"
-
 #include "lwip/sockets.h"
-#include "lwip/dns.h"
-#include "lwip/netdb.h"
 
 //#include "freertos/semphr.h"
 
@@ -1061,10 +1054,10 @@ static void ftp_wait_for_enabled (void) {
 
 //---------------------
 void ftp_deinit(void) {
-	if (ftp_path) free(ftp_path);
-	if (ftp_cmd_buffer) free(ftp_cmd_buffer);
-	if (ftp_data.dBuffer) free(ftp_data.dBuffer);
-	if (ftp_scratch_buffer) free(ftp_scratch_buffer);
+	if (ftp_path) vPortFree(ftp_path);
+	if (ftp_cmd_buffer) vPortFree(ftp_cmd_buffer);
+	if (ftp_data.dBuffer) vPortFree(ftp_data.dBuffer);
+	if (ftp_scratch_buffer) vPortFree(ftp_scratch_buffer);
 	ftp_path = NULL;
 	ftp_cmd_buffer = NULL;
 	ftp_data.dBuffer = NULL;
@@ -1078,24 +1071,24 @@ bool ftp_init(void) {
 	ftp_deinit();
 
 	memset(&ftp_data, 0, sizeof(ftp_data_t));
-	ftp_data.dBuffer = malloc(ftp_buff_size+1);
+	ftp_data.dBuffer = pvPortMalloc(ftp_buff_size+1);
 	if (ftp_data.dBuffer == NULL) return false;
-	ftp_path = malloc(FTP_MAX_PARAM_SIZE);
+	ftp_path = pvPortMalloc(FTP_MAX_PARAM_SIZE);
 	if (ftp_path == NULL) {
-		free(ftp_data.dBuffer);
+		vPortFree(ftp_data.dBuffer);
 		return false;
 	}
-	ftp_scratch_buffer = malloc(FTP_MAX_PARAM_SIZE);
+	ftp_scratch_buffer = pvPortMalloc(FTP_MAX_PARAM_SIZE);
 	if (ftp_scratch_buffer == NULL) {
-		free(ftp_path);
-		free(ftp_data.dBuffer);
+		vPortFree(ftp_path);
+		vPortFree(ftp_data.dBuffer);
 		return false;
 	}
-	ftp_cmd_buffer = malloc(FTP_MAX_PARAM_SIZE + FTP_CMD_SIZE_MAX);
+	ftp_cmd_buffer = pvPortMalloc(FTP_MAX_PARAM_SIZE + FTP_CMD_SIZE_MAX);
 	if (ftp_cmd_buffer == NULL) {
-		free(ftp_scratch_buffer);
-		free(ftp_path);
-		free(ftp_data.dBuffer);
+		vPortFree(ftp_scratch_buffer);
+		vPortFree(ftp_path);
+		vPortFree(ftp_data.dBuffer);
 		return false;
 	}
 

@@ -340,7 +340,7 @@ ui_t *ui_init(lv_display_t *disp)
     ESP_LOGI(TAG, "Initialize UI");
 
     lv_obj_t *scr = lv_display_get_screen_active(disp);
-    ui_t *ui = malloc(sizeof(ui_t));
+    ui_t *ui = pvPortMalloc(sizeof(ui_t));
 
     lvgl_port_lock(-1);
     init_styles();

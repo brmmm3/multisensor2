@@ -163,11 +163,9 @@ static void sw_wifi_pwr_cb(lv_event_t *e)
     }
 }
 
-static void sw_sd_record_cb(lv_event_t *e)
+void ui_sd_record_set_value(bool enable)
 {
-    lv_obj_t *obj = lv_event_get_target(e);
-
-    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
+    if (enable) {
         status.recording = true;
         status.record_pos = 0;
         set_data_filename();
@@ -176,6 +174,17 @@ static void sw_sd_record_cb(lv_event_t *e)
     } else {
         status.recording = false;
         ui_set_tab_color(4, LV_PALETTE_GREY);
+    }
+}
+
+static void sw_sd_record_cb(lv_event_t *e)
+{
+    lv_obj_t *obj = lv_event_get_target(e);
+
+    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
+        ui_sd_record_set_value(true);
+    } else {
+        ui_sd_record_set_value(false);
     }
 }
 

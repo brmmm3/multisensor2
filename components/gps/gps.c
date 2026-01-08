@@ -1,5 +1,4 @@
 #include <string.h>
-#include "hal/uart_types.h"
 #include "driver/uart.h"
 #include "esp_log.h"
 
@@ -110,9 +109,9 @@ void gps_cmd_txt(gps_sensor_t *sensor, char *p, char *end)
 
     if (sensor->msg_size < msg_size) {
         if (sensor->messages != NULL) {
-            free(sensor->messages);
+            vPortFree(sensor->messages);
         }
-        sensor->messages = malloc(msg_size);
+        sensor->messages = pvPortMalloc(msg_size);
         sensor->msg_size = msg_size;
     }
 
@@ -443,8 +442,9 @@ bool gps_data_ready(gps_sensor_t *sensor)
 
 esp_err_t gps_init(gps_sensor_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin)
 {
-    hw_serial_t *gps_serial = malloc(sizeof(hw_serial_t));
-    gps_sensor_t *sensor = calloc(1, sizeof(gps_sensor_t));
+    hw_serial_t *gps_serial = pvPortMalloc(sizeof(hw_serial_t));
+    gps_sensor_t *sensor = pvPortMalloc(sizeof(gps_sensor_t));
+    memset(sensor, 0, sizeof(gps_sensor_t));
 
     ESP_LOGI(TAG, "Initialize GPS");
    // Serial
@@ -455,7 +455,8 @@ esp_err_t gps_init(gps_sensor_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, 
     gps_serial->queue = xQueueCreate(128, 1);
     // Sensor
     sensor->name = "GPS";
-    sensor->buffer = calloc(UART_BUFFER_SIZE + 1, 1);
+    sensor->buffer = pvPortMalloc(UART_BUFFER_SIZE + 1);
+    memset(sensor->buffer, 0, UART_BUFFER_SIZE + 1);
     sensor-> cnt = 0;
     sensor->queue = xQueueCreate(128, 1);
     sensor->serial = gps_serial;

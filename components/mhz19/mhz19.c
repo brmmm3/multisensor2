@@ -1,4 +1,3 @@
-#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -228,8 +227,8 @@ esp_err_t mhz19_reset(mhz19_t *sensor)
 
 esp_err_t mhz19_init(mhz19_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin)
 {
-    hw_serial_t *mhz19_serial = malloc(sizeof(hw_serial_t));
-    mhz19_t *sensor = malloc(sizeof(mhz19_t));
+    hw_serial_t *mhz19_serial = pvPortMalloc(sizeof(hw_serial_t));
+    mhz19_t *sensor = pvPortMalloc(sizeof(mhz19_t));
 
     ESP_LOGI(TAG, "Initialize MHZ19");
     // Serial

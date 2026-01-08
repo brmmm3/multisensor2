@@ -3,7 +3,6 @@
 #include <math.h>
 #include "driver/i2c_master.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/projdefs.h"
 #include "freertos/task.h"
 #include "esp_err.h"
 #include "esp_log.h"
@@ -160,7 +159,7 @@ static esp_err_t adxl345_device_create(adxl345_t *sensor, const uint16_t dev_add
 
 adxl345_t *adxl345_create_master(i2c_master_bus_handle_t bus_handle)
 {
-    adxl345_t *sensor = malloc(sizeof(adxl345_t));
+    adxl345_t *sensor = pvPortMalloc(sizeof(adxl345_t));
 
     if (sensor) {
         adxl345_values_t *values = &sensor->values;
@@ -192,7 +191,7 @@ void adxl345_close(adxl345_t *sensor)
     if (sensor != NULL && sensor->i2c_dev != NULL) {
         i2c_master_bus_rm_device(sensor->i2c_dev);
     }
-    free(sensor);
+    vPortFree(sensor);
 }
 
 esp_err_t adxl345_device_init(adxl345_t *sensor)

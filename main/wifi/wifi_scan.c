@@ -201,14 +201,15 @@ void wifi_scan(void)
     esp_wifi_disconnect();  // Stop any connection attempt
 
 #ifdef USE_CHANNEL_BITMAP
-    wifi_scan_config_t *scan_config = (wifi_scan_config_t *)calloc(1, sizeof(wifi_scan_config_t));
+    wifi_scan_config_t *scan_config = (wifi_scan_config_t *)pvPortMalloc(sizeof(wifi_scan_config_t));
+    memset(scan_config, 0, sizeof(wifi_scan_config_t));
     if (!scan_config) {
         ESP_LOGE(TAG, "Memory Allocation for scan config failed!");
         return;
     }
     array_2_channel_bitmap(channel_list, CHANNEL_LIST_SIZE, scan_config);
     esp_wifi_scan_start(scan_config, true);
-    free(scan_config);
+    vPortFree(scan_config);
 
 #else
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_scan_start(NULL, true));

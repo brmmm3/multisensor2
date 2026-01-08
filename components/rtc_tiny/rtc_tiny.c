@@ -1,19 +1,9 @@
 #include <stdint.h>
-#include <stdio.h>
-#include <string.h>
 #include "freertos/FreeRTOS.h"
-#include "freertos/projdefs.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
-#include "hal/wdt_hal.h"
-#include "esp_timer.h"
 #include "esp_err.h"
 #include "esp_log.h"
-#include "esp_sntp.h"
-#include "esp_netif_sntp.h"
-
-#include "lwip/dns.h"
-
 #include "rtc_tiny.h"
 
 static const char *TAG = "RTC";
@@ -51,7 +41,7 @@ esp_err_t rtc_init(rtc_t **rtc_ptr, i2c_master_bus_handle_t *bus_handle)
 {
     ESP_LOGI(TAG, "Initialize RTC");
 
-    rtc_t *rtc = malloc(sizeof(rtc_t));
+    rtc_t *rtc = pvPortMalloc(sizeof(rtc_t));
     i2c_lowlevel_config config = {
         .bus = bus_handle
     };

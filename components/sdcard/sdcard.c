@@ -32,7 +32,7 @@ esp_err_t write_text_file(const char *path, char *data)
     return ESP_OK;
 }
 
-esp_err_t read_text_file(const char *path, char *buf, uint16_t size)
+esp_err_t read_text_file(const char *path, char *buf, uint32_t size)
 {
     ESP_LOGI(TAG, "Read text file %s", path);
     FILE *f = fopen(path, "r");
@@ -45,7 +45,7 @@ esp_err_t read_text_file(const char *path, char *buf, uint16_t size)
     return ESP_OK;
 }
 
-esp_err_t write_bin_file(const char *path, void *data, uint16_t size)
+esp_err_t write_bin_file(const char *path, void *data, uint32_t size)
 {
     ESP_LOGI(TAG, "Write binary file %s", path);
     FILE *f = fopen(path, "wb");
@@ -58,19 +58,101 @@ esp_err_t write_bin_file(const char *path, void *data, uint16_t size)
     return ESP_OK;
 }
 
-esp_err_t read_bin_file(const char *path, void *buf, uint16_t size)
+uint32_t read_bin_file(const char *path, void *buf, uint32_t size)
 {
     ESP_LOGI(TAG, "Read bin file %s", path);
     FILE *f = fopen(path, "rb");
     if (f == NULL) {
         ESP_LOGE(TAG, "Failed to open file for reading: %s (errno=%d)", strerror(errno), errno);
+        return 0;
+    }
+    if (buf == NULL) return 0;
+    uint32_t len = fread(buf, size, 1, f);
+    fclose(f);
+    return len;
+}
+
+FILE *open_bin_file(const char *path)
+{
+    return fopen(path, "rb");
+}
+
+uint32_t read_bin_file_part(FILE *f, void *buf, uint32_t size)
+{
+    if (buf == NULL) return 0;
+    uint32_t len = fread(buf, size, 1, f);
+    return len;
+}
+
+int close_bin_file(FILE *f)
+{
+    return fclose(f);
+}
+
+char *get_data_file_path(const char *path)
+{
+    static char p[80];
+
+    sprintf(p, "%s/data/%s", MOUNT_POINT, path);
+    return p;
+}
+
+FILE *open_data_file(const char *path)
+{
+    return fopen(get_data_file_path(path), "rb");
+}
+
+uint32_t read_data_file_part(FILE *f, void *buf, uint32_t size)
+{
+    return read_bin_file_part(f, buf, size);
+}
+
+int close_data_file(FILE *f)
+{
+    return close_bin_file(f);
+}
+
+uint32_t read_data_file(const char *path, void *buf, uint32_t size)
+{
+    return read_bin_file(get_data_file_path(path), buf, size);
+}
+
+esp_err_t remove_data_file(const char *path)
+{
+    if (remove((get_data_file_path(path))) != 0) {
+        ESP_LOGE(TAG, "Failed to delete file: %s (error: %d)", path, errno);
         return ESP_FAIL;
     }
-    if (buf != NULL) {
-        fread(buf, size, 1, f);
-    }
-    fclose(f);
     return ESP_OK;
+}
+
+DIR *sd_open_data_dir()
+{
+    char buf[32];
+
+    sprintf(buf, "%s/data", MOUNT_POINT);
+    ESP_LOGI(TAG, "sd_open_data_dir %s", buf);
+    return opendir(buf);
+}
+
+int sd_read_dir(DIR *dir, char *buf, int maxlen)
+{
+    struct dirent *dp;
+    int pos = 0;
+
+    maxlen -= 80;
+    while ((dp = readdir(dir)) != NULL) {
+        strcpy(&buf[pos], dp->d_name);
+        pos += strlen(dp->d_name);
+        buf[pos++] = '\n';
+        if (pos >= maxlen) return pos;
+    }
+    return 0;
+}
+
+void sd_closedir(DIR *dir)
+{
+    closedir(dir);
 }
 
 void list_dir(char *path)
@@ -91,14 +173,24 @@ void list_dir(char *path)
         struct stat st;
         strcpy(&p[pos], dp->d_name);
         if (stat(p, &st) == 0) {
+            // TODO
         }
         ESP_LOGI(TAG, "%s: %s %lu",
-            (dp->d_type == DT_DIR)
-                ? "DIR"
-                : "FILE",
+            (dp->d_type == DT_DIR) ? "DIR" : "FILE",
             dp->d_name, st.st_size);
     }
     closedir(dir);
+}
+
+sd_fat_info_t *sd_get_fat_info()
+{
+    static sd_fat_info_t fat_info;
+
+    ESP_LOGI(TAG, "Get FAT Info");
+    esp_vfs_fat_info(MOUNT_POINT, &fat_info.bytes_total, &fat_info.bytes_free);
+    ESP_LOGI(TAG, "FAT FS: %" PRIu64 " MB total, %" PRIu64 " MB free",
+        fat_info.bytes_total / (1024 * 1024), fat_info.bytes_free / (1024 * 1024));
+    return &fat_info;
 }
 
 int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t miso_pin)
@@ -149,14 +241,9 @@ int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t mis
     err = esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_config, &card);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Filesystem mounted");
-
         // Card has been initialized, print its properties
         sdmmc_card_print_info(stdout, card);
-
-        ESP_LOGI(TAG, "Get FAT Info");
-        uint64_t bytes_total, bytes_free;
-        esp_vfs_fat_info(MOUNT_POINT, &bytes_total, &bytes_free);
-        ESP_LOGI(TAG, "FAT FS: %" PRIu64 " kB total, %" PRIu64 " kB free", bytes_total / 1024, bytes_free / 1024);
+        sd_get_fat_info();
     } else {
         if (err == ESP_FAIL) {
             ESP_LOGE(TAG, "Failed to mount filesystem. "

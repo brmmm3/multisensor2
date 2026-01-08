@@ -1,6 +1,5 @@
 #include <nvs.h>
 #include "esp_log.h"
-#include "esp_console.h"
 #include "sdcard.h"
 #include "main.h"
 #include "config.h"
@@ -19,7 +18,8 @@ esp_err_t config_nvs_read()
 
     ESP_LOGI(TAG, "Read NVS config.");
     if (config_nvs == NULL) {
-        config_nvs = calloc(1, sizeof(config_nvs_t));
+        config_nvs = pvPortMalloc(sizeof(config_nvs_t));
+        memset(config_nvs, 0, sizeof(config_nvs_t));
     }
     // Then read sensitive data from NVS
     if ((err = nvs_open("config", NVS_READWRITE, &handle)) != ESP_OK) {
@@ -67,15 +67,15 @@ esp_err_t create_default_config_sd()
 
 esp_err_t config_sd_read()
 {
-    esp_err_t err;
+    esp_err_t err = ESP_OK;
 
     ESP_LOGI(TAG, "Read SD-Card config.");
     if (config == NULL) {
-        config = calloc(1, sizeof(config_t));
+        config = pvPortMalloc(sizeof(config_t));
+        memset(config, 0, sizeof(config_t));
     }
-    err = read_bin_file(MOUNT_POINT"/config.dat", config, sizeof(config_t));
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read config.dat: %s", esp_err_to_name(err));
+    if (read_bin_file(MOUNT_POINT"/config.dat", config, sizeof(config_t)) == 0) {
+        ESP_LOGE(TAG, "Failed to read config.dat!");
         err = create_default_config_sd();
     }
     if (config->cfg_version != CONFIG_VERSION) {

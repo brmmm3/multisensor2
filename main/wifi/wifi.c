@@ -10,7 +10,6 @@
 #include "include/wifi_sntp.h"
 #include "config.h"
 #include "misc/lv_palette.h"
-#include "ui/include/ui.h"
 #include "ui/include/ui_config.h"
 #include "include/wifi.h"
 
@@ -218,7 +217,8 @@ esp_err_t wifi_connect_bg(const char *ssid, const char *password)
             vTaskDelay(pdMS_TO_TICKS(100));
         }
     }
-    wifi_network_t *network = calloc(1, sizeof(wifi_network_t));
+    wifi_network_t *network = pvPortMalloc(sizeof(wifi_network_t));
+    memset(network, 0, sizeof(wifi_network_t));
     network->ssid = ssid;
     network->password = password;
     xTaskCreate(wifi_connect_task, "wifi_connect_task", 4096, network, WIFI_CONNECT_TASK_PRIORITY, &connect_task_handle);

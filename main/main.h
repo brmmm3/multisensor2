@@ -181,6 +181,8 @@ extern bool qmc5883l_update;
 // Bit 6: Log ADXL345 ad QMC5883L sensor values
 extern uint32_t debug_main;
 
+extern bool force_update_all;
+
 void get_current_date_time(uint16_t *year, uint8_t *month, uint8_t *day, uint8_t *hour, uint8_t *min, uint8_t *sec);
 
 void set_data_filename();

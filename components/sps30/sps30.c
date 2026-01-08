@@ -70,7 +70,8 @@ static uint8_t buffer[60];
 
 sps30_t *sps30_create_master(i2c_master_bus_handle_t bus_handle)
 {
-    sps30_t *sensor = calloc(1, sizeof(sps30_t));
+    sps30_t *sensor = pvPortMalloc(sizeof(sps30_t));
+    memset(sensor, 0, sizeof(sps30_t));
 
     if (sensor == NULL) {
         sps30_close(sensor);
@@ -119,7 +120,7 @@ void sps30_close(sps30_t *sensor)
     if (sensor != NULL && sensor->dev_handle != NULL) {
         i2c_master_bus_rm_device(sensor->dev_handle);
     }
-    free(sensor);
+    vPortFree(sensor);
 }
 
 /**

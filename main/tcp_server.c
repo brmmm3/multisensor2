@@ -1,12 +1,11 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include "mbedtls/base64.h"
 #include "adxl345.h"
 #include "esp_log.h"
-#include "esp_wifi.h"
-#include "esp_event.h"
 #include "mhz19.h"
-#include "nvs_flash.h"
+#include "sdcard.h"
 #include "wifi/include/wifi.h"
 #include "main.h"
 
@@ -21,15 +20,23 @@ typedef struct {
     size_t len;
 } msg_t;
 
+static msg_t msg_array[16];
+static uint8_t msg_num;
+
 static TaskHandle_t tcp_server_task_handle = NULL;
 static QueueHandle_t tx_queue = NULL;
+static char rx_buffer[BUFFER_SIZE];
+static uint8_t update_all_cnt = 0;
+
 bool tcp_server_running = false;
+bool tcp_send_values = false;
 uint8_t tcp_client_cnt = 0;
 
 
 static bool send_message(const char *buf, int len)
 {
-    msg_t *msg = pvPortMalloc(sizeof(msg_t));
+    msg_t *msg = &msg_array[msg_num++];
+    if (msg_num > 15) msg_num = 0;
     msg->data = pvPortMalloc(len);
     memcpy(msg->data, buf, len);
     msg->len = len;
@@ -38,7 +45,6 @@ static bool send_message(const char *buf, int len)
 
 static bool send_data_to_client(int client_sock, uint8_t *data, int to_write)
 {
-    ESP_LOGI(TAG, "SEND %d %s", to_write, data);
     int written = 0;
     while (to_write > 0) {
         int ret = send(client_sock, data + written, to_write, 0);
@@ -52,9 +58,51 @@ static bool send_data_to_client(int client_sock, uint8_t *data, int to_write)
     return true;
 }
 
+static esp_err_t send_data_file_part(int client_sock, char *path, char *buf, size_t size)
+{
+    uint8_t encoded_data[BUFFER_SIZE];
+    size_t encoded_len = 0;
+
+    int ret = mbedtls_base64_encode(encoded_data, BUFFER_SIZE, &encoded_len, (const uint8_t *)buf, size);
+    if (ret != 0) {
+        ESP_LOGE(TAG, "Base64 encode failed: %d", ret);
+        return ESP_FAIL;
+    }
+    if (!send_data_to_client(client_sock, (uint8_t *)encoded_data,encoded_len)) {
+        ESP_LOGE(TAG, "Failed to send file %s", path);
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
+static esp_err_t send_data_file(int client_sock, char *path)
+{
+    size_t buffer_size2 = BUFFER_SIZE >> 1;
+    esp_err_t err = ESP_OK;
+
+    FILE *f = open_data_file(path);
+    if (f == NULL) return ESP_FAIL;
+    if (!send_data_to_client(client_sock, (uint8_t *)":",1)) {
+        ESP_LOGE(TAG, "Failed to send file %s", path);
+        err = ESP_FAIL;
+    } else {
+        while (true) {
+            uint32_t len = read_data_file_part(f, rx_buffer, BUFFER_SIZE);
+            if (len == 0) break;
+            if ((err = send_data_file_part(client_sock, path, rx_buffer, buffer_size2)) != ESP_OK) break;
+            if ((err = send_data_file_part(client_sock, path, &rx_buffer[buffer_size2], buffer_size2)) != ESP_OK) break;
+        }
+    }
+    close_data_file(f);
+    if (!send_data_to_client(client_sock, (uint8_t *)"\n",1)) {
+        ESP_LOGE(TAG, "Failed to send file %s", path);
+        err = ESP_FAIL;
+    }
+    return err;
+}
+
 static void tcp_server_task(void *pvParameters)
 {
-    char rx_buffer[BUFFER_SIZE];
     char addr_str[128];
     int listen_sock;
     struct sockaddr_in server_addr;
@@ -102,6 +150,8 @@ static void tcp_server_task(void *pvParameters)
             continue;
         }
         tcp_client_cnt++;
+        update_all_cnt = 2;
+        force_update_all = true;
 
         // Convert IP to string
         inet_ntoa_r(client_addr.sin_addr, addr_str, sizeof(addr_str) - 1);
@@ -111,7 +161,7 @@ static void tcp_server_task(void *pvParameters)
         int flags = fcntl(client_sock, F_GETFL, 0);
         fcntl(client_sock, F_SETFL, flags | O_NONBLOCK);
 
-        int len = sprintf(rx_buffer, "{id=%d,name=\"MultiSensor V2.0\"}", E_SENSOR_INFO);
+        int len = sprintf(rx_buffer, "{id=%d,name=\"MultiSensor V2.0\"}\n", E_SENSOR_INFO);
         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
 
         len = sprintf(rx_buffer, "{id=%d,lat=\"%c\",lng=\"%c\",co2=\"ppm\",temp=\"°C\",hum=\"%%\",o2=\"%%\",co=\"ppm\",h2s=\"ppm\",ch4=\"ppm\",",
@@ -119,12 +169,12 @@ static void tcp_server_task(void *pvParameters)
             gps_values.ns, gps_values.ew);
         len += sprintf(&rx_buffer[len], "pm0_5=\"#/cm3\",typ_part_sz=\"um\",pm1_0=\"ug/cm3\",p1_0=\"#/cm3\"}");
         len += sprintf(&rx_buffer[len], "pm2_5=\"ug/cm3\",p2_5=\"#/cm3\",pm4_0=\"ug/cm3\",p4_0=\"#/cm3\",pm10_0=\"ug/cm3\",p10_0=\"#/cm3\",");
-        len += sprintf(&rx_buffer[len], "adxl345=\"g\",qmc5883l=\"gauss\"}");
+        len += sprintf(&rx_buffer[len], "adxl345=\"g\",qmc5883l=\"gauss\"}\n");
         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
 
         // Echo loop for this client
         while (true) {
-            len = recv(client_sock, rx_buffer, sizeof(rx_buffer) - 1, 0);
+            len = recv(client_sock, rx_buffer, BUFFER_SIZE - 1, 0);
             if (len < 0) {
                 if (errno == EWOULDBLOCK || errno == EAGAIN) {
                     // No data available right now - normal in non-blocking mode
@@ -137,16 +187,72 @@ static void tcp_server_task(void *pvParameters)
                 ESP_LOGI(TAG, "Client %s disconnected", addr_str);
                 break;
             }
+            rx_buffer[len] = 0;  // NULL terminate string
+            while (--len > 0) {
+                if (rx_buffer[len] > 31) break;
+                rx_buffer[len] = 0;
+            }
             if (len > 0) {
-                rx_buffer[len] = 0;  // Null-terminate
-                ESP_LOGI(TAG, "Received %d bytes from %s: %s", len, addr_str, rx_buffer);
+                if (strcmp(rx_buffer, "bye") == 0) break;
+                if (strcmp(rx_buffer, "values 1") == 0) tcp_send_values = true;
+                else if (strcmp(rx_buffer, "values 0") == 0) tcp_send_values = false;
+                else if (strcmp(rx_buffer, "list") == 0) {
+                    // Show data files on SD-Card
+                    DIR *dir = sd_open_data_dir();
+                    if (dir == NULL) {
+                        ESP_LOGE(TAG, "Failed to open data dir");
+                        continue;
+                    }
+                    while (true) {
+                        int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE);
+                        ESP_LOGI(TAG, "sd_read_dir %d", len);
+                        if (len == 0) break;
+                        send_data_to_client(client_sock, (uint8_t *)rx_buffer,len);
+                    }
+                    sd_closedir(dir);
+                } else if (strncmp(rx_buffer, "cp ", 3) == 0) {
+                    // Download data file and keep it on SD-Card
+                    char path[32];
+                    strcpy(path, &rx_buffer[3]);
+                    send_data_file(client_sock, path);
+                } else if (strncmp(rx_buffer, "mv ", 3) == 0) {
+                    // Download data file and remove it on SD-Card
+                    char path[32];
+                    strcpy(path, &rx_buffer[3]);
+                    send_data_file(client_sock, path);
+                    remove_data_file(path);
+                } else if (strncmp(rx_buffer, "rm ", 3) == 0) {
+                    // Remove it on SD-Card
+                    char path[32];
+                    strcpy(path, &rx_buffer[3]);
+                    remove_data_file(path);
+                } else if (strcmp(rx_buffer, "rec 1") == 0) {
+                    ui_set_switch_state(ui->sw_record, true);
+                    ui_sd_record_set_value(true);
+                } else if (strcmp(rx_buffer, "rec 0") == 0) {
+                    ui_set_switch_state(ui->sw_record, false);
+                    ui_sd_record_set_value(false);
+                } else if (strcmp(rx_buffer, "free") == 0) {
+                    sd_fat_info_t *fat_info = sd_get_fat_info();
+                    len = sprintf(rx_buffer, "FAT FS: %" PRIu64 " MB total, %" PRIu64 " MB free\n",
+                        fat_info->bytes_total / (1024 * 1024), fat_info->bytes_free / (1024 * 1024));
+                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                    uint32_t free_heap = esp_get_free_heap_size();
+                    len = sprintf(rx_buffer, "Free heap: %.2f kB\n", (float)free_heap / 1024.0);
+                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                    ESP_LOGI(TAG, "%s", rx_buffer);
+                } else {
+                    ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
+                    send_data_to_client(client_sock, (uint8_t *)"ERR\n", 4);
+                    continue;
+                }
+                send_data_to_client(client_sock, (uint8_t *)"OK\n", 3);
             }
 
-            msg_t *tx_data;
+            msg_t tx_data;
             if (xQueueReceive(tx_queue, &tx_data, pdMS_TO_TICKS(10))) {
-                send_data_to_client(client_sock, tx_data->data, tx_data->len);
-                vPortFree(tx_data->data);
-                vPortFree(tx_data);
+                send_data_to_client(client_sock, tx_data.data, tx_data.len);
+                vPortFree(tx_data.data);
             }
         }
         tcp_client_cnt--;
@@ -162,7 +268,7 @@ esp_err_t tcp_server_start()
     if (!wifi_connected) return ESP_FAIL;
     tcp_server_stop();
     xTaskCreate(tcp_server_task, "tcp_server", 4096, NULL, 5, &tcp_server_task_handle);
-    tx_queue = xQueueCreate(10, sizeof(msg_t *));
+    tx_queue = xQueueCreate(10, sizeof(msg_t));
     return ESP_OK;
 }
 
@@ -183,14 +289,19 @@ esp_err_t tcp_server_stop()
 void tcp_server_publish_values()
 {
     if (tcp_server_task_handle == NULL) return;
+    if (!wifi_connected || !tcp_server_running || !tcp_send_values || tcp_client_cnt == 0) return;
     if (!gps_update && !bmx280lo_update && !bmx280hi_update && !mhz19_update && !scd4x_calibrate &&
         !scd4x_update && !yys_update && !sps30_update && !adxl345_update && !qmc5883l_update) {
         return;
     }
+    if (update_all_cnt > 0) {
+        if (--update_all_cnt == 0) {
+            force_update_all = false;
+        }
+    }
  
     static char buf[256];
 
-    ESP_LOGI(TAG, "Publish %d", bmx280lo_update);
     uint16_t year;
     uint8_t month;
     uint8_t day;
@@ -198,12 +309,12 @@ void tcp_server_publish_values()
     uint8_t min;
     uint8_t sec;
     get_current_date_time(&year, &month, &day, &hour, &min, &sec);
-    int len = sprintf(buf, "{id=%d,date=\"%d.%d.%d\",time=\"%d:%d:%d\"}",
+    int len = sprintf(buf, "{id=%d,date=\"%d.%d.%d\",time=\"%d:%d:%d\"}\n",
         E_SENSOR_TIME,
         year, month, day, hour, min, sec);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     if (gps_update) {
-        int len = sprintf(buf, "{id=%d,sat=%s,date=%lu,time=%lu,lat=%f,lng=%f,alt=%f,spd=%f,mode_3d=\"%c\",sats=%d,status=%d,pdop=%f,hdop=%f,vdop=%f}",
+        int len = sprintf(buf, "{id=%d,sat=%s,date=%lu,time=%lu,lat=%f,lng=%f,alt=%f,spd=%f,mode_3d=\"%c\",sats=%d,status=%d,pdop=%f,hdop=%f,vdop=%f}\n",
                 E_SENSOR_GPS,
                 gps_values.sat, (unsigned long)gps_values.date, (unsigned long)gps_values.time, gps_values.lat, gps_values.lng,
                 gps_values.altitude, gps_values.speed, gps_values.mode_3d, gps_values.sats,
@@ -212,34 +323,34 @@ void tcp_server_publish_values()
     }
     if (bmx280lo_update) {
         bmx280_values_t *values = &bmx280lo->values;
-        int len = sprintf(buf, "{id=%d,temp=%f,hum=%f,press=%f,alt=%f}",
+        int len = sprintf(buf, "{id=%d,temp=%f,hum=%f,press=%f,alt=%f}\n",
             E_SENSOR_BMX280_LO,
             values->temperature, values->humidity, values->pressure, values->altitude);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (bmx280hi_update) {
         bmx280_values_t *values = &bmx280hi->values;
-        int len = sprintf(buf, "{id=%d,temp=%f,hum=%f,press=%f,alt=%f}",
+        int len = sprintf(buf, "{id=%d,temp=%f,hum=%f,press=%f,alt=%f}\n",
             E_SENSOR_BMX280_HI,
             values->temperature, values->humidity, values->pressure, values->altitude);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (mhz19_update) {
         mhz19_values_t *values = &mhz19->values;
-        int len = sprintf(buf, "{id=%d,co2=%d,temp=%d,status=%d}",
+        int len = sprintf(buf, "{id=%d,co2=%d,temp=%d,status=%d}\n",
             E_SENSOR_MHZ19,
             values->co2, values->temp, values->status);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (scd4x_update) {
         scd4x_values_t *values = &scd4x->values;
-        int len = sprintf(buf, "{id=%d,co2=%d,temp=%f,hum=%f}",
+        int len = sprintf(buf, "{id=%d,co2=%d,temp=%f,hum=%f}\n",
             E_SENSOR_SCD4X,
             values->co2, values->temperature, values->humidity);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (yys_update) {
-        int len = sprintf(buf, "{id=%d,o2=%f,co=%f,,h2s=%f,ch4=%f}",
+        int len = sprintf(buf, "{id=%d,o2=%f,co=%f,,h2s=%f,ch4=%f}\n",
             E_SENSOR_YYS,
             yys_get_o2(yys_sensor), yys_get_co(yys_sensor),
             yys_get_h2s(yys_sensor), yys_get_ch4(yys_sensor));
@@ -253,12 +364,12 @@ void tcp_server_publish_values()
         len += sprintf(&buf[len], "pm1_0=%f,p1_0=%f,", values->mc_1p0, values->nc_1p0);
         len += sprintf(&buf[len], "pm2_5=%f,p2_5=%f,", values->mc_2p5, values->nc_2p5);
         len += sprintf(&buf[len], "pm4_0=%f,p4_0=%f,", values->mc_4p0, values->nc_4p0);
-        len += sprintf(&buf[len], "pm10_0=%f,p10_0=%f}", values->mc_10p0, values->nc_10p0);
+        len += sprintf(&buf[len], "pm10_0=%f,p10_0=%f}\n", values->mc_10p0, values->nc_10p0);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (adxl345_update) {
         adxl345_values_t *values = &adxl345->values;
-        int len = sprintf(buf, "{id=%d,x=%f,y=%f,z=%f,abs=%f,offs=%f %f %f}",
+        int len = sprintf(buf, "{id=%d,x=%f,y=%f,z=%f,abs=%f,offs=%f %f %f}\n",
             E_SENSOR_ADXL345,
             values->accel_x, values->accel_y, values->accel_z, values->accel_abs,
             values->accel_offset_x, values->accel_offset_y, values->accel_offset_z);
@@ -266,7 +377,7 @@ void tcp_server_publish_values()
     }
     if (qmc5883l_update) {
         qmc5883l_values_t *values = &qmc5883l->values;
-        int len = sprintf(buf, "{id=%d,status=%d,x=%f,y=%f,z=%f,range=%f}",
+        int len = sprintf(buf, "{id=%d,status=%d,x=%f,y=%f,z=%f,range=%f}\n",
             E_SENSOR_QMC5883L,
             values->status, values->mag_x, values->mag_y, values->mag_z, values->range);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));

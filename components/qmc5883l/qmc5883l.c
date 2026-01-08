@@ -156,7 +156,7 @@ static esp_err_t qmc5883l_device_create(qmc5883l_t *sensor, const uint16_t dev_a
 
 qmc5883l_t *qmc5883l_create_master(i2c_master_bus_handle_t bus_handle)
 {
-    qmc5883l_t *sensor = malloc(sizeof(qmc5883l_t));
+    qmc5883l_t *sensor = pvPortMalloc(sizeof(qmc5883l_t));
 
     if (sensor) {
         qmc5883l_values_t *values = &sensor->values;
@@ -186,7 +186,7 @@ void qmc5883l_close(qmc5883l_t *sensor)
         i2c_master_bus_rm_device(sensor->i2c_dev);
         sensor->i2c_dev = NULL;
     }
-    free(sensor);
+    vPortFree(sensor);
 }
 
 esp_err_t qmc5883l_device_init(qmc5883l_t *sensor)
