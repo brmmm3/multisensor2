@@ -22,6 +22,8 @@ void ui_set_switch_state(lv_obj_t *obj, bool enabled);
 
 void ui_set_text_color(lv_obj_t *obj, int color);
 
+esp_err_t ui_set_current_tab(uint32_t tab_num);
+
 void ui_set_tab_color(int index, int color);
 
 void ui_remove_style(lv_obj_t *obj, lv_style_t *style);

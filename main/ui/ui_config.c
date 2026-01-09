@@ -54,6 +54,15 @@ void ui_set_text_color(lv_obj_t *obj, int color)
 }
 
 
+esp_err_t ui_set_current_tab(uint32_t tab_num)
+{
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
+    lv_tabview_set_act(ui->tbv_main, tab_num, LV_ANIM_OFF);
+    lvgl_port_unlock();
+    return ESP_OK;
+}
+
+
 void ui_set_tab_color(int index, int color)
 {
     lv_style_t *style = &tab_styles[index];

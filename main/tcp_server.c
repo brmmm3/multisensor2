@@ -356,7 +356,7 @@ static void tcp_server_task(void *pvParameters)
                     // Set current tab
                     uint32_t tab = rx_buffer[4] - '0';
                     if (tab < 6) {
-                        lv_tabview_set_act(ui->tbv_main, tab, LV_ANIM_OFF);
+                        ui_set_current_tab(tab);
                     } else {
                         ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
                         response = "ERR\n";
@@ -447,9 +447,6 @@ void tcp_server_publish_values()
         ESP_LOGW(TAG, "TX queue full");
         return;
     }
-    // Send free mem
-    int len = sprintf(buf, "{id=%d,heap=%u}\n", E_SENSOR_FREE, (unsigned int)esp_get_free_heap_size());
-    ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     if (!tcp_send_values) return;
     if (!gps_update && !bmx280lo_update && !bmx280hi_update && !mhz19_update && !scd4x_calibrate &&
         !scd4x_update && !yys_update && !sps30_update && !adxl345_update && !qmc5883l_update) {
