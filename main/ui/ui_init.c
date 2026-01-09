@@ -253,7 +253,7 @@ lv_obj_t *add_page_dust(ui_t *ui)
     ui->lbl_sps30_2 = add_section_label(tab, 28, 30, 72, "PM1.0");
     ui->lbl_sps30_3 = add_section_label(tab, 56, 30, 72, "PM2.5");
     ui->lbl_sps30_4 = add_section_label(tab, 84, 30, 72, "PM4.0");
-    ui->lbl_sps30_5 = add_section_label(tab, 112, 30, 72, "PM1.0");
+    ui->lbl_sps30_5 = add_section_label(tab, 112, 30, 72, "PM10.0");
     ui->lbl_sps30_6 = add_section_label(tab, 140, 30, 72, "TypPartSz");
     return tab;
 }
