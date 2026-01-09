@@ -150,7 +150,6 @@ typedef struct gps_sensor_s {
     char *name;
     uint8_t *buffer;
     uint8_t cnt;
-    QueueHandle_t queue;
     hw_serial_t *serial;
     char *messages;
     uint8_t msg_size;

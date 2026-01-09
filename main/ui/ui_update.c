@@ -130,10 +130,9 @@ void update_cfg_tab(bool force_update)
 
 void ui_update(bool force_update)
 {
-    lvgl_port_lock(-1);
-
     uint32_t tab_idx = lv_tabview_get_tab_active(ui->tbv_main);
 
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return;
     if (tab_idx == 0) {
         update_air_tab(force_update);
     } else if (tab_idx == 1) {

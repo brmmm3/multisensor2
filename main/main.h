@@ -74,6 +74,7 @@ typedef enum {
     E_SENSOR_CONFIG,
     E_SENSOR_STATUS,
     E_SENSOR_UNITS,
+    E_SENSOR_FREE,
     E_SENSOR_DATE = 0x0F,
     E_SENSOR_TIME,
     E_SENSOR_GPS,

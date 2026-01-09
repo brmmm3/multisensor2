@@ -274,7 +274,6 @@ void sensors_init()
 
 static bool update_gps()
 {
-    uint16_t v16;
     bool force_update = force_update_all || (debug_main & 1) != 0;
 
     if (gps_data_ready(gps)) {
@@ -296,11 +295,6 @@ static bool update_gps()
         if (force_update || memcmp(&last_values.gps, &gps_values, sizeof(sensors_data_gps_t)) != 0) {
             memcpy(&last_values.gps, &gps_values, sizeof(sensors_data_gps_t));
             return true;
-        }
-    }
-    if (xQueueReceive(gps->queue, &v16, 1)) {
-        if (gps->debug & 1) {
-            ESP_LOGI(TAG, "GPS v16=%04X", v16);
         }
     }
     return false;
@@ -763,7 +757,6 @@ static void update_task(void *arg)
 
         // Show system time
         time_t now = time(NULL);
-        ui_set_time_value(ui->lbl_time, &now);
 
         update_gps_status();
 
@@ -801,7 +794,10 @@ static void update_task(void *arg)
             sprintf(buf, "%.1f %%", fill_level);
             ui_set_label_text(ui->lbl_sd_fill, buf);
             // Update Cfg tab
+            ui_set_time_value(ui->lbl_time, &now);
             ui_set_duration_value(ui->lbl_uptime, (uint32_t)(now - status.start_time));
+            sprintf(buf, "%u bytes free", (unsigned int)esp_get_free_heap_size());
+            ui_set_label_text(ui->lbl_heap, buf);
             // Wait up to 1s
             for (int i = 0; i < 10; i++) {
                 if (status.force_update) break;

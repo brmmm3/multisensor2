@@ -29,7 +29,7 @@ static uint8_t sd_cs_pin = 0;
 esp_err_t write_text_file(const char *path, char *data)
 {
     ESP_LOGI(TAG, "Write text file %s", path);
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
     FILE *f = fopen(path, "w");
     if (f == NULL) {
         lvgl_port_unlock();
@@ -45,7 +45,7 @@ esp_err_t write_text_file(const char *path, char *data)
 esp_err_t read_text_file(const char *path, char *buf, uint32_t size)
 {
     ESP_LOGI(TAG, "Read text file %s", path);
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
     FILE *f = fopen(path, "r");
     if (f == NULL) {
         lvgl_port_unlock();
@@ -61,7 +61,7 @@ esp_err_t read_text_file(const char *path, char *buf, uint32_t size)
 esp_err_t write_bin_file(const char *path, void *data, uint32_t size)
 {
     ESP_LOGI(TAG, "Write binary file %s", path);
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
     FILE *f = fopen(path, "wb");
     if (f == NULL) {
         lvgl_port_unlock();
@@ -77,7 +77,7 @@ esp_err_t write_bin_file(const char *path, void *data, uint32_t size)
 uint32_t read_bin_file(const char *path, void *buf, uint32_t size)
 {
     ESP_LOGI(TAG, "Read bin file %s", path);
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
     FILE *f = fopen(path, "rb");
     if (f == NULL) {
         lvgl_port_unlock();
@@ -93,7 +93,7 @@ uint32_t read_bin_file(const char *path, void *buf, uint32_t size)
 
 FILE *open_bin_file(const char *path)
 {
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return NULL;
     FILE *fd = fopen(path, "rb");
     lvgl_port_unlock();
     return fd;
@@ -102,7 +102,7 @@ FILE *open_bin_file(const char *path)
 uint32_t read_bin_file_part(FILE *f, void *buf, uint32_t size)
 {
     if (buf == NULL) return 0;
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return 0;
     uint32_t len = fread(buf, size, 1, f);
     lvgl_port_unlock();
    return len;
@@ -110,7 +110,7 @@ uint32_t read_bin_file_part(FILE *f, void *buf, uint32_t size)
 
 int close_bin_file(FILE *f)
 {
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return 0;
     int res = fclose(f);
     lvgl_port_unlock();
     return res;
@@ -126,7 +126,7 @@ char *get_data_file_path(const char *path)
 
 FILE *open_data_file(const char *path)
 {
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return NULL;
     FILE *f = fopen(get_data_file_path(path), "rb");
     lvgl_port_unlock();
     return f;
@@ -150,7 +150,7 @@ uint32_t read_data_file(const char *path, void *buf, uint32_t size)
 
 esp_err_t remove_data_file(const char *path)
 {
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
     if (remove((get_data_file_path(path))) != 0) {
         lvgl_port_unlock();
         ESP_LOGE(TAG, "Failed to delete file: %s (error: %d)", path, errno);
@@ -166,7 +166,7 @@ DIR *sd_open_data_dir()
 
     sprintf(buf, "%s/data", MOUNT_POINT);
     ESP_LOGD(TAG, "sd_open_data_dir %s", buf);
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return NULL;
     DIR *dp = opendir(buf);
     lvgl_port_unlock();
     return dp;
@@ -178,7 +178,7 @@ int sd_read_dir(DIR *dir, char *buf, int maxlen)
     int pos = 0;
 
     maxlen -= 80;
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return 0;
     while ((dp = readdir(dir)) != NULL) {
         strcpy(&buf[pos], dp->d_name);
         pos += strlen(dp->d_name);
@@ -191,7 +191,7 @@ int sd_read_dir(DIR *dir, char *buf, int maxlen)
 
 void sd_closedir(DIR *dir)
 {
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return;
     closedir(dir);
     lvgl_port_unlock();
 }
@@ -199,7 +199,8 @@ void sd_closedir(DIR *dir)
 void list_dir(char *path)
 {
     struct dirent *dp;
-    lvgl_port_lock(0);
+
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return;
     DIR *dir = opendir(path);
     char p[80];
 
@@ -231,7 +232,7 @@ sd_fat_info_t *sd_get_fat_info()
     static sd_fat_info_t fat_info;
 
     ESP_LOGI(TAG, "Get FAT Info");
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return NULL;
     esp_vfs_fat_info(MOUNT_POINT, &fat_info.bytes_total, &fat_info.bytes_free);
     lvgl_port_unlock();
     ESP_LOGI(TAG, "FAT FS: %" PRIu64 " MB total, %" PRIu64 " MB free",
@@ -274,13 +275,13 @@ esp_err_t sd_card_mount_fs()
 
     ESP_LOGI(TAG, "Mounting filesystem");
     // IMPORTANT WORKAROUND: Comment out "SDMMC_INIT_STEP(is_spi, sdmmc_init_spi_crc);" in sdmmc_init.c
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
     esp_err_t err = esp_vfs_fat_sdspi_mount(MOUNT_POINT, &sd_card_host, &slot_config, &mount_config, &sd_card);
     lvgl_port_unlock();
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Filesystem mounted");
         // Card has been initialized, print its properties
-        lvgl_port_lock(0);
+        if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
         sdmmc_card_print_info(stdout, sd_card);
         sd_get_fat_info();
         lvgl_port_unlock();
@@ -309,11 +310,11 @@ int sd_card_init(uint8_t cs_pin, uint8_t sclk_pin, uint8_t mosi_pin, uint8_t mis
     return sd_card_host.slot;
 }
 
-int sd_card_mounted(bool check)
+bool sd_card_mounted(bool check)
 {
     if (!check) return sd_card != NULL;
 
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return false;
     DIR* dir = opendir(MOUNT_POINT);
     if (dir != NULL) {
         closedir(dir);
@@ -347,7 +348,7 @@ esp_err_t sd_card_get_info(char *buf, uint64_t *bytes_total, uint64_t *bytes_fre
     }
     uint64_t size = ((uint64_t) sd_card->csd.capacity) * sd_card->csd.sector_size / (1024 * 1024 * 1024);
     sprintf(buf, "%s (%s) %llu GB", sd_card->cid.name, type, size);
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
     esp_err_t err = esp_vfs_fat_info(MOUNT_POINT, bytes_total, bytes_free);
     lvgl_port_unlock();
     return err;
@@ -357,7 +358,7 @@ int sd_card_get_file_count(const char *path)
 {
     int file_count = 0;
 
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return -1;
     DIR *dir = opendir(path);
     if (dir == NULL) {
         lvgl_port_unlock();
@@ -385,7 +386,7 @@ esp_err_t ensure_dir(const char *path)
     struct stat st;
 
     ESP_LOGI(TAG, "ensure_dir %s", path);
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
     if (stat(path, &st) == 0) {
         lvgl_port_unlock();
         // Path exists

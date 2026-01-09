@@ -11,6 +11,7 @@
 #include <esp_err.h>
 #include <misc/lv_types.h>
 #include <esp_lvgl_port.h>
+#include "freertos/projdefs.h"
 #include "main.h"
 
 static const char *TAG = "UIC";
@@ -23,7 +24,7 @@ static lv_style_t tab_styles[6];
 
 void ui_set_label_text(lv_obj_t *obj, const char *text)
 {
-    lvgl_port_lock(-1);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return;
     lv_label_set_text(obj, text);
     lvgl_port_unlock();
 }
@@ -31,7 +32,7 @@ void ui_set_label_text(lv_obj_t *obj, const char *text)
 
 void ui_set_switch_state(lv_obj_t *obj, bool enabled)
 {
-    lvgl_port_lock(-1);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return;
     if (enabled) {
         lv_obj_add_state(obj, LV_STATE_CHECKED);
     } else {
@@ -44,7 +45,7 @@ void ui_set_switch_state(lv_obj_t *obj, bool enabled)
 void ui_set_text_color(lv_obj_t *obj, int color)
 {
     static lv_style_t style;
-    lvgl_port_lock(-1);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return;
     lv_style_init(&style);
     //lv_style_set_text_opa(&style, LV_OPA_COVER);
     lv_style_set_text_color(&style, lv_palette_main(color));  // Any color
@@ -56,7 +57,8 @@ void ui_set_text_color(lv_obj_t *obj, int color)
 void ui_set_tab_color(int index, int color)
 {
     lv_style_t *style = &tab_styles[index];
-    lvgl_port_lock(-1);
+
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return;
     lv_style_init(style);
     //lv_style_set_text_opa(&style, LV_OPA_COVER);
     lv_style_set_text_color(style, lv_palette_main(color));  // Any color
@@ -69,7 +71,7 @@ void ui_set_tab_color(int index, int color)
 
 void ui_remove_style(lv_obj_t *obj, lv_style_t *style)
 {
-    lvgl_port_lock(-1);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return;
     lv_obj_remove_style(obj, style, 0);
     lvgl_port_unlock();
 }
@@ -77,7 +79,7 @@ void ui_remove_style(lv_obj_t *obj, lv_style_t *style)
 
 void ui_list_clear(lv_obj_t *obj)
 {
-    lvgl_port_lock(-1);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return;
     lv_obj_clean(obj);
     lvgl_port_unlock();
 }
@@ -85,7 +87,7 @@ void ui_list_clear(lv_obj_t *obj)
 
 lv_obj_t *ui_list_add(lv_obj_t *obj, const char *symbol, const char *text)
 {
-    lvgl_port_lock(-1);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return NULL;
     obj = lv_list_add_button(obj, symbol, text);
     lvgl_port_unlock();
     return obj;
@@ -95,10 +97,10 @@ esp_err_t ui_lcd_set_pwr_mode(uint8_t mode)
 {
     esp_err_t err;
 
-    if ((err = lcd_set_pwr_mode(mode)) != ESP_OK) {
-        return err;
-    }
+    if ((err = lcd_set_pwr_mode(mode)) != ESP_OK) return err;
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
     lv_slider_set_value(ui->sl_lcd_pwr, config->lcd_pwr, LV_ANIM_OFF);
+    lvgl_port_unlock();
     return ESP_OK;
 }
 
@@ -106,10 +108,10 @@ esp_err_t ui_gps_set_pwr_mode(uint8_t mode)
 {
     esp_err_t err;
 
-    if ((err = gps_set_pwr_mode(mode)) != ESP_OK) {
-        return err;
-    }
+    if ((err = gps_set_pwr_mode(mode)) != ESP_OK) return err;
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
     lv_slider_set_value(ui->sl_gps_pwr, config->gps_pwr, LV_ANIM_OFF);
+    lvgl_port_unlock();
     return ESP_OK;
 }
 
@@ -117,10 +119,10 @@ esp_err_t ui_scd4x_set_pwr_mode(uint8_t mode)
 {
     esp_err_t err;
 
-    if ((err = scd4x_set_pwr_mode(mode)) != ESP_OK) {
-        return err;
-    }
+    if ((err = scd4x_set_pwr_mode(mode)) != ESP_OK) return err;
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
     lv_slider_set_value(ui->sl_scd4x_pwr, config->scd4x_pwr, LV_ANIM_OFF);
+    lvgl_port_unlock();
     return ESP_OK;
 }
 
@@ -128,13 +130,11 @@ esp_err_t ui_wifi_set_pwr_mode(uint8_t mode)
 {
     esp_err_t err;
 
-    if (mode > 2) {
-        mode = 2;
-    }
-    if ((err = wifi_set_pwr_mode(mode)) != ESP_OK) {
-        return err;
-    }
+    if (mode > 2) mode = 2;
+    if ((err = wifi_set_pwr_mode(mode)) != ESP_OK) return err;
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
     lv_slider_set_value(ui->sl_wifi_pwr, config->wifi_pwr, LV_ANIM_OFF);
+    lvgl_port_unlock();
     return ESP_OK;
 }
 

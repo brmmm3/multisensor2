@@ -458,7 +458,6 @@ esp_err_t gps_init(gps_sensor_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, 
     sensor->buffer = pvPortMalloc(UART_BUFFER_SIZE + 1);
     memset(sensor->buffer, 0, UART_BUFFER_SIZE + 1);
     sensor-> cnt = 0;
-    sensor->queue = xQueueCreate(128, 1);
     sensor->serial = gps_serial;
     sensor->messages = NULL;
     sensor->msg_size = 0;

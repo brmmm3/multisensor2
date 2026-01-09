@@ -153,7 +153,7 @@ static void wifi_selected_cb(lv_event_t *e)
         selected_ssid = NULL;
         wifi_disconnect();
     } else {
-        lvgl_port_lock(-1);
+        if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return;
         if (!style_initialized) {
             lv_style_init(&style_selected);
             lv_style_set_bg_color(&style_selected, lv_palette_main(LV_PALETTE_BLUE));  // Your color
@@ -228,7 +228,9 @@ void wifi_scan(void)
         }
         ESP_LOGI(TAG, "Channel \t\t%d", ap_info[i].primary);
         lv_obj_t *btn = ui_list_add(ui->lst_wifi, NULL, (const char *)ap_info[i].ssid);
-        lv_obj_add_event_cb(btn, wifi_selected_cb, LV_EVENT_CLICKED, NULL);
+        if (btn != NULL) {
+            lv_obj_add_event_cb(btn, wifi_selected_cb, LV_EVENT_CLICKED, NULL);
+        }
     }
     set_scanning(false);
     ui_set_label_text(ui->lbl_wifi_status1, "Select network");

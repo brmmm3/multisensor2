@@ -217,65 +217,54 @@ lv_obj_t *add_tab(lv_obj_t *tab, const char *title)
     return obj;
 }
 
+lv_obj_t *add_section_label(lv_obj_t *tab, int32_t y, int32_t h, int32_t w0, const char *title)
+{
+    lv_obj_t *section = add_section(tab, 0, y, 320, h, w0, title);
+    return add_label(lv_obj_get_child(section, 0), 8, 0);
+}
+
+lv_obj_t *add_slider_label(lv_obj_t *tab, int32_t y, int32_t max, const char *title)
+{
+    add_label_text(tab, 0, y, title, lv_color_black());
+    return add_slider(tab, 120, y, 180, 0, max);
+}
+
 lv_obj_t *add_page_air(ui_t *ui)
 {
     lv_obj_t *tab = add_tab(ui->tbv_main, "Air");
-    lv_obj_t *sec_bme280lo = add_section(tab, 0, 0, 320, 42, 72, "BME280L");
-    lv_obj_t *sec_bme280hi = add_section(tab, 0, 40, 320, 42, 72, "BME280H");
-    lv_obj_t *sec_scd41 = add_section(tab, 0, 80, 320, 42, 72, "SCD41");
-    lv_obj_t *sec_mhz19 = add_section(tab, 0, 120, 320, 42, 72, "MHZ19");
-    lv_obj_t *sec_yys = add_section(tab, 0, 160, 320, 42, 72, "YYS");
-
-    ui->lbl_bmx280lo = add_label(lv_obj_get_child(sec_bme280lo, 0), 8, 0);
-    ui->lbl_bmx280hi = add_label(lv_obj_get_child(sec_bme280hi, 0), 8, 0);
-    ui->lbl_scd4x = add_label(lv_obj_get_child(sec_scd41, 0), 8, 0);
-    ui->lbl_mhz19 = add_label(lv_obj_get_child(sec_mhz19, 0), 8, 0);
-    ui->lbl_yys = add_label(lv_obj_get_child(sec_yys, 0), 8, 0);
+    ui->lbl_bmx280lo = add_section_label(tab, 0, 42, 72, "BME280L");
+    ui->lbl_bmx280hi = add_section_label(tab, 40, 42, 72, "BME280H");
+    ui->lbl_scd4x = add_section_label(tab, 80, 42, 72, "SCD41");
+    ui->lbl_mhz19 = add_section_label(tab, 120, 42, 72, "MHZ19");
+    ui->lbl_yys = add_section_label(tab, 160, 42, 72, "YYS");
     return tab;
 }
 
 lv_obj_t *add_page_dust(ui_t *ui)
 {
     lv_obj_t *tab = add_tab(ui->tbv_main, "Dust");
-    lv_obj_t *sec_sps30_1 = add_section(tab, 0, 0, 320, 30, 72, "PM0.5");
-    lv_obj_t *sec_sps30_2 = add_section(tab, 0, 28, 320, 30, 72, "PM1.0");
-    lv_obj_t *sec_sps30_3 = add_section(tab, 0, 56, 320, 30, 72, "PM2.5");
-    lv_obj_t *sec_sps30_4 = add_section(tab, 0, 84, 320, 30, 72, "PM4.0");
-    lv_obj_t *sec_sps30_5 = add_section(tab, 0, 112, 320, 30, 72, "PM1.0");
-    lv_obj_t *sec_sps30_6 = add_section(tab, 0, 140, 320, 30, 72, "TypPartSz");
-
-    ui->lbl_sps30_1 = add_label(lv_obj_get_child(sec_sps30_1, 0), 8, 0);
-    ui->lbl_sps30_2 = add_label(lv_obj_get_child(sec_sps30_2, 0), 8, 0);
-    ui->lbl_sps30_3 = add_label(lv_obj_get_child(sec_sps30_3, 0), 8, 0);
-    ui->lbl_sps30_4 = add_label(lv_obj_get_child(sec_sps30_4, 0), 8, 0);
-    ui->lbl_sps30_5 = add_label(lv_obj_get_child(sec_sps30_5, 0), 8, 0);
-    ui->lbl_sps30_6 = add_label(lv_obj_get_child(sec_sps30_6, 0), 8, 0);
+    ui->lbl_sps30_1 = add_section_label(tab, 0, 30, 72, "PM0.5");
+    ui->lbl_sps30_2 = add_section_label(tab, 28, 30, 72, "PM1.0");
+    ui->lbl_sps30_3 = add_section_label(tab, 56, 30, 72, "PM2.5");
+    ui->lbl_sps30_4 = add_section_label(tab, 84, 30, 72, "PM4.0");
+    ui->lbl_sps30_5 = add_section_label(tab, 112, 30, 72, "PM1.0");
+    ui->lbl_sps30_6 = add_section_label(tab, 140, 30, 72, "TypPartSz");
     return tab;
 }
 
 lv_obj_t *add_page_gps(ui_t *ui)
 {
     lv_obj_t *tab = add_tab(ui->tbv_main, "GPS");
-    lv_obj_t *sec_date = add_section(tab, 0, 0, 320, 30, 64, "Date");
-    ui->lbl_gps_date = add_label(lv_obj_get_child(sec_date, 0), 8, 0);
-    lv_obj_t *sec_time = add_section(tab, 0, 28, 320, 30, 64, "Time");
-    ui->lbl_gps_time = add_label(lv_obj_get_child(sec_time, 0), 8, 0);
-    lv_obj_t *sec_lat = add_section(tab, 0, 56, 320, 30, 64, "Lat");
-    ui->lbl_gps_lat = add_label(lv_obj_get_child(sec_lat, 0), 8, 0);
-    lv_obj_t *sec_lng = add_section(tab, 0, 84, 320, 30, 64, "Lng");
-    ui->lbl_gps_lng = add_label(lv_obj_get_child(sec_lng, 0), 8, 0);
-    lv_obj_t *sec_alt = add_section(tab, 0, 112, 320, 30, 64, "Alt");
-    ui->lbl_gps_alt = add_label(lv_obj_get_child(sec_alt, 0), 8, 0);
-    lv_obj_t *sec_speed = add_section(tab, 0, 140, 320, 30, 64, "Speed");
-    ui->lbl_gps_speed = add_label(lv_obj_get_child(sec_speed, 0), 8, 0);
-    lv_obj_t *sec_sats = add_section(tab, 0, 168, 320, 30, 64, "Sats");
-    ui->lbl_gps_sats = add_label(lv_obj_get_child(sec_sats, 0), 8, 0);
-    lv_obj_t *sec_pdop = add_section(tab, 0, 196, 320, 30, 64, "PDOP");
-    ui->lbl_gps_pdop = add_label(lv_obj_get_child(sec_pdop, 0), 8, 0);
-    lv_obj_t *sec_hdop = add_section(tab, 0, 224, 320, 30, 64, "HDOP");
-    ui->lbl_gps_hdop = add_label(lv_obj_get_child(sec_hdop, 0), 8, 0);
-    lv_obj_t *sec_vdop = add_section(tab, 0, 252, 320, 30, 64, "VDOP");
-    ui->lbl_gps_vdop = add_label(lv_obj_get_child(sec_vdop, 0), 8, 0);
+    ui->lbl_gps_date = add_section_label(tab, 0, 30, 64, "Date");
+    ui->lbl_gps_time = add_section_label(tab, 28, 30, 64, "Time");
+    ui->lbl_gps_lat = add_section_label(tab, 56, 30, 64, "Lat");
+    ui->lbl_gps_lng = add_section_label(tab, 84, 30, 64, "Lng");
+    ui->lbl_gps_alt = add_section_label(tab, 112, 30, 64, "Alt");
+    ui->lbl_gps_speed = add_section_label(tab, 140, 30, 64, "Speed");
+    ui->lbl_gps_sats = add_section_label(tab, 168, 30, 64, "Sats");
+    ui->lbl_gps_pdop = add_section_label(tab, 196, 30, 64, "PDOP");
+    ui->lbl_gps_hdop = add_section_label(tab, 224, 30, 64, "HDOP");
+    ui->lbl_gps_vdop = add_section_label(tab, 252, 30, 64, "VDOP");
     return tab;
 }
 
@@ -284,14 +273,10 @@ lv_obj_t *add_page_wifi(ui_t *ui)
     lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_WIFI);
     add_label_text(tab, 0, 0, "Enable", lv_color_black());
     ui->sw_wifi_enable = add_switch(tab, 260, 00, 60, 30);
-    lv_obj_t *sec_wifi_status1 = add_section(tab, 0, 30, 320, 30, 64, "Network");
-    ui->lbl_wifi_status1 = add_label(lv_obj_get_child(sec_wifi_status1, 0), 8, 0);
-    lv_obj_t *sec_wifi_status2 = add_section(tab, 0, 60, 320, 30, 64, "IP");
-    ui->lbl_wifi_status2 = add_label(lv_obj_get_child(sec_wifi_status2, 0), 8, 0);
-    lv_obj_t *sec_mqtt_status = add_section(tab, 0, 90, 320, 30, 64, "MQTT");
-    ui->lbl_mqtt_status = add_label(lv_obj_get_child(sec_mqtt_status, 0), 8, 0);
-    lv_obj_t *sec_ftp_status = add_section(tab, 0, 120, 320, 30, 64, "FTP");
-    ui->lbl_ftp_status = add_label(lv_obj_get_child(sec_ftp_status, 0), 8, 0);
+    ui->lbl_wifi_status1 = add_section_label(tab, 30, 30, 64, "Network");
+    ui->lbl_wifi_status2 = add_section_label(tab, 60, 30, 64, "IP");
+    ui->lbl_mqtt_status = add_section_label(tab, 90, 30, 64, "MQTT");
+    ui->lbl_ftp_status = add_section_label(tab, 120, 30, 64, "FTP");
     ui->lst_wifi = lv_list_create(tab);
     lv_obj_set_pos(ui->lst_wifi, 0, 150);
     lv_obj_set_size(ui->lst_wifi, 320, 120);
@@ -305,14 +290,10 @@ lv_obj_t *add_page_sd(ui_t *ui)
     ui->sw_record = add_switch(tab, 260, 0, 60, 30);
     add_label_text(tab, 0, 30, "Auto Record", lv_color_black());
     ui->sw_auto_record = add_switch(tab, 260, 30, 60, 30);
-    lv_obj_t *sec_sd_card = add_section(tab, 0, 60, 320, 30, 64, "SD-Card");
-    ui->lbl_sd_card = add_label(lv_obj_get_child(sec_sd_card, 0), 8, 0);
-    lv_obj_t *sec_sd_free = add_section(tab, 0, 90, 320, 30, 64, "Free");
-    ui->lbl_sd_free = add_label(lv_obj_get_child(sec_sd_free, 0), 8, 0);
-    lv_obj_t *sec_sd_files = add_section(tab, 0, 120, 320, 30, 64, "Files");
-    ui->lbl_sd_files = add_label(lv_obj_get_child(sec_sd_files, 0), 8, 0);
-    lv_obj_t *sec_sd_fill = add_section(tab, 0, 150, 320, 30, 64, "FillLvl");
-    ui->lbl_sd_fill = add_label(lv_obj_get_child(sec_sd_fill, 0), 8, 0);
+    ui->lbl_sd_card = add_section_label(tab, 60, 30, 64, "SD-Card");
+    ui->lbl_sd_free = add_section_label(tab, 90, 30, 64, "Free");
+    ui->lbl_sd_files = add_section_label(tab, 120, 30, 64, "Files");
+    ui->lbl_sd_fill = add_section_label(tab, 150, 30, 64, "FillLvl");
     return tab;
 }
 
@@ -320,33 +301,23 @@ lv_obj_t *add_page_cfg(ui_t *ui)
 {
     lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_SETTINGS);
 
-    lv_obj_t *sec_time = add_section(tab, 0, 0, 320, 30, 72, "Time");
-    ui->lbl_time = add_label(lv_obj_get_child(sec_time, 0), 8, 0);
-    lv_obj_t *sec_savetime = add_section(tab, 0, 30, 320, 30, 72, "Save Time");
-    ui->lbl_savetime = add_label(lv_obj_get_child(sec_savetime, 0), 8, 0);
-    lv_obj_t *sec_uptime = add_section(tab, 0, 60, 320, 30, 72, "Up Time");
-    ui->lbl_uptime = add_label(lv_obj_get_child(sec_uptime, 0), 8, 0);
-    lv_obj_t *sec_startup_cnt = add_section(tab, 0, 90, 320, 30, 72, "Strt Cnt");
-    ui->lbl_startup_cnt = add_label(lv_obj_get_child(sec_startup_cnt, 0), 8, 0);
-    lv_obj_t *sec_qmc5883L = add_section(tab, 0, 120, 320, 30, 72, "QMC5883L");
-    ui->lbl_qmc5883L = add_label(lv_obj_get_child(sec_qmc5883L, 0), 8, 0);
-    lv_obj_t *sec_adxl345 = add_section(tab, 0, 150, 320, 30, 72, "ADXL345");
-    ui->lbl_adxl345 = add_label(lv_obj_get_child(sec_adxl345, 0), 8, 0);
+    ui->lbl_time = add_section_label(tab, 0, 30, 72, "Time");
+    ui->lbl_savetime = add_section_label(tab, 30, 30, 72, "Save Time");
+    ui->lbl_uptime = add_section_label(tab, 60, 30, 72, "Up Time");
+    ui->lbl_startup_cnt = add_section_label(tab, 90, 30, 72, "Strt Cnt");
+    ui->lbl_heap = add_section_label(tab, 120, 30, 72, "Heap");
+    ui->lbl_qmc5883L = add_section_label(tab, 150, 30, 72, "QMC5883L");
+    ui->lbl_adxl345 = add_section_label(tab, 180, 30, 72, "ADXL345");
 
-    add_label_text(tab, 0, 180, "Power Mode", lv_color_black());
-    add_label_text(tab, 0, 200, "LCD", lv_color_black());
-    ui->sl_lcd_pwr = add_slider(tab, 120, 200, 180, 0,2);
-    add_label_text(tab, 0, 240, "GPS", lv_color_black());
-    ui->sl_gps_pwr = add_slider(tab, 120, 240, 180, 0, 3);
-    add_label_text(tab, 0, 280, "SCD4x", lv_color_black());
-    ui->sl_scd4x_pwr = add_slider(tab, 120, 280, 180, 0, 3);
-    add_label_text(tab, 0, 320, "WiFi", lv_color_black());
-    ui->sl_wifi_pwr = add_slider(tab, 120, 320, 180, 0, 2);
-    add_label_text(tab, 0, 360, "Mode", lv_color_black());
-    ui->sl_mode_pwr = add_slider(tab, 120, 360, 180, 0, 4);
+    add_label_text(tab, 0, 210, "Power Mode", lv_color_black());
+    ui->sl_lcd_pwr = add_slider_label(tab, 230, 2, "LCD");
+    ui->sl_gps_pwr = add_slider_label(tab, 270, 3, "GPS");
+    ui->sl_scd4x_pwr = add_slider_label(tab, 310, 3, "SCD4x");
+    ui->sl_wifi_pwr = add_slider_label(tab, 350, 2, "WiFi");
+    ui->sl_mode_pwr = add_slider_label(tab, 390, 4, "Mode");
 
-    ui->btn_calibrate = add_button(tab, 0, 400, 200, 0, "Calibrate Sensors");
-    ui->btn_save_config = add_button(tab, 0, 450, 200, 0, "Save Config");
+    ui->btn_calibrate = add_button(tab, 0, 430, 200, 0, "Calibrate Sensors");
+    ui->btn_save_config = add_button(tab, 0, 480, 200, 0, "Save Config");
     return tab;
 }
 
@@ -357,7 +328,7 @@ ui_t *ui_init(lv_display_t *disp)
     lv_obj_t *scr = lv_display_get_screen_active(disp);
     ui_t *ui = pvPortMalloc(sizeof(ui_t));
 
-    lvgl_port_lock(-1);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return NULL;
     init_styles();
     ESP_LOGI(TAG, "Add Tab main");
     ui->tbv_main = add_tabiew(scr, 0, 0);

@@ -34,7 +34,7 @@ esp_err_t sd_card_get_info(char *buf, uint64_t *bytes_total, uint64_t *bytes_fre
 
 esp_err_t sd_card_mount_fs();
 
-int sd_card_mounted(bool check);
+bool sd_card_mounted(bool check);
 
 int sd_card_get_file_count(const char *path);
 

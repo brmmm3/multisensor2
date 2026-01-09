@@ -409,11 +409,17 @@ esp_err_t tcp_server_stop()
 
 void tcp_server_publish_values()
 {
+    static char buf[256];
+
     if (!tcp_server_running && config->tcp_auto_start) {
         if (tcp_server_start() != ESP_OK) return;
     }
     if (tcp_server_task_handle == NULL) return;
-    if (!wifi_connected || !tcp_server_running || !tcp_send_values || tcp_client_cnt == 0) return;
+    if (!wifi_connected || !tcp_server_running) return;
+    // Send free mem
+    int len = sprintf(buf, "{id=%d,heap=%u}\n", E_SENSOR_FREE, (unsigned int)esp_get_free_heap_size());
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
+    if (!tcp_send_values || tcp_client_cnt == 0) return;
     if (!gps_update && !bmx280lo_update && !bmx280hi_update && !mhz19_update && !scd4x_calibrate &&
         !scd4x_update && !yys_update && !sps30_update && !adxl345_update && !qmc5883l_update) {
         return;
@@ -424,8 +430,6 @@ void tcp_server_publish_values()
         }
     }
  
-    static char buf[256];
-
     uint16_t year;
     uint8_t month;
     uint8_t day;
@@ -433,7 +437,7 @@ void tcp_server_publish_values()
     uint8_t min;
     uint8_t sec;
     get_current_date_time(&year, &month, &day, &hour, &min, &sec);
-    int len = sprintf(buf, "{id=%d,date=\"%d.%d.%d\",time=\"%d:%d:%d\"}\n",
+    len = sprintf(buf, "{id=%d,date=\"%d.%d.%d\",time=\"%d:%d:%d\"}\n",
         E_SENSOR_TIME,
         year, month, day, hour, min, sec);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
