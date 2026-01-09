@@ -7,7 +7,7 @@
 #include "lcd.h"
 #include "main.h"
 #include "misc/lv_palette.h"
-#include "mqtt.h"
+//#include "mqtt.h"
 #include "nvs_flash.h"
 #include "rtc_tiny.h"
 #include "scd4x.h"
@@ -86,12 +86,17 @@ static const char *TAG = "MS2";
 #define DATA_HEADER_ID0     0xAA
 #define DATA_HEADER_ID1     0x55
 #define DATA_HEADER_VERSION 1
-#define DATA_MAX_SIZE       65000
+#define DATA_MAX_SIZE       40000
 
 typedef struct startup_cnt_s {
     uint32_t startup_cnt;
     uint32_t uptime_cnt;
 } startup_cnt_t;
+
+typedef struct uptime_record_s {
+    time_t start_time;
+    time_t save_time;
+} uptime_record_t;
 
 wdt_hal_context_t rtc_wdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
 i2c_master_bus_handle_t bus_handle;
@@ -138,14 +143,14 @@ uint8_t sps30_not_ready_cnt = 0;
 sensors_data_t last_values = {0};
 
 // Recorded measurement data
-uint8_t data[65536];
+uint8_t data[DATA_MAX_SIZE + 512];
 
 void dump_values(bool force);
 
 
 void get_current_date_time(uint16_t *year, uint8_t *month, uint8_t *day, uint8_t *hour, uint8_t *min, uint8_t *sec)
 {
-    if (gps->status.date != 0) {
+    if (gps->status.date > 0 && gps->status.time > 0 && gps->status.sats > 2 && gps->gsa.pdop < 50.0) {
         uint32_t date = gps->status.date;
         uint32_t time = gps->status.time;
         uint32_t _day = date / 10000;
@@ -163,8 +168,8 @@ void get_current_date_time(uint16_t *year, uint8_t *month, uint8_t *day, uint8_t
         ESP_LOGD(TAG, "No GPS date/time -> fallback to RTC");
         struct tm t;
         rtc_get_datetime(rtc->rtc, &t);
-        *year = t.tm_year;
-        *month = t.tm_mon;
+        *year = t.tm_year + 1900;
+        *month = t.tm_mon + 1;
         *day = t.tm_mday;
         *hour = t.tm_hour;
         *min = t.tm_min;
@@ -641,7 +646,7 @@ void show_starup_cnt()
 esp_err_t update_startup_cnt(uint32_t startup_cnt_inc, uint32_t uptime_cnt_inc)
 {
     char *path = MOUNT_POINT"/startup.cnt";
-    startup_cnt_t cnt;
+    startup_cnt_t cnt = {0};
 
     read_bin_file(path, &cnt, sizeof(cnt));
     cnt.startup_cnt += startup_cnt_inc;
@@ -650,6 +655,28 @@ esp_err_t update_startup_cnt(uint32_t startup_cnt_inc, uint32_t uptime_cnt_inc)
     status.uptime_cnt = cnt.uptime_cnt;
     ESP_LOGI(TAG, "startup_cnt=%d  uptime_cnt=%d", cnt.startup_cnt, cnt.uptime_cnt);
     return write_bin_file(path, &cnt, sizeof(cnt));
+}
+
+esp_err_t update_save_time_file()
+{
+    uptime_record_t data[250] = {0};
+    uint32_t size = 250 * sizeof(uptime_record_t);
+    uint32_t file_ext = (status.uptime_cnt / 250) % 1000;
+    uint32_t pos = status.uptime_cnt % 250;
+    char path[32];
+
+    sprintf(path, "%s/uptime.%d", MOUNT_POINT, file_ext);
+    read_bin_file(path, &data, size);
+    if (data[pos].start_time != status.start_time) {
+        if (data[pos].start_time == 0 && ++pos >= 250) {
+            pos = 0;
+            file_ext++;
+            sprintf(path, "%s/uptime.%d", MOUNT_POINT, file_ext);
+        }
+        data[pos].start_time = status.start_time;
+    }
+    data[pos].save_time = status.save_time;
+    return write_bin_file(path, &data, size);
 }
 
 void set_data_filename()
@@ -711,6 +738,7 @@ static void update_task(void *arg)
     status.file_cnt = sd_card_get_file_count(MOUNT_POINT"/data");
     sprintf(buf, "%d data files", status.file_cnt);
     ui_set_label_text(ui->lbl_sd_files, buf);
+    ui_set_switch_state(ui->sw_auto_record, config->auto_record);
 
     while (true) {
         if (loop_cnt++ > 0 && !status.recording && config->auto_record) {
@@ -725,7 +753,6 @@ static void update_task(void *arg)
 
         if (wifi_connected) {
             if (!old_wifi_connected) {
-                status.start_time = time(NULL);
                 old_wifi_connected = true;
             }
             //mqtt_publish_values();
@@ -778,16 +805,17 @@ static void update_task(void *arg)
                 ui_set_label_text(ui->lbl_sd_files, buf);
                 ui_set_label_text(ui->lbl_sd_fill, "0.0 %");
                 set_data_filename();
+                if (status.save_time == 0) {
+                    ESP_ERROR_CHECK_WITHOUT_ABORT(update_startup_cnt(0, 1));
+                }
+                status.save_time = now;
+                ui_set_time_value(ui->lbl_savetime, &status.save_time);
+                update_save_time_file();
             } else if (!sd_card_mounted(true)) {
                 ui_set_switch_state(ui->sw_record, false);
                 ui_sd_record_set_value(false);
                 ui_set_tab_color(4, LV_PALETTE_RED);
             }
-            if (status.save_time == 0) {
-                ESP_ERROR_CHECK_WITHOUT_ABORT(update_startup_cnt(0, 1));
-            }
-            status.save_time = now;
-            ui_set_time_value(ui->lbl_savetime, &status.save_time);
         } else {
             // Update SD-Card tab
             float fill_level = 100.0 * (float) status.record_pos / (float)DATA_MAX_SIZE;
@@ -796,7 +824,11 @@ static void update_task(void *arg)
             // Update Cfg tab
             ui_set_time_value(ui->lbl_time, &now);
             ui_set_duration_value(ui->lbl_uptime, (uint32_t)(now - status.start_time));
-            sprintf(buf, "%u bytes free", (unsigned int)esp_get_free_heap_size());
+            uint32_t free_heap = esp_get_free_heap_size();
+            if (free_heap < 10000) {
+                ESP_LOGW(TAG, "free_heap=%u", (unsigned int)free_heap);
+            }
+            sprintf(buf, "%u bytes free", (unsigned int)free_heap);
             ui_set_label_text(ui->lbl_heap, buf);
             // Wait up to 1s
             for (int i = 0; i < 10; i++) {
