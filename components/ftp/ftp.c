@@ -877,7 +877,7 @@ static void ftp_process_cmd(void) {
 			if ((strlen(ftp_path) > 0) && (ftp_path[strlen(ftp_path)-1] != '/')) {
 				if (ftp_open_file(ftp_path, "rb")) {
 					ftp_data.state = E_FTP_STE_CONTINUE_FILE_TX;
-					vTaskDelay(20 / portTICK_PERIOD_MS);
+					vTaskDelay(pdMS_TO_TICKS(20));
 					ftp_send_reply(150, NULL);
 				}
 				else {
@@ -897,7 +897,7 @@ static void ftp_process_cmd(void) {
 			if ((strlen(ftp_path) > 0) && (ftp_path[strlen(ftp_path)-1] != '/')) {
 				if (ftp_open_file(ftp_path, "ab")) {
 					ftp_data.state = E_FTP_STE_CONTINUE_FILE_RX;
-					vTaskDelay(20 / portTICK_PERIOD_MS);
+					vTaskDelay(pdMS_TO_TICKS(20));
 					ftp_send_reply(150, NULL);
 				}
 				else {
@@ -918,7 +918,7 @@ static void ftp_process_cmd(void) {
 				ESP_LOGD(TAG, "E_FTP_CMD_STOR ftp_path=[%s]", ftp_path);
 				if (ftp_open_file(ftp_path, "wb")) {
 					ftp_data.state = E_FTP_STE_CONTINUE_FILE_RX;
-					vTaskDelay(20 / portTICK_PERIOD_MS);
+					vTaskDelay(pdMS_TO_TICKS(20));
 					ftp_send_reply(150, NULL);
 				}
 				else {
@@ -941,7 +941,7 @@ static void ftp_process_cmd(void) {
 
 				//if (unlink(ftp_path) == 0) {
 				if (unlink(fullname) == 0) {
-					vTaskDelay(20 / portTICK_PERIOD_MS);
+					vTaskDelay(pdMS_TO_TICKS(20));
 					ftp_send_reply(250, NULL);
 				}
 				else ftp_send_reply(550, NULL);
@@ -958,7 +958,7 @@ static void ftp_process_cmd(void) {
 
 				//if (rmdir(ftp_path) == 0) {
 				if (rmdir(fullname) == 0) {
-					vTaskDelay(20 / portTICK_PERIOD_MS);
+					vTaskDelay(pdMS_TO_TICKS(20));
 					ftp_send_reply(250, NULL);
 				}
 				else ftp_send_reply(550, NULL);
@@ -975,7 +975,7 @@ static void ftp_process_cmd(void) {
 
 				//if (mkdir(ftp_path, 0755) == 0) {
 				if (mkdir(fullname, 0755) == 0) {
-					vTaskDelay(20 / portTICK_PERIOD_MS);
+					vTaskDelay(pdMS_TO_TICKS(20));
 					ftp_send_reply(250, NULL);
 				}
 				else ftp_send_reply(550, NULL);

@@ -52,7 +52,7 @@ esp_err_t sntp_obtain_time(void)
 	const int retry_count = 10;
 	while (sntp_get_sync_status() != SNTP_SYNC_STATUS_RESET && ++retry < retry_count) {
 		ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
-		vTaskDelay(1000 / portTICK_PERIOD_MS);
+		vTaskDelay(pdMS_TO_TICKS(1000));
 	}
 	if (retry == retry_count) return ESP_FAIL;
 	return ESP_OK;

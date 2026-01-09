@@ -110,6 +110,7 @@ void wifi_disconnect()
 {
     if (connect_task_handle != NULL) {
         vTaskDelete(connect_task_handle);
+        connect_task_handle = NULL;
     }
     esp_wifi_disconnect();             // break connection to AP
     ui_set_label_text(ui->lbl_wifi_status1, "Disconnected");
@@ -209,6 +210,7 @@ static void wifi_connect_task(void *arg)
     wifi_network_t *network = arg;
 
     wifi_connect(network->ssid, network->password);
+    connect_task_handle = NULL;
     vTaskDelete(NULL);
 }
 

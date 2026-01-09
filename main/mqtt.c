@@ -119,7 +119,7 @@ void mqtt_stop()
 {
     if (mqtt_client == NULL) return;
     esp_mqtt_client_stop(mqtt_client);     // Clean disconnect + stop task
-    vTaskDelay(100 / portTICK_PERIOD_MS);  // Small delay for network cleanup
+    vTaskDelay(pdMS_TO_TICKS(100));  // Small delay for network cleanup
     esp_mqtt_client_destroy(mqtt_client);  // Free resources
     mqtt_client = NULL;
     mqtt_connected = false;

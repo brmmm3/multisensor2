@@ -754,6 +754,7 @@ static void update_task(void *arg)
             ui_sd_record_set_value(true);
         }
         sensors_update();
+        scd4x_state_machine(scd4x);
         if (status.recording) {
             sensors_recording();
         }
@@ -776,18 +777,6 @@ static void update_task(void *arg)
 
         // Dump data for debugging
         dump_values(false);
-
-        // Reset update flags
-        gps_update = false;
-        bmx280lo_update = false;
-        bmx280hi_update = false;
-        mhz19_update = false;
-        scd4x_calibrate = false;
-        scd4x_update = false;
-        yys_update = false;
-        sps30_update = false;
-        adxl345_update = false;
-        qmc5883l_update = false;
 
         esp_task_wdt_reset();
 
@@ -850,9 +839,21 @@ static void update_task(void *arg)
             // Wait up to 1s
             for (int i = 0; i < 10; i++) {
                 if (status.force_update) break;
-                vTaskDelay(100 / portTICK_PERIOD_MS);
+                vTaskDelay(pdMS_TO_TICKS(100));
             }
         }
+        // Reset update flags
+        gps_update = false;
+        bmx280lo_update = false;
+        bmx280hi_update = false;
+        mhz19_update = false;
+        scd4x_calibrate = false;
+        scd4x_update = false;
+        yys_update = false;
+        sps30_update = false;
+        adxl345_update = false;
+        qmc5883l_update = false;
+        gps_status->status = 0;
     }
 }
 

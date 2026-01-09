@@ -353,6 +353,14 @@ static void tcp_server_task(void *pvParameters)
                         ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
                         response = "ERR\n";
                     }
+                } else if (strncmp(rx_buffer, "cal ", 4) == 0) {
+                    // Set power status
+                    if (strcmp(&rx_buffer[4], "scd") == 0) {
+                        scd4x_state_machine_cmd(SCD4X_CMD_FRC, mhz19->values.co2);
+                    } else {
+                        ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
+                        response = "ERR\n";
+                    }
                 } else if (strncmp(rx_buffer, "auto ", 5) == 0) {
                     // Set auto configs
                     if (strncmp(&rx_buffer[5], "con ", 4) == 0) {
@@ -491,7 +499,7 @@ void tcp_server_publish_values()
         year, month, day, hour, min, sec);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     if (gps_update) {
-        int len = sprintf(buf, "{id=%d,sat=%s,date=%lu,time=%lu,lat=%f,lng=%f,alt=%f,spd=%f,mode_3d=\"%c\",sats=%d,pdop=%f,hdop=%f,vdop=%f,status=%d,data_cnt=%d,error_cnt=%d}\n",
+        int len = sprintf(buf, "{id=%d,sat=%s,date=%lu,time=%lu,lat=%f,lng=%f,alt=%f,spd=%f,mode_3d=\"%c\",sats=%d,pdop=%f,hdop=%f,vdop=%f,status=0x%x,data_cnt=%d,error_cnt=%d}\n",
                 E_SENSOR_GPS,
                 gps_values.sat, (unsigned long)gps_values.date, (unsigned long)gps_values.time, gps_values.lat, gps_values.lng,
                 gps_values.altitude, gps_values.speed, gps_values.mode_3d, gps_values.sats,
@@ -521,9 +529,9 @@ void tcp_server_publish_values()
     }
     if (scd4x_update) {
         scd4x_values_t *values = &scd4x->values;
-        int len = sprintf(buf, "{id=%d,co2=%d,temp=%f,hum=%f}\n",
+        int len = sprintf(buf, "{id=%d,co2=%d,temp=%f,hum=%f,st=%d}\n",
             E_SENSOR_SCD4X,
-            values->co2, values->temperature, values->humidity);
+            values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (yys_update) {

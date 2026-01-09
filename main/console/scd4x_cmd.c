@@ -27,9 +27,9 @@ int process_scd4x_cmd(int argc, char **argv)
 
             // Get sensor info and status
             ESP_LOGI(TAG, "SCD4x (serial=0x%012llX ready=%d):", scd4x->serial_number, scd4x_get_data_ready_status(scd4x));
-            ESP_LOGI(TAG, "temp_offs=%f °C  altitude=%d m  pressure=%d hPa * co2=%d ppm  temp=%.1f °C  hum=%.1f %%",
+            ESP_LOGI(TAG, "temp_offs=%f °C  altitude=%d m  pressure=%d hPa * co2=%d ppm  temp=%.1f °C  hum=%.1f %%  st=%d",
                     scd4x->temperature_offset, scd4x->altitude, scd4x->pressure,
-                    values->co2, values->temperature, values->humidity);
+                    values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
         } else if (strcmp(cmd, "cfg") == 0) {
             if (scd4x_cmd_args.temperature->count == 1) {
                 scd4x_set_temperature_offset(scd4x, (float)scd4x_cmd_args.temperature->ival[0]);
@@ -42,23 +42,9 @@ int process_scd4x_cmd(int argc, char **argv)
             }
         } else if (strcmp(cmd, "cal") == 0) {
             if (scd4x_cmd_args.co2->count == 1) {
-                esp_err_t err = scd4x_stop_periodic_measurement(scd4x);
-                if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "Failed to stop periodic measurement: %d", err);
-                    return 1;
-                }
-                vTaskDelay(pdMS_TO_TICKS(500));
-                uint16_t result = scd4x_perform_forced_recalibration(scd4x, scd4x_cmd_args.co2->ival[0]);
-                ESP_LOGE(TAG, "Recalibration result: %d", result);
-                vTaskDelay(pdMS_TO_TICKS(500));
-                err = scd4x_start_periodic_measurement(scd4x);
-                if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "Failed start periodic measurement: %d", err);
-                    return 1;
-                }
+                scd4x_state_machine_cmd(SCD4X_CMD_FRC, scd4x_cmd_args.co2->ival[0]);
             } else {
-                ESP_LOGE(TAG, "no valid arguments");
-                return 1;
+                scd4x_state_machine_cmd(SCD4X_CMD_FRC, mhz19->values.co2);
             }
         } else if (strcmp(cmd, "reset") == 0) {
             esp_err_t err = scd4x_stop_periodic_measurement(scd4x);

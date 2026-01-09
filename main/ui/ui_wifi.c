@@ -329,16 +329,16 @@ static void networkConnector() {
 }
 
 static void scanWIFITask(void *pvParameters) {
-  while (1) {
+  while (true) {
     foundWifiList.clear();
     int n = WiFi.scanNetworks();
-    vTaskDelay(10);
+    vTaskDelay(pdMS_TO_TICKS(20));
     for (int i = 0; i < n; ++i) {
       String item = WiFi.SSID(i) + " (" + WiFi.RSSI(i) + ") " + ((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
       foundWifiList.push_back(item);
-      vTaskDelay(10);
+      vTaskDelay(pdMS_TO_TICKS(20));
     }
-    vTaskDelay(5000);
+    vTaskDelay(pdMS_TO_TICKS(5000));
   }
 }
 
@@ -348,11 +348,11 @@ void beginWIFITask(void *pvParameters) {
   unsigned long startingTime = millis();
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
-  vTaskDelay(100);
+  vTaskDelay(pdMS_TO_TICKS(100));
 
   WiFi.begin(ssidName.c_str(), ssidPW.c_str());
   while (WiFi.status() != WL_CONNECTED && (millis() - startingTime) < networkTimeout) {
-    vTaskDelay(250);
+    vTaskDelay(pdMS_TO_TICKS(250));
   }
 
   if (WiFi.status() == WL_CONNECTED) {

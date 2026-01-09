@@ -285,7 +285,6 @@ static void gps_sensor_task(void *arg)
             status->error_cnt++;
             continue; // UART error
         }
-        status->status = 0;
         status->data_cnt++;
         if (sensor->debug & 16) {
             ESP_LOG_BUFFER_CHAR(sensor->name, buf, rxBytes);
@@ -511,7 +510,7 @@ void gps_dump_values(gps_sensor_t *sensor, bool force)
     if (force || sensor->debug & 1) {
         gps_status_t *status = &sensor->status;
 
-        ESP_LOGI(TAG, "%s date=%lu time=%lu lat=%f %c lng=%f %c altitude=%f speed=%f mode_3d=%c sats=%d status=%d errors=%d",
+        ESP_LOGI(TAG, "%s date=%lu time=%lu lat=%f %c lng=%f %c altitude=%f speed=%f mode_3d=%c sats=%d status=0x%x errors=%d",
                  status->sat, status->date, status->time, status->lat, status->ns, status->lng, status->ew, status->altitude,
                  status->speed, status->mode_3d, status->sats, status->status, status->error_cnt);
     }

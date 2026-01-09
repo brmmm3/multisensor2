@@ -32,7 +32,7 @@ void update_air_tab(bool force_update)
     if (scd4x_update || force_update) {
         scd4x_values_t *scd4x_values = &scd4x->values;
 
-        sprintf(buf, "CO2=%d ppm\nT=%.1f °C  H=%.1f %%", scd4x_values->co2, scd4x_values->temperature, scd4x_values->humidity);
+        sprintf(buf, "CO2=%d ppm    ST=%d\nT=%.1f °C  H=%.1f %%", scd4x_values->co2, scd4x_st_machine_status, scd4x_values->temperature, scd4x_values->humidity);
         lv_label_set_text(ui->lbl_scd4x, buf);
     }
     if (mhz19_update || force_update) {
@@ -82,9 +82,7 @@ void update_gps_tab(bool force_update)
         day = gps_status->date / 10000;
         month = gps_status->date / 100 - day * 100;
         year = gps_status->date % 100;
-        sprintf(buf, "%02u.%02u.20%02u      (st=%d dc=%d err=%d)",
-            (unsigned int)day, (unsigned int)month, (unsigned int)year,
-            gps_status->status, gps_status->data_cnt, gps_status->error_cnt);
+        sprintf(buf, "%02u.%02u.20%02u", (unsigned int)day, (unsigned int)month, (unsigned int)year);
         lv_label_set_text(ui->lbl_gps_date, buf);
         hours = gps_status->time / 10000;
         minutes = gps_status->time / 100 - hours * 100;
@@ -99,13 +97,19 @@ void update_gps_tab(bool force_update)
         lv_label_set_text(ui->lbl_gps_alt, buf);
         sprintf(buf, "%.1f km/h", gps_status->speed);
         lv_label_set_text(ui->lbl_gps_speed, buf);
-        sprintf(buf, "%d  ST=%d  2/3D=%s  %s", gps_status->sats, gps_status->status,
+        sprintf(buf, "SATs=%d  MODE=%s  TYP=%s",
+            gps_status->sats,
             gps_status->mode_3d == 2 ? "2D" : gps_status->mode_3d == 3 ? "3D": "-",
             gps_status->sat);
         lv_label_set_text(ui->lbl_gps_sats, buf);
-        sprintf(buf, "%d", gps_status->status);
-        lv_label_set_text(ui->lbl_gps_status, buf);
-        sprintf(buf, "%d", gps_status->status);
+        uint8_t st = gps_status->status;
+        sprintf(buf, "%c%c%c%c%c%c",
+            st & 0x20 ? '1' : '0',
+            st & 0x10 ? '1' : '0',
+            st & 0x08 ? '1' : '0',
+            st & 0x04 ? '1' : '0',
+            st & 0x02 ? '1' : '0',
+            st & 0x01 ? '1' : '0');
         lv_label_set_text(ui->lbl_gps_status, buf);
         sprintf(buf, "%d", gps_status->data_cnt);
         lv_label_set_text(ui->lbl_gps_data_cnt, buf);
