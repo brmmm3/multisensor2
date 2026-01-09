@@ -784,6 +784,10 @@ static void update_task(void *arg)
 
         // Show system time
         time_t now = time(NULL);
+        if (now - status.start_time > loop_cnt + 36000) {
+            ESP_LOGW(TAG, "start_time deviation more than 10 days. SYNC");
+            status.start_time = now;
+        }
 
         update_gps_status();
 
