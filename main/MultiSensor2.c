@@ -661,17 +661,17 @@ esp_err_t update_save_time_file()
 {
     uptime_record_t data[250] = {0};
     uint32_t size = 250 * sizeof(uptime_record_t);
-    uint32_t file_ext = (status.uptime_cnt / 250) % 1000;
-    uint32_t pos = status.uptime_cnt % 250;
+    uint16_t file_ext = (status.uptime_cnt / 250) % 1000;
+    uint16_t pos = status.uptime_cnt % 250;
     char path[32];
 
-    sprintf(path, "%s/uptime.%d", MOUNT_POINT, file_ext);
+    sprintf(path, "%s/uptime.%u", MOUNT_POINT, file_ext);
     read_bin_file(path, &data, size);
     if (data[pos].start_time != status.start_time) {
         if (data[pos].start_time == 0 && ++pos >= 250) {
             pos = 0;
             file_ext++;
-            sprintf(path, "%s/uptime.%d", MOUNT_POINT, file_ext);
+            sprintf(path, "%s/uptime.%u", MOUNT_POINT, file_ext);
         }
         data[pos].start_time = status.start_time;
     }
