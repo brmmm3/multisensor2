@@ -71,7 +71,7 @@ void update_dust_tab(bool force_update)
 void update_gps_tab(bool force_update)
 {
     if (gps_update || force_update) {
-        char buf[100];
+        char buf[80];
         uint32_t day;
         uint32_t month;
         uint32_t year;
@@ -82,7 +82,9 @@ void update_gps_tab(bool force_update)
         day = gps_status->date / 10000;
         month = gps_status->date / 100 - day * 100;
         year = gps_status->date % 100;
-        sprintf(buf, "%02lu.%02lu.20%02lu", (unsigned long)day, (unsigned long)month, (unsigned long)year);
+        sprintf(buf, "%02u.%02u.20%02u      (st=%d dc=%d err=%d)",
+            (unsigned int)day, (unsigned int)month, (unsigned int)year,
+            gps_status->status, gps_status->data_cnt, gps_status->error_cnt);
         lv_label_set_text(ui->lbl_gps_date, buf);
         hours = gps_status->time / 10000;
         minutes = gps_status->time / 100 - hours * 100;
@@ -101,6 +103,14 @@ void update_gps_tab(bool force_update)
             gps_status->mode_3d == 2 ? "2D" : gps_status->mode_3d == 3 ? "3D": "-",
             gps_status->sat);
         lv_label_set_text(ui->lbl_gps_sats, buf);
+        sprintf(buf, "%d", gps_status->status);
+        lv_label_set_text(ui->lbl_gps_status, buf);
+        sprintf(buf, "%d", gps_status->status);
+        lv_label_set_text(ui->lbl_gps_status, buf);
+        sprintf(buf, "%d", gps_status->data_cnt);
+        lv_label_set_text(ui->lbl_gps_data_cnt, buf);
+        sprintf(buf, "%d", gps_status->error_cnt);
+        lv_label_set_text(ui->lbl_gps_error_cnt, buf);
     }
 }
 

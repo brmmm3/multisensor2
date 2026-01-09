@@ -130,8 +130,10 @@ typedef struct gps_status_s {
     float speed;        // Speed over ground in km/h
     char mode_3d;       // Fix mode; 1 = no fix, 2 = 2D, 3 = 3D
     uint8_t sats;       // Number of satellites
-    uint8_t status;     // Data status.
-    uint16_t error_cnt;
+    uint8_t status;     // Data status. 0=OK
+    uint8_t data_cnt;   // Data counter.
+    uint8_t old_data_cnt; // Old Data counter.
+    uint8_t error_cnt;
 } gps_status_t;
 
 typedef struct __attribute__((packed)) gps_data_s {
@@ -169,6 +171,10 @@ esp_err_t gps_init(gps_sensor_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint
 bool gps_data_ready(gps_sensor_t *sensor);
 
 int gps_set_power_mode(gps_sensor_t *sensor, uint8_t mode);
+
+int gps_soft_reset(gps_sensor_t *sensor);
+
+int gps_full_reset(gps_sensor_t *sensor);
 
 int gps_power_off(gps_sensor_t *sensor);
 

@@ -223,6 +223,12 @@ lv_obj_t *add_section_label(lv_obj_t *tab, int32_t y, int32_t h, int32_t w0, con
     return add_label(lv_obj_get_child(section, 0), 8, 0);
 }
 
+lv_obj_t *add_section_label_xw(lv_obj_t *tab, int32_t x, int32_t y, int32_t w, int32_t h, int32_t w0, const char *title)
+{
+    lv_obj_t *section = add_section(tab, x, y, w, h, w0, title);
+    return add_label(lv_obj_get_child(section, 0), 8, 0);
+}
+
 lv_obj_t *add_slider_label(lv_obj_t *tab, int32_t y, int32_t max, const char *title)
 {
     add_label_text(tab, 0, y, title, lv_color_black());
@@ -255,9 +261,12 @@ lv_obj_t *add_page_dust(ui_t *ui)
 lv_obj_t *add_page_gps(ui_t *ui)
 {
     lv_obj_t *tab = add_tab(ui->tbv_main, "GPS");
-    ui->lbl_gps_date = add_section_label(tab, 0, 30, 64, "Date");
-    ui->lbl_gps_time = add_section_label(tab, 28, 30, 64, "Time");
-    ui->lbl_gps_lat = add_section_label(tab, 56, 30, 64, "Lat");
+    ui->lbl_gps_date = add_section_label_xw(tab, 0, 0, 180, 30, 64, "Date");
+    ui->lbl_gps_time = add_section_label_xw(tab, 0, 28, 180, 30, 64, "Time");
+    ui->lbl_gps_lat = add_section_label_xw(tab, 0, 56, 180, 30, 64, "Lat");
+    ui->lbl_gps_status = add_section_label_xw(tab, 180, 0, 140, 30, 64, "Status");
+    ui->lbl_gps_data_cnt = add_section_label_xw(tab, 180, 28, 140, 30, 64, "DatCnt");
+    ui->lbl_gps_error_cnt = add_section_label_xw(tab, 180, 56, 140, 30, 64, "Error");
     ui->lbl_gps_lng = add_section_label(tab, 84, 30, 64, "Lng");
     ui->lbl_gps_alt = add_section_label(tab, 112, 30, 64, "Alt");
     ui->lbl_gps_speed = add_section_label(tab, 140, 30, 64, "Speed");

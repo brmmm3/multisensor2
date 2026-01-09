@@ -332,6 +332,27 @@ static void tcp_server_task(void *pvParameters)
                         ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
                         response = "ERR\n";
                     }
+                } else if (strncmp(rx_buffer, "reset ", 6) == 0) {
+                    // Set power status
+                    if (strncmp(&rx_buffer[6], "gps ", 4) == 0) {
+                        if (strcmp(&rx_buffer[10], "soft") == 0) {
+                            if (gps_soft_reset(gps) == -1) {
+                                ESP_LOGE(TAG, "GPS sensor soft reset failed");
+                                response = "ERR\n";
+                            }
+                        } else if (strcmp(&rx_buffer[10], "full") == 0) {
+                            if (gps_full_reset(gps) == -1) {
+                                ESP_LOGE(TAG, "GPS sensor full reset failed");
+                                response = "ERR\n";
+                            }
+                        } else {
+                            ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
+                            response = "ERR\n";
+                        }
+                    } else {
+                        ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
+                        response = "ERR\n";
+                    }
                 } else if (strncmp(rx_buffer, "auto ", 5) == 0) {
                     // Set auto configs
                     if (strncmp(&rx_buffer[5], "con ", 4) == 0) {
@@ -470,11 +491,11 @@ void tcp_server_publish_values()
         year, month, day, hour, min, sec);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     if (gps_update) {
-        int len = sprintf(buf, "{id=%d,sat=%s,date=%lu,time=%lu,lat=%f,lng=%f,alt=%f,spd=%f,mode_3d=\"%c\",sats=%d,status=%d,pdop=%f,hdop=%f,vdop=%f}\n",
+        int len = sprintf(buf, "{id=%d,sat=%s,date=%lu,time=%lu,lat=%f,lng=%f,alt=%f,spd=%f,mode_3d=\"%c\",sats=%d,pdop=%f,hdop=%f,vdop=%f,status=%d,data_cnt=%d,error_cnt=%d}\n",
                 E_SENSOR_GPS,
                 gps_values.sat, (unsigned long)gps_values.date, (unsigned long)gps_values.time, gps_values.lat, gps_values.lng,
                 gps_values.altitude, gps_values.speed, gps_values.mode_3d, gps_values.sats,
-                gps_values.status, gps_values.pdop, gps_values.hdop, gps_values.vdop);
+                gps_values.pdop, gps_values.hdop, gps_values.vdop, gps_values.status, gps_values.data_cnt, gps_values.error_cnt);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (bmx280lo_update) {

@@ -10,6 +10,8 @@ static const char *TAG = "GPS";
 #define UART_BUFFER_SIZE 256
 
 //Power save modes
+const unsigned char ubxSoftReset[] = { 0x04,0x00,0x02, 0x00 }; // Soft Reset
+const unsigned char ubxFullReset[] = { 0x00,0x00,0x02, 0x00 }; // Full Reset
 const unsigned char ubxPSM[] = { 0x06,0x11,0x02,0x08,0x01 }; // Power Save Mode
 const unsigned char ubxEM[] =  { 0x06,0x11,0x02,0x08,0x04 }; // Eco Mode
 const unsigned char ubxMPM[] = { 0x06,0x11,0x02,0x08,0x00 }; // Max Performance Mode
@@ -260,7 +262,7 @@ void gps_cmd_zda(gps_sensor_t *sensor, char *p, char *end)
     zda->cnt++;
 }
 
-void rx_task_gps_sensor(void *arg)
+static void gps_sensor_task(void *arg)
 {
     gps_sensor_t *sensor = (gps_sensor_t *)arg;
     gps_rmc_t *rmc = &sensor->rmc;
@@ -274,6 +276,7 @@ void rx_task_gps_sensor(void *arg)
     char *buf = (char *)sensor->buffer;
     uint8_t offset = 0;
 
+    ESP_LOGI(TAG, "gps_sensor_task start");
     while (true) {
         const int rxBytes = uart_read_bytes(serial->uart_num, &buf[offset], UART_BUFFER_SIZE - offset, 100);
 
@@ -282,7 +285,8 @@ void rx_task_gps_sensor(void *arg)
             status->error_cnt++;
             continue; // UART error
         }
-        status->status++;
+        status->status = 0;
+        status->data_cnt++;
         if (sensor->debug & 16) {
             ESP_LOG_BUFFER_CHAR(sensor->name, buf, rxBytes);
         }
@@ -310,15 +314,10 @@ void rx_task_gps_sensor(void *arg)
         }
         while (end != NULL) {
             if (strncmp(p, "$G", 2) == 0) {
-                if (p[2] == 'P') {
-                    status->sat = "GPS";
-                } else if (p[2] == 'N') {
-                    status->sat = "GPS+GLN";
-                } else if (p[2] == 'L') {
-                    status->sat = "GLN";
-                } else {
-                    break;
-                }
+                if (p[2] == 'P') status->sat = "GPS";
+                else if (p[2] == 'N') status->sat = "GPS+GLN";
+                else if (p[2] == 'L') status->sat = "GLN";
+                else break;
             } else if (strncmp(p, "$BD", 3) == 0) {
                 status->sat = "BDU";
             } else {
@@ -352,7 +351,7 @@ void rx_task_gps_sensor(void *arg)
                     status->lng = rmc->lng;
                     status->ew = rmc->ew;
                     status->speed = rmc->speed * 1.852;
-                    status->status = 0;
+                    status->status |= 1;
                 }
             } else if (strncmp(p, "GLL,", 4) == 0) {
                 gps_cmd_gll(sensor, p + 4, end);
@@ -362,7 +361,7 @@ void rx_task_gps_sensor(void *arg)
                     status->ns = gll->ns;
                     status->lng = gll->lng;
                     status->ew = gll->ew;
-                    status->status = 0;
+                    status->status |= 2;
                 }
             } else if (strncmp(p, "GSA,", 4) == 0) {
                 gps_cmd_gsa(sensor, p + 4, end);
@@ -375,7 +374,7 @@ void rx_task_gps_sensor(void *arg)
                     }
                 }
                 status->mode_3d = gsa->mode_3d;
-                status->status = 0;
+                status->status |= 4;
             } else if (strncmp(p, "GSV,", 4) == 0) {
                 gps_cmd_gsv(sensor, p + 4, end);
             } else if (strncmp(p, "GGA,", 4) == 0) {
@@ -388,20 +387,20 @@ void rx_task_gps_sensor(void *arg)
                     status->ew = gga->ew;
                     status->sats = gga->sat_used;
                     status->altitude = gga->altitude;
-                    status->status = 0;
+                    status->status |= 8;
                 }
             } else if (strncmp(p, "VTG,", 4) == 0) {
                 gps_cmd_vtg(sensor, p + 4, end);
                 if (vtg->kmh_unit == 'K') {
                     status->speed = vtg->speed_kmh;
-                    status->status = 0;
+                    status->status |= 16;
                 }
             } else if (strncmp(p, "ZDA,", 4) == 0) {
                 gps_cmd_zda(sensor, p + 4, end);
                 if (zda->year > 24) {
                     status->date = (uint32_t)zda->year * 10000 + (uint32_t)zda->month * 100 + (uint32_t)zda->day;
                     status->time = (uint32_t)zda->time;
-                    status->status = 0;
+                    status->status |= 32;
                 }
             } else {
                 //ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, rxBytes, ESP_LOG_INFO);
@@ -466,7 +465,7 @@ esp_err_t gps_init(gps_sensor_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, 
 
     uart_init(gps_serial->uart_num, gps_serial->rx_pin, gps_serial->tx_pin);
 
-    xTaskCreate(rx_task_gps_sensor, "rx_task_gps_sensor", 4096, sensor, configMAX_PRIORITIES - 1, NULL);
+    xTaskCreate(gps_sensor_task, "gps_sensor_task", 4096, sensor, configMAX_PRIORITIES - 1, NULL);
 
     ESP_LOGI(TAG, "GPS initialized");
     return ESP_OK;
@@ -490,6 +489,16 @@ int gps_set_power_mode(gps_sensor_t *sensor, uint8_t mode)
     buf[sizeof(ubxPSM) + 2] = a;
     buf[sizeof(ubxPSM) + 3] = b;
     return uart_write_bytes(sensor->serial->uart_num, buf, sizeof(buf));
+}
+
+int gps_soft_reset(gps_sensor_t *sensor)
+{
+    return uart_write_bytes(sensor->serial->uart_num, ubxSoftReset, sizeof(ubxSoftReset));
+}
+
+int gps_full_reset(gps_sensor_t *sensor)
+{
+    return uart_write_bytes(sensor->serial->uart_num, ubxFullReset, sizeof(ubxFullReset));
 }
 
 int gps_power_off(gps_sensor_t *sensor)

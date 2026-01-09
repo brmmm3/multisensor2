@@ -46,6 +46,9 @@ typedef struct ui_s {
     lv_obj_t *lbl_gps_pdop;
     lv_obj_t *lbl_gps_hdop;
     lv_obj_t *lbl_gps_vdop;
+    lv_obj_t *lbl_gps_status;
+    lv_obj_t *lbl_gps_data_cnt;
+    lv_obj_t *lbl_gps_error_cnt;
     // Tab WiFi
     lv_obj_t *tab_wifi;
     lv_obj_t *sw_wifi_enable;

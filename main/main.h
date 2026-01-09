@@ -101,10 +101,12 @@ typedef struct gps_values_s {
     float speed;
     uint8_t mode_3d;
     uint8_t sats;
-    uint8_t status;
     float pdop;         // Position dilution of precision (PDOP), typically 1 or 2 dp
     float hdop;         // Horizontal dilution of precision (HDOP), typically 1 or 2 dp
     float vdop;         // Vertical dilution of precision (VDOP), typically 1 or 2 dp
+    uint8_t status;
+    uint8_t data_cnt;
+    uint8_t error_cnt;
 } gps_values_t;
 
 typedef struct scd4x_cal_values_s {

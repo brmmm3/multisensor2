@@ -294,10 +294,12 @@ static bool update_gps()
         gps_values.speed = gps->status.speed;
         gps_values.mode_3d = gps->status.mode_3d;
         gps_values.sats = gps->status.sats;
-        gps_values.status = gps->status.status;
         gps_values.pdop = gps->gsa.pdop;
         gps_values.hdop = gps->gsa.hdop;
         gps_values.vdop = gps->gsa.vdop;
+        gps_values.status = gps->status.status;
+        gps_values.data_cnt = gps->status.data_cnt;
+        gps_values.error_cnt = gps->status.error_cnt;
         if (force_update || memcmp(&last_values.gps, &gps_values, sizeof(sensors_data_gps_t)) != 0) {
             memcpy(&last_values.gps, &gps_values, sizeof(sensors_data_gps_t));
             return true;
@@ -480,13 +482,16 @@ static bool update_qmc5883l()
 
 static void update_gps_status()
 {
-    if (gps_values.date == 0 || gps_values.lat == 0 || gps_values.altitude == 0) {
+    if (gps_status->old_data_cnt == gps_status->data_cnt) {
+        ui_set_tab_color(2, LV_PALETTE_GREY);
+    } else if (gps_values.date == 0 || gps_values.lat == 0 || gps_values.altitude == 0) {
         ui_set_tab_color(2, LV_PALETTE_RED);
     } else if (gps_values.sats < 4) {
         ui_set_tab_color(2, LV_PALETTE_YELLOW);
     } else {
         ui_set_tab_color(2, LV_PALETTE_GREEN);
     }
+    gps_status->old_data_cnt = gps_status->data_cnt;
     ui_set_dop_value(ui->lbl_gps_pdop, gps_values.pdop);
     ui_set_dop_value(ui->lbl_gps_hdop, gps_values.hdop);
     ui_set_dop_value(ui->lbl_gps_vdop, gps_values.vdop);
@@ -546,10 +551,10 @@ static void sensors_recording()
     if (gps_update) {
         data_add(E_SENSOR_GPS, &last_values.gps, sizeof(sensors_data_gps_t));
         if (log_values || (debug_main & 4) != 0) {
-            ESP_LOGI(TAG, "GPS: %s date=%lu time=%lu lat=%f %c lng=%f %c alt=%.1f spd=%.1f mode_3d=%c sats=%d st=%d pdop=%.1f hdop=%.1f vdop=%.1f",
+            ESP_LOGI(TAG, "GPS: %s date=%lu time=%lu lat=%f %c lng=%f %c alt=%.1f spd=%.1f mode_3d=%c sats=%d pdop=%.1f hdop=%.1f vdop=%.1f st=%d dc=%d err=%d",
                     gps_values.sat, gps_values.date, gps_values.time, gps_values.lat, gps_values.ns, gps_values.lng,
                     gps_values.ew, gps_values.altitude, gps_values.speed, gps_values.mode_3d, gps_values.sats,
-                    gps_values.status, gps_values.pdop, gps_values.hdop, gps_values.vdop);
+                    gps_values.pdop, gps_values.hdop, gps_values.vdop, gps_values.status, gps_values.data_cnt, gps_values.error_cnt);
         }
     }
     if (bmx280lo_update) {
@@ -836,8 +841,8 @@ static void update_task(void *arg)
             size_t total_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
             size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
             int frag = 100 - (largest_block * 100 / (total_free + 1));
-            if (total_free < 10000 || (debug_main & 256) != 0) {
-                ESP_LOGI(TAG, "Heap: free=%u largest_block=%u frag=%d%%",
+            if (total_free < 10000 || frag > 50 || (debug_main & 256) != 0) {
+                ESP_LOGW(TAG, "Heap: free=%u largest_block=%u frag=%d%%",
                     total_free, largest_block, frag);
             }
             sprintf(buf, "%u B  frag=%d%%", total_free, frag);
