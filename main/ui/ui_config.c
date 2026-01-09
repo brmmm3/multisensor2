@@ -11,6 +11,7 @@
 #include <esp_err.h>
 #include <misc/lv_types.h>
 #include <esp_lvgl_port.h>
+#include "core/lv_obj_style_gen.h"
 #include "freertos/projdefs.h"
 #include "main.h"
 
@@ -18,8 +19,6 @@ static const char *TAG = "UIC";
 
 // 10MHz resolution, 1 tick = 0.1us (led strip needs a high resolution)
 #define LED_STRIP_RMT_RES_HZ  (10 * 1000 * 1000)
-
-static lv_style_t tab_styles[6];
 
 
 void ui_set_label_text(lv_obj_t *obj, const char *text)
@@ -45,10 +44,16 @@ void ui_set_switch_state(lv_obj_t *obj, bool enabled)
 void ui_set_text_color(lv_obj_t *obj, int color)
 {
     static lv_style_t style;
+    static bool style_init = false;
+
     if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return;
-    lv_style_init(&style);
+    if (!style_init) {
+        lv_style_init(&style);
+        style_init = true;
+    }
     //lv_style_set_text_opa(&style, LV_OPA_COVER);
     lv_style_set_text_color(&style, lv_palette_main(color));  // Any color
+    //lv_obj_remove_style(obj, &style, 0);
     lv_obj_add_style(obj, &style, 0);
     lvgl_port_unlock();
 }
@@ -65,10 +70,15 @@ esp_err_t ui_set_current_tab(uint32_t tab_num)
 
 void ui_set_tab_color(int index, int color)
 {
+    static lv_style_t tab_styles[6];
+    static bool tab_styles_init[6] = {false};
     lv_style_t *style = &tab_styles[index];
 
     if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return;
-    lv_style_init(style);
+    if (!tab_styles_init[index]) {
+        lv_style_init(style);
+        tab_styles_init[index] = true;
+    }
     //lv_style_set_text_opa(&style, LV_OPA_COVER);
     lv_style_set_text_color(style, lv_palette_main(color));  // Any color
     lv_obj_t *tab_bar = lv_tabview_get_tab_bar(ui->tbv_main);

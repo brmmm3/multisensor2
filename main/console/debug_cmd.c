@@ -1,4 +1,5 @@
 
+#include "gps.h"
 #include "main.h"
 
 #include "include/debug_cmd.h"
@@ -66,6 +67,12 @@ int process_debug_main_cmd(int argc, char **argv)
     }
     if (debug_main_cmd_args.value->count == 1) {
         debug_main = debug_main_cmd_args.value->ival[0];
+        lv_timer_enable((debug_main & 0x1000) == 0);
+        if ((debug_main & 0x2000) != 0) {
+            gps_stop_sensor(&gps);
+        } else if (gps == NULL) {
+            gps_init_sensor(&gps);
+        }
     } else {
         ESP_LOGE(TAG, "no valid arguments");
         return 1;

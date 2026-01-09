@@ -271,8 +271,6 @@ void sensors_init()
     ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_init(&scd4x, bus_handle));
     // This will never fail here
     yys_init(&yys_sensor, YYS_PIN_NUM_RX, YYS_PIN_NUM_TX);
-    //ESP_ERROR_CHECK_WITHOUT_ABORT(tlv493_init(&tlv493, bus_handle));
-    //ESP_LOGI("TLV493D", "ChipId = %d", tlv493->device_id);
     ESP_ERROR_CHECK_WITHOUT_ABORT(sps30_init(&sps30, bus_handle));
     ESP_ERROR_CHECK_WITHOUT_ABORT(adxl345_init(&adxl345, bus_handle));
     ESP_ERROR_CHECK_WITHOUT_ABORT(qmc5883l_init(&qmc5883l, bus_handle));
@@ -310,7 +308,7 @@ static bool update_gps()
 
 static bool update_bmx280(int num, bmx280_t **sensor, sensors_data_bmx280_t *last_values)
 {
-    if (sensor == NULL) {
+    if (sensor == NULL && (debug_main & 0x2000) == 0) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(bmx280_init(sensor, bus_handle, num != 0));
         if (*sensor == NULL) return false;
     }
@@ -346,7 +344,7 @@ static bool update_scd4x()
 {
     esp_err_t err;
 
-    if (scd4x == NULL) {
+    if (scd4x == NULL && (debug_main & 0x2000) == 0) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_init(&scd4x, bus_handle));
         if (scd4x == NULL) return false;
     }
@@ -398,7 +396,7 @@ static bool update_yys()
 
 static bool update_sps30()
 {
-    if (sps30 == NULL) {
+    if (sps30 == NULL && (debug_main & 0x2000) == 0) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(sps30_init(&sps30, bus_handle));
         if (sps30 == NULL) return false;
     }
@@ -440,7 +438,7 @@ static bool update_adxl345()
 {
     esp_err_t err;
 
-    if (adxl345 == NULL) {
+    if (adxl345 == NULL && (debug_main & 0x2000) == 0) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(adxl345_init(&adxl345, bus_handle));
         if (adxl345 == NULL) return false;
     }
@@ -462,7 +460,7 @@ static bool update_qmc5883l()
 {
     esp_err_t err;
 
-    if (qmc5883l == NULL) {
+    if (qmc5883l == NULL && (debug_main & 0x2000) == 0) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(qmc5883l_init(&qmc5883l, bus_handle));
         if (qmc5883l == NULL) return false;
     }
@@ -482,6 +480,7 @@ static bool update_qmc5883l()
 
 static void update_gps_status()
 {
+    if (gps_status == NULL) return;
     if (gps_status->old_data_cnt == gps_status->data_cnt) {
         ui_set_tab_color(2, LV_PALETTE_GREY);
     } else if (gps_values.date == 0 || gps_values.lat == 0 || gps_values.altitude == 0) {
@@ -753,12 +752,16 @@ static void update_task(void *arg)
         if (loop_cnt++ > 0 && !status.recording && config->auto_record) {
             ui_sd_record_set_value(true);
         }
-        sensors_update();
-        scd4x_state_machine(scd4x);
-        if (status.recording) {
-            sensors_recording();
+        if ((debug_main & 0x200) == 0) {
+            sensors_update();
+            scd4x_state_machine(scd4x);
+            if (status.recording) {
+                sensors_recording();
+            }
         }
-        ui_update(status.force_update);
+        if ((debug_main & 0x400) == 0) {
+            ui_update(status.force_update);
+        }
         status.force_update = false;
 
         if (wifi_connected) {
@@ -819,23 +822,27 @@ static void update_task(void *arg)
                 ui_set_tab_color(4, LV_PALETTE_RED);
             }
         } else {
-            // Update SD-Card tab
-            float fill_level = 100.0 * (float) status.record_pos / (float)DATA_MAX_SIZE;
-            sprintf(buf, "%.1f %%", fill_level);
-            ui_set_label_text(ui->lbl_sd_fill, buf);
-            // Update Cfg tab
-            ui_set_time_value(ui->lbl_time, &now);
-            ui_set_duration_value(ui->lbl_uptime, (uint32_t)(now - status.start_time));
-            // Free HEAP
-            size_t total_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-            size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-            int frag = 100 - (largest_block * 100 / (total_free + 1));
-            if (total_free < 10000 || frag > 50 || (debug_main & 256) != 0) {
-                ESP_LOGW(TAG, "Heap: free=%u largest_block=%u frag=%d%%",
-                    total_free, largest_block, frag);
+            if ((debug_main & 0x800) == 0) {
+                // Update SD-Card tab
+                float fill_level = 100.0 * (float) status.record_pos / (float)DATA_MAX_SIZE;
+                sprintf(buf, "%.1f %%", fill_level);
+                ui_set_label_text(ui->lbl_sd_fill, buf);
+                // Update Cfg tab
+                ui_set_time_value(ui->lbl_time, &now);
+                ui_set_duration_value(ui->lbl_uptime, (uint32_t)(now - status.start_time));
             }
-            sprintf(buf, "%u B  frag=%d%%", total_free, frag);
-            ui_set_label_text(ui->lbl_heap, buf);
+                // Free HEAP
+                size_t total_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+                size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+                int frag = 100 - (largest_block * 100 / (total_free + 1));
+                if (total_free < 10000 || frag > 50 || (debug_main & 0x100) != 0) {
+                    ESP_LOGW(TAG, "Heap: free=%u largest_block=%u frag=%d%%",
+                        total_free, largest_block, frag);
+                }
+            if ((debug_main & 0x800) == 0) {
+                sprintf(buf, "%u B  frag=%d%%", total_free, frag);
+                ui_set_label_text(ui->lbl_heap, buf);
+            }
             // Wait up to 1s
             for (int i = 0; i < 10; i++) {
                 if (status.force_update) break;
@@ -853,7 +860,7 @@ static void update_task(void *arg)
         sps30_update = false;
         adxl345_update = false;
         qmc5883l_update = false;
-        gps_status->status = 0;
+        if (gps_status != NULL) gps_status->status = 0;
     }
 }
 

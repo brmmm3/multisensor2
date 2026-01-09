@@ -146,6 +146,7 @@ static void tcp_server_task(void *pvParameters)
     listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
     if (listen_sock < 0) {
         ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+        tcp_server_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
@@ -159,6 +160,7 @@ static void tcp_server_task(void *pvParameters)
     if (err < 0) {
         ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
         close(listen_sock);
+        tcp_server_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
@@ -168,6 +170,7 @@ static void tcp_server_task(void *pvParameters)
     if (err < 0) {
         ESP_LOGE(TAG, "Error listening: errno %d", errno);
         close(listen_sock);
+        tcp_server_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }

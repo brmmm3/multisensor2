@@ -166,7 +166,11 @@ typedef struct gps_sensor_s {
     uint8_t debug;
 } gps_sensor_t;
 
+esp_err_t gps_init_sensor(gps_sensor_t **sensor_ptr);
+
 esp_err_t gps_init(gps_sensor_t **sensor, uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin);
+
+void gps_stop_sensor(gps_sensor_t **sensor_ptr);
 
 bool gps_data_ready(gps_sensor_t *sensor);
 

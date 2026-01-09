@@ -160,11 +160,13 @@ static void rx_task_mhz19_sensor(void *arg)
 
 uint8_t mhz19_pending(mhz19_t *sensor)
 {
+    if (sensor == NULL) return 0;
     return sensor->pending;
 }
 
 bool mhz19_data_ready(mhz19_t *sensor)
 {
+    if (sensor == NULL) return false;
     if (sensor->data_cnt > 0) {
         sensor->data_cnt = 0;
         return true;
@@ -174,6 +176,7 @@ bool mhz19_data_ready(mhz19_t *sensor)
 
 esp_err_t mhz19_set_auto_calibration(mhz19_t *sensor, bool auto_calib)
 {
+    if (sensor == NULL) return ESP_FAIL;
     uint8_t cmd[CMD_SIZE] = {MHZ19_SET_ABC, auto_calib ? 0xA0: 0x00, 0x00, 0x00, 0x00, 0x00};
     sensor->auto_calib = auto_calib;
     sensor->pending++;
@@ -183,6 +186,7 @@ esp_err_t mhz19_set_auto_calibration(mhz19_t *sensor, bool auto_calib)
 
 esp_err_t mhz19_get_auto_calibration(mhz19_t *sensor)
 {
+    if (sensor == NULL) return ESP_FAIL;
     sensor->pending++;
     if (xQueueSend(sensor->queue, &cmd_get_abc, 1)) return ESP_OK;
     return ESP_FAIL;
@@ -190,6 +194,7 @@ esp_err_t mhz19_get_auto_calibration(mhz19_t *sensor)
 
 esp_err_t mhz19_calibrate_zero(mhz19_t *sensor)
 {
+    if (sensor == NULL) return ESP_FAIL;
     sensor->pending++;
     if (xQueueSend(sensor->queue, &cmd_zero_calib, 1)) return ESP_OK;
     return ESP_FAIL;
@@ -206,6 +211,7 @@ esp_err_t mhz19_calibrate_span(mhz19_t *sensor, uint16_t ppm)
 
 enum MHZ19_RANGE mhz19_get_range(mhz19_t *sensor)
 {
+    if (sensor == NULL) return 0;
     sensor->pending++;
     if (!xQueueSend(sensor->queue, &cmd_get_range, 1)) return MHZ19_RANGE_INVALID;
     return sensor->range;
@@ -213,6 +219,7 @@ enum MHZ19_RANGE mhz19_get_range(mhz19_t *sensor)
 
 esp_err_t mhz19_set_range(mhz19_t *sensor, enum MHZ19_RANGE range)
 {
+    if (sensor == NULL) return ESP_FAIL;
     sensor->pending++;
     if (xQueueSend(sensor->queue, &cmd_set_range[range], 1)) return ESP_OK;
     return ESP_FAIL;

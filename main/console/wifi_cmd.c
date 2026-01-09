@@ -15,6 +15,7 @@
 
 #include "wifi/include/wifi.h"
 #include "include/wifi_cmd.h"
+#include "ui/include/ui_config.h"
 
 const static char *TAG = "WiFi";
 
@@ -38,7 +39,7 @@ static esp_err_t cmd_do_wifi_connect(const char *ssid, const char *password)
         ESP_LOGE(TAG, "Failed to set WIFI_MODE_STA. err(%d)=%s", err, strerror(err));
         return err;
     }
-    err = wifi_init(false);
+    err = ui_wifi_set_pwr_mode(true);
     ESP_LOGI(TAG, "WIFI_CONNECT_START, ret: 0x%x", err);
     return err;
 }
@@ -64,9 +65,10 @@ int process_wifi_cmd(int argc, char **argv)
         if (strcmp(cmd, "show") == 0) {
             cmd_do_wifi_show();
         } else if (strcmp(cmd, "init") == 0) {
-            wifi_init(true);
+            ESP_ERROR_CHECK_WITHOUT_ABORT(ui_wifi_set_pwr_mode(true));
         } else if (strcmp(cmd, "down") == 0) {
-            wifi_uninit();
+            config->auto_connect = 4;
+            ESP_ERROR_CHECK_WITHOUT_ABORT(ui_wifi_set_pwr_mode(false));
         } else if (strcmp(cmd, "scan") == 0) {
             wifi_scan();
         } else if (strcmp(cmd, "pwr") == 0) {
@@ -84,7 +86,7 @@ int process_wifi_cmd(int argc, char **argv)
             }
             uint8_t index = (uint8_t)wifi_cmd_args.auto_connect->ival[0];
             config->auto_connect = index;
-            wifi_init(false);
+            ESP_ERROR_CHECK_WITHOUT_ABORT(ui_wifi_set_pwr_mode(true));
         } else if (strcmp(cmd, "connect") == 0) {
             if (wifi_cmd_args.ssid->count < 1) {
                 ESP_LOGE(TAG, "SSID missing");

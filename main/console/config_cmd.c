@@ -29,13 +29,15 @@ int process_config_cmd(int argc, char **argv)
             ESP_LOGI(TAG, "cfg_version=%d", config->cfg_version);
             ESP_LOGI(TAG, "auto_connect=%d", config->auto_connect);
             ESP_LOGI(TAG, "auto_record=%d", config->auto_record);
+            ESP_LOGI(TAG, "tcp_auto_start=%d", config->tcp_auto_start);
+            ESP_LOGI(TAG, "ftp_auto_start=%d", config->ftp_auto_start);
             ESP_LOGI(TAG, "lcd_pwr=%d", config->lcd_pwr);
             ESP_LOGI(TAG, "gps_pwr=%d", config->gps_pwr);
             ESP_LOGI(TAG, "scd4x_pwr=%d", config->scd4x_pwr);
             ESP_LOGI(TAG, "wifi_pwr=%d", config->wifi_pwr);
             ESP_LOGI(TAG, "mode_pwr=%d", config->mode_pwr);
-            ESP_LOGI(TAG, "mqtt_broker=%s", config->mqtt_broker);
-            ESP_LOGI(TAG, "mqtt_auto_connect=%d", config->mqtt_auto_connect);
+            //ESP_LOGI(TAG, "mqtt_broker=%s", config->mqtt_broker);
+            //ESP_LOGI(TAG, "mqtt_auto_connect=%d", config->mqtt_auto_connect);
         } else {
             ESP_LOGE(TAG, "no valid arguments");
             return 1;

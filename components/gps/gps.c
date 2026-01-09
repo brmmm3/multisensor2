@@ -1,6 +1,7 @@
 #include <string.h>
 #include "driver/uart.h"
 #include "esp_log.h"
+#include "freertos/portable.h"
 
 #include "gps.h"
 
@@ -16,6 +17,10 @@ const unsigned char ubxPSM[] = { 0x06,0x11,0x02,0x08,0x01 }; // Power Save Mode
 const unsigned char ubxEM[] =  { 0x06,0x11,0x02,0x08,0x04 }; // Eco Mode
 const unsigned char ubxMPM[] = { 0x06,0x11,0x02,0x08,0x00 }; // Max Performance Mode
 const unsigned char ubxSleep[] = {0xB5, 0x62, 0x02, 0x41, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x4D, 0x3B}; // Sleep mode
+
+static hw_serial_t *gps_serial = NULL;
+
+static TaskHandle_t gps_sensor_task_handle = NULL;
 
 
 uint8_t nmea_get_checksum(const char *buf)
@@ -278,7 +283,9 @@ static void gps_sensor_task(void *arg)
 
     ESP_LOGI(TAG, "gps_sensor_task start");
     while (true) {
-        const int rxBytes = uart_read_bytes(serial->uart_num, &buf[offset], UART_BUFFER_SIZE - offset, 100);
+        vTaskDelay(pdMS_TO_TICKS(100));
+        continue;
+        const int rxBytes = uart_read_bytes(serial->uart_num, &buf[offset], UART_BUFFER_SIZE - offset, pdMS_TO_TICKS(100));
 
         if (rxBytes == 0) continue;
         if (rxBytes < 0) {
@@ -289,6 +296,7 @@ static void gps_sensor_task(void *arg)
         if (sensor->debug & 16) {
             ESP_LOG_BUFFER_CHAR(sensor->name, buf, rxBytes);
         }
+        continue;
         //ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, rxBytes, ESP_LOG_INFO);
 
         char *p = buf;
@@ -435,23 +443,30 @@ static void gps_sensor_task(void *arg)
 
 bool gps_data_ready(gps_sensor_t *sensor)
 {
+    if (sensor == NULL) return false;
     return sensor->status.status == 0;
 }
 
-esp_err_t gps_init(gps_sensor_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin)
+void gps_init_serial(uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin)
 {
-    hw_serial_t *gps_serial = pvPortMalloc(sizeof(hw_serial_t));
-    gps_sensor_t *sensor = pvPortMalloc(sizeof(gps_sensor_t));
-    memset(sensor, 0, sizeof(gps_sensor_t));
-
-    ESP_LOGI(TAG, "Initialize GPS");
    // Serial
+    ESP_LOGI(TAG, "Initialize UART for GPS");
+    gps_serial = pvPortMalloc(sizeof(hw_serial_t));
     gps_serial->uart_num = uart_num;
     gps_serial->rx_pin = rx_pin;
     gps_serial->tx_pin = tx_pin;
     gps_serial->baudrate = 9600;
     gps_serial->queue = xQueueCreate(128, 1);
+
+    uart_init(gps_serial->uart_num, gps_serial->rx_pin, gps_serial->tx_pin);
+}
+
+esp_err_t gps_init_sensor(gps_sensor_t **sensor_ptr)
+{
     // Sensor
+    ESP_LOGI(TAG, "Initialize GPS");
+    gps_sensor_t *sensor = pvPortMalloc(sizeof(gps_sensor_t));
+    memset(sensor, 0, sizeof(gps_sensor_t));
     sensor->name = "GPS";
     sensor->buffer = pvPortMalloc(UART_BUFFER_SIZE + 1);
     memset(sensor->buffer, 0, UART_BUFFER_SIZE + 1);
@@ -462,12 +477,28 @@ esp_err_t gps_init(gps_sensor_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, 
     sensor->status.sat = "?";
     *sensor_ptr = sensor;
 
-    uart_init(gps_serial->uart_num, gps_serial->rx_pin, gps_serial->tx_pin);
-
-    xTaskCreate(gps_sensor_task, "gps_sensor_task", 4096, sensor, configMAX_PRIORITIES - 1, NULL);
+    xTaskCreate(gps_sensor_task, "gps_sensor_task", 4096, sensor, configMAX_PRIORITIES - 1, &gps_sensor_task_handle);
 
     ESP_LOGI(TAG, "GPS initialized");
     return ESP_OK;
+}
+
+esp_err_t gps_init(gps_sensor_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin)
+{
+    gps_init_serial(uart_num, rx_pin, tx_pin);
+    return gps_init_sensor(sensor_ptr);
+}
+
+void gps_stop_sensor(gps_sensor_t **sensor_ptr)
+{
+    if (*sensor_ptr == NULL) return;
+    gps_power_off(*sensor_ptr);
+    if (gps_sensor_task_handle == NULL) return;
+    vTaskDelete(gps_sensor_task_handle);
+    gps_sensor_task_handle = NULL;
+    vPortFree((*sensor_ptr)->buffer);
+    vPortFree(*sensor_ptr);
+    *sensor_ptr = NULL;
 }
 
 int gps_set_power_mode(gps_sensor_t *sensor, uint8_t mode)
@@ -476,6 +507,7 @@ int gps_set_power_mode(gps_sensor_t *sensor, uint8_t mode)
     char buf[sizeof(ubxPSM) + 4];
 
     ESP_LOGI(TAG, "gps_set_power_mode %d", mode);
+    if (sensor == NULL) return -1;
     if (mode > 1) return gps_power_off(sensor);
     buf[0] = 0xB5;
     buf[1] = 0x62;
@@ -487,26 +519,31 @@ int gps_set_power_mode(gps_sensor_t *sensor, uint8_t mode)
     }
     buf[sizeof(ubxPSM) + 2] = a;
     buf[sizeof(ubxPSM) + 3] = b;
+    if (sensor->serial == NULL) return -1;
     return uart_write_bytes(sensor->serial->uart_num, buf, sizeof(buf));
 }
 
 int gps_soft_reset(gps_sensor_t *sensor)
 {
+    if (sensor == NULL || sensor->serial == NULL) return -1;
     return uart_write_bytes(sensor->serial->uart_num, ubxSoftReset, sizeof(ubxSoftReset));
 }
 
 int gps_full_reset(gps_sensor_t *sensor)
 {
+    if (sensor == NULL || sensor->serial == NULL) return -1;
     return uart_write_bytes(sensor->serial->uart_num, ubxFullReset, sizeof(ubxFullReset));
 }
 
 int gps_power_off(gps_sensor_t *sensor)
 {
+    if (sensor == NULL || sensor->serial == NULL) return -1;
     return uart_write_bytes(sensor->serial->uart_num, ubxSleep, sizeof(ubxSleep));
 }
 
 void gps_dump_values(gps_sensor_t *sensor, bool force)
 {
+    if (sensor == NULL) return;
     if (force || sensor->debug & 1) {
         gps_status_t *status = &sensor->status;
 

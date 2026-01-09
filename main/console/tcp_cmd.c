@@ -22,6 +22,7 @@ int process_tcp_cmd(int argc, char **argv)
         if (strcmp(cmd, "start") == 0) {
             tcp_server_start();
         } else if (strcmp(cmd, "stop") == 0) {
+            config->tcp_auto_start = false;
             tcp_server_stop();
         } else if (strcmp(cmd, "auto") == 0) {
             if (tcp_cmd_args.tcp_auto_start->count == 1) {
