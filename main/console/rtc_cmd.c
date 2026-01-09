@@ -36,10 +36,10 @@ int process_rtc_cmd(int argc, char **argv)
 
             ESP_ERROR_CHECK_WITHOUT_ABORT(rtc_get_datetime(rtc->rtc, &timeinfo));
             if (rtc_cmd_args.year->count == 1) {
-                timeinfo.tm_year = rtc_cmd_args.year->ival[0];
+                timeinfo.tm_year = rtc_cmd_args.year->ival[0] - 1900;
             }
             if (rtc_cmd_args.month->count == 1) {
-                timeinfo.tm_mon = rtc_cmd_args.month->ival[0];
+                timeinfo.tm_mon = rtc_cmd_args.month->ival[0] - 1;
             }
             if (rtc_cmd_args.day->count == 1) {
                 timeinfo.tm_mday = rtc_cmd_args.day->ival[0];

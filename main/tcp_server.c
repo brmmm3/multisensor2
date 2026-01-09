@@ -213,12 +213,16 @@ static void tcp_server_task(void *pvParameters)
                 char *response = "OK\n";
 
                 if (strcmp(rx_buffer, "bye") == 0) break;
-                if (strcmp(rx_buffer, "val 1") == 0) {
-                    tcp_send_values = true;
-                    update_all_cnt = 2;
-                    force_update_all = true;
-                } else if (strcmp(rx_buffer, "val 0") == 0) tcp_send_values = false;
-                else if (strcmp(rx_buffer, "ls") == 0) {
+                if (strncmp(rx_buffer, "val ", 4) == 0) {
+                    int value = atoi(&rx_buffer[4]);
+                    if (value == 0) {
+                        tcp_send_values = false;
+                    } else {
+                        tcp_send_values = true;
+                        force_update_all = true;
+                        if (value == 1) update_all_cnt = 2;
+                    }
+                } else if (strcmp(rx_buffer, "ls") == 0) {
                     // Show data files on SD-Card
                     if ((err = client_cmd_ls(client_sock)) != ESP_OK) {
                         response = "ERR\n";
@@ -339,7 +343,7 @@ static void tcp_server_task(void *pvParameters)
                     struct tm timeinfo;
                     rtc_get_datetime(rtc->rtc, &timeinfo);
                     int len = sprintf(rx_buffer, "%d.%02d.%02d %02d:%02d:%02d",
-                        1900 + timeinfo.tm_year, timeinfo.tm_mon, timeinfo.tm_mday,
+                        1900 + timeinfo.tm_year, timeinfo.tm_mon + 1, timeinfo.tm_mday,
                         timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                 } else if (strncmp(rx_buffer, "rtc ", 4) == 0) {
@@ -350,8 +354,8 @@ static void tcp_server_task(void *pvParameters)
                     } else {
                         struct tm timeinfo;
 
-                        timeinfo.tm_year = atoi(&rx_buffer[4]);
-                        timeinfo.tm_mon = atoi(&rx_buffer[7]);
+                        timeinfo.tm_year = atoi(&rx_buffer[4]) - 1900;
+                        timeinfo.tm_mon = atoi(&rx_buffer[7]) - 1;
                         timeinfo.tm_mday = atoi(&rx_buffer[10]);
                         timeinfo.tm_hour = atoi(&rx_buffer[13]);
                         timeinfo.tm_min = atoi(&rx_buffer[16]);
@@ -415,11 +419,15 @@ void tcp_server_publish_values()
         if (tcp_server_start() != ESP_OK) return;
     }
     if (tcp_server_task_handle == NULL) return;
-    if (!wifi_connected || !tcp_server_running) return;
+    if (!wifi_connected || !tcp_server_running || tcp_client_cnt == 0) return;
+    if (uxQueueMessagesWaiting(tx_queue) == 10) {
+        ESP_LOGW(TAG, "TX queue full");
+        return;
+    }
     // Send free mem
     int len = sprintf(buf, "{id=%d,heap=%u}\n", E_SENSOR_FREE, (unsigned int)esp_get_free_heap_size());
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
-    if (!tcp_send_values || tcp_client_cnt == 0) return;
+    if (!tcp_send_values) return;
     if (!gps_update && !bmx280lo_update && !bmx280hi_update && !mhz19_update && !scd4x_calibrate &&
         !scd4x_update && !yys_update && !sps30_update && !adxl345_update && !qmc5883l_update) {
         return;

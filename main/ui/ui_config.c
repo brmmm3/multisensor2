@@ -186,10 +186,11 @@ void ui_set_time_value(lv_obj_t *obj, time_t *time)
         return;
     }
 
-    char buf[30];
+    char buf[32];
     struct tm *t = localtime(time);
+    uint16_t year = t->tm_year + 1900;
 
-    sprintf(buf, "%d.%02d.%02d  %02d:%02d:%02d", 1900 + t->tm_year, t->tm_mon, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
+    sprintf(buf, "%d.%02d.%02d  %02d:%02d:%02d", year, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
     ui_set_label_text(obj, buf);
 }
 

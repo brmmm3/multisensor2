@@ -184,6 +184,10 @@ esp_err_t wifi_connect(const char *ssid, const char *password)
             setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1);
             tzset();
             sntp_obtain_time();
+            status.start_time = time(NULL);
+            if (status.save_time > 0 && status.save_time > status.start_time) {
+                status.save_time = 0;
+            }
         } else {
             ui_set_tab_color(3, LV_PALETTE_RED);
         }
