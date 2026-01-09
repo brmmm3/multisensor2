@@ -171,9 +171,11 @@ void ui_sd_record_set_value(bool enable)
         set_data_filename();
         ui_set_tab_color(4, LV_PALETTE_GREEN);
         ui_set_label_text(ui->lbl_sd_fill, "0.0 %");
+        ui_set_switch_state(ui->sw_record, true);
     } else {
         status.recording = false;
         ui_set_tab_color(4, LV_PALETTE_GREY);
+        ui_set_switch_state(ui->sw_record, false);
     }
 }
 
