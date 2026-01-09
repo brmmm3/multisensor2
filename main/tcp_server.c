@@ -465,7 +465,7 @@ void tcp_server_publish_values()
     uint8_t min;
     uint8_t sec;
     get_current_date_time(&year, &month, &day, &hour, &min, &sec);
-    len = sprintf(buf, "{id=%d,date=\"%d.%d.%d\",time=\"%d:%d:%d\"}\n",
+    int len = sprintf(buf, "{id=%d,date=\"%d.%d.%d\",time=\"%d:%d:%d\"}\n",
         E_SENSOR_TIME,
         year, month, day, hour, min, sec);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
