@@ -142,6 +142,9 @@ typedef struct sensors_data_s {
 
 typedef struct status_s {
     time_t start_time;
+    time_t save_time;
+    uint32_t startup_cnt;
+    uint32_t uptime_cnt;
     bool force_update;
     bool recording;
     uint16_t record_pos;
@@ -184,6 +187,8 @@ extern bool qmc5883l_update;
 extern uint32_t debug_main;
 
 extern bool force_update_all;
+
+esp_err_t set_sys_time(struct tm *timeinfo);
 
 void get_current_date_time(uint16_t *year, uint8_t *month, uint8_t *day, uint8_t *hour, uint8_t *min, uint8_t *sec);
 

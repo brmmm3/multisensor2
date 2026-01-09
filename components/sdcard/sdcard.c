@@ -29,13 +29,16 @@ static uint8_t sd_cs_pin = 0;
 esp_err_t write_text_file(const char *path, char *data)
 {
     ESP_LOGI(TAG, "Write text file %s", path);
+    lvgl_port_lock(0);
     FILE *f = fopen(path, "w");
     if (f == NULL) {
+        lvgl_port_unlock();
         ESP_LOGE(TAG, "Failed to open file for writing: %s (errno=%d)", strerror(errno), errno);
         return ESP_FAIL;
     }
     fwrite(data, strlen(data), 1, f);
     fclose(f);
+    lvgl_port_unlock();
     return ESP_OK;
 }
 
@@ -201,6 +204,7 @@ void list_dir(char *path)
     char p[80];
 
     if (dir == NULL) {
+        lvgl_port_unlock();
         ESP_LOGE(TAG, "Can't Open Dir.");
         return;
     }
@@ -270,12 +274,16 @@ esp_err_t sd_card_mount_fs()
 
     ESP_LOGI(TAG, "Mounting filesystem");
     // IMPORTANT WORKAROUND: Comment out "SDMMC_INIT_STEP(is_spi, sdmmc_init_spi_crc);" in sdmmc_init.c
+    lvgl_port_lock(0);
     esp_err_t err = esp_vfs_fat_sdspi_mount(MOUNT_POINT, &sd_card_host, &slot_config, &mount_config, &sd_card);
+    lvgl_port_unlock();
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Filesystem mounted");
         // Card has been initialized, print its properties
+        lvgl_port_lock(0);
         sdmmc_card_print_info(stdout, sd_card);
         sd_get_fat_info();
+        lvgl_port_unlock();
     } else {
         if (err == ESP_FAIL) {
             ESP_LOGE(TAG, "Failed to mount filesystem. "

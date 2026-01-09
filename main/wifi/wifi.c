@@ -243,9 +243,9 @@ esp_err_t wifi_init(bool scan)
 void wifi_uninit()
 {
     ESP_LOGI(TAG, "Uninitialize WiFi");
-    if (connect_task_handle != NULL) {
-        vTaskDelete(connect_task_handle);
-    }
+    if (connect_task_handle == NULL) return;
+    vTaskDelete(connect_task_handle);
+    connect_task_handle = NULL;
     wifi_deinit_sta();
     ui_set_tab_color(3, LV_PALETTE_GREY);
     ui_set_switch_state(ui->sw_wifi_enable, false);

@@ -43,6 +43,9 @@ typedef struct ui_s {
     lv_obj_t *lbl_gps_alt;
     lv_obj_t *lbl_gps_speed;
     lv_obj_t *lbl_gps_sats;
+    lv_obj_t *lbl_gps_pdop;
+    lv_obj_t *lbl_gps_hdop;
+    lv_obj_t *lbl_gps_vdop;
     // Tab WiFi
     lv_obj_t *tab_wifi;
     lv_obj_t *sw_wifi_enable;
@@ -61,6 +64,10 @@ typedef struct ui_s {
     lv_obj_t *lbl_sd_fill;
     // Tab Config
     lv_obj_t *tab_cfg;
+    lv_obj_t *lbl_time;
+    lv_obj_t *lbl_uptime;
+    lv_obj_t *lbl_savetime;
+    lv_obj_t *lbl_startup_cnt;
     lv_obj_t *lbl_adxl345;
     lv_obj_t *lbl_qmc5883L;
     lv_obj_t *sl_lcd_pwr;

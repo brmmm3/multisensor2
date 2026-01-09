@@ -42,6 +42,12 @@ esp_err_t ui_mode_set_pwr_mode(uint8_t mode);
 
 void ui_sd_record_set_value(bool enable);
 
+void ui_set_time_value(lv_obj_t *obj, time_t *time);
+
+void ui_set_duration_value(lv_obj_t *obj, uint32_t duration);
+
+void ui_set_dop_value(lv_obj_t *obj, float dop);
+
 void ui_register_callbacks(ui_t *ui);
 
 #ifdef __cplusplus

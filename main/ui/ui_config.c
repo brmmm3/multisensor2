@@ -177,6 +177,47 @@ void ui_sd_record_set_value(bool enable)
     }
 }
 
+void ui_set_time_value(lv_obj_t *obj, time_t *time)
+{
+    if (*time == 0) {
+        ui_set_label_text(obj, "-");
+        return;
+    }
+
+    char buf[30];
+    struct tm *t = localtime(time);
+
+    sprintf(buf, "%d.%02d.%02d  %02d:%02d:%02d", 1900 + t->tm_year, t->tm_mon, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
+    ui_set_label_text(obj, buf);
+}
+
+void ui_set_duration_value(lv_obj_t *obj, uint32_t duration)
+{
+    char buf[25];
+    uint8_t secs = duration % 60;
+    duration /= 60;
+    uint8_t mins = duration % 60;
+    duration /= 60;
+    uint8_t hours = duration % 24;
+    duration /= 24;
+
+    sprintf(buf, "%lu days  %02d:%02d:%02d", (unsigned long)duration, hours, mins, secs);
+    ui_set_label_text(obj, buf);
+}
+
+void ui_set_dop_value(lv_obj_t *obj, float dop)
+{
+    char buf[20];
+    const char *quality = "POOR";
+
+    if (dop < 2) quality = "EXCELLENT";
+    else if (dop < 6) quality = "GOOD";
+    else if (dop < 11) quality = "MODERATE";
+    else if (dop < 21) quality = "FAIR";
+    sprintf(buf, "%.1f  %s", dop, quality);
+    ui_set_label_text(obj, buf);
+}
+
 static void sw_sd_record_cb(lv_event_t *e)
 {
     lv_obj_t *obj = lv_event_get_target(e);

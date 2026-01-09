@@ -339,7 +339,7 @@ static void tcp_server_task(void *pvParameters)
                     struct tm timeinfo;
                     rtc_get_datetime(rtc->rtc, &timeinfo);
                     int len = sprintf(rx_buffer, "%d.%02d.%02d %02d:%02d:%02d",
-                        timeinfo.tm_year, timeinfo.tm_mon, timeinfo.tm_mday,
+                        1900 + timeinfo.tm_year, timeinfo.tm_mon, timeinfo.tm_mday,
                         timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                 } else if (strncmp(rx_buffer, "rtc ", 4) == 0) {
@@ -356,8 +356,8 @@ static void tcp_server_task(void *pvParameters)
                         timeinfo.tm_hour = atoi(&rx_buffer[13]);
                         timeinfo.tm_min = atoi(&rx_buffer[16]);
                         timeinfo.tm_sec = atoi(&rx_buffer[19]);
-                        if ((err = rtc_set_datetime(rtc->rtc, &timeinfo)) != ESP_OK) {
-                            ESP_LOGE(TAG, "Failed to set RTC date/time: err=%d", err);
+                        if ((err = set_sys_time(&timeinfo)) != ESP_OK) {
+                            ESP_LOGE(TAG, "Failed to set system date/time: err=%d", err);
                             response = "ERR\n";
                         }
                     }

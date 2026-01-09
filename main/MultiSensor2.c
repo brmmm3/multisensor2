@@ -19,6 +19,7 @@
 
 #include "esp_task_wdt.h"
 #include "console/include/console.h"
+#include <sys/time.h>
 
 static const char *TAG = "MS2";
 
@@ -87,6 +88,11 @@ static const char *TAG = "MS2";
 #define DATA_HEADER_VERSION 1
 #define DATA_MAX_SIZE       65000
 
+typedef struct startup_cnt_s {
+    uint32_t startup_cnt;
+    uint32_t uptime_cnt;
+} startup_cnt_t;
+
 wdt_hal_context_t rtc_wdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
 i2c_master_bus_handle_t bus_handle;
 int spi_host_id;
@@ -154,7 +160,7 @@ void get_current_date_time(uint16_t *year, uint8_t *month, uint8_t *day, uint8_t
         *hour = (uint8_t)_hour;
     } else {
         // Fallback is RTC
-        ESP_LOGW(TAG, "No GPS date/time -> fallback to RTC");
+        ESP_LOGD(TAG, "No GPS date/time -> fallback to RTC");
         struct tm t;
         rtc_get_datetime(rtc->rtc, &t);
         *year = t.tm_year;
@@ -472,6 +478,20 @@ static bool update_qmc5883l()
     return false;
 }
 
+static void update_gps_status()
+{
+    if (gps_values.date == 0 || gps_values.lat == 0 || gps_values.altitude == 0) {
+        ui_set_tab_color(2, LV_PALETTE_RED);
+    } else if (gps_values.sats < 4) {
+        ui_set_tab_color(2, LV_PALETTE_YELLOW);
+    } else {
+        ui_set_tab_color(2, LV_PALETTE_GREEN);
+    }
+    ui_set_dop_value(ui->lbl_gps_pdop, gps_values.pdop);
+    ui_set_dop_value(ui->lbl_gps_hdop, gps_values.hdop);
+    ui_set_dop_value(ui->lbl_gps_vdop, gps_values.vdop);
+}
+
 static void sensors_update()
 {
     // Update/Read data
@@ -616,6 +636,28 @@ static void sensors_recording()
     }
 }
 
+void show_starup_cnt()
+{
+    char buf[8];
+
+    sprintf(buf, "%lu", (unsigned long)status.startup_cnt);
+    ui_set_label_text(ui->lbl_startup_cnt, buf);
+}
+
+esp_err_t update_startup_cnt(uint32_t startup_cnt_inc, uint32_t uptime_cnt_inc)
+{
+    char *path = MOUNT_POINT"/startup.cnt";
+    startup_cnt_t cnt;
+
+    read_bin_file(path, &cnt, sizeof(cnt));
+    cnt.startup_cnt += startup_cnt_inc;
+    cnt.uptime_cnt += uptime_cnt_inc;
+    status.startup_cnt = cnt.startup_cnt;
+    status.uptime_cnt = cnt.uptime_cnt;
+    ESP_LOGI(TAG, "startup_cnt=%d  uptime_cnt=%d", cnt.startup_cnt, cnt.uptime_cnt);
+    return write_bin_file(path, &cnt, sizeof(cnt));
+}
+
 void set_data_filename()
 {
     uint16_t year;
@@ -636,6 +678,25 @@ uint32_t calculate_crc32(const uint8_t *data, size_t len)
     return esp_rom_crc32_le(0xFFFFFFFF, data, len) ^ 0xFFFFFFFF;
 }
 
+
+esp_err_t set_sys_time(struct tm *timeinfo)
+{
+    time_t utc_time = mktime(timeinfo);
+    if (utc_time == -1) {
+        ESP_LOGE(TAG, "mktime failed");
+        return ESP_FAIL;
+    }
+
+    // Set system time
+    struct timeval tv;
+    tv.tv_sec = utc_time;
+    tv.tv_usec = 0;
+    if (settimeofday(&tv, NULL) != 0) {
+        ESP_LOGE(TAG, "settimeofday failed");
+        return ESP_FAIL;
+    }
+    return rtc_set_datetime(rtc->rtc, timeinfo);
+}
 
 static void update_task(void *arg)
 {
@@ -700,6 +761,12 @@ static void update_task(void *arg)
 
         esp_task_wdt_reset();
 
+        // Show system time
+        time_t now = time(NULL);
+        ui_set_time_value(ui->lbl_time, &now);
+
+        update_gps_status();
+
         if (status.record_pos > DATA_MAX_SIZE) {
             // Write end marker and checksum
             data[status.record_pos++] = DATA_HEADER_ID1;
@@ -723,10 +790,19 @@ static void update_task(void *arg)
                 ui_sd_record_set_value(false);
                 ui_set_tab_color(4, LV_PALETTE_RED);
             }
+            if (status.save_time == 0) {
+                ESP_ERROR_CHECK_WITHOUT_ABORT(update_startup_cnt(0, 1));
+            }
+            status.save_time = now;
+            ui_set_time_value(ui->lbl_savetime, &status.save_time);
         } else {
+            // Update SD-Card tab
             float fill_level = 100.0 * (float) status.record_pos / (float)DATA_MAX_SIZE;
             sprintf(buf, "%.1f %%", fill_level);
             ui_set_label_text(ui->lbl_sd_fill, buf);
+            // Update Cfg tab
+            ui_set_duration_value(ui->lbl_uptime, (uint32_t)(now - status.start_time));
+            // Wait up to 1s
             for (int i = 0; i < 10; i++) {
                 if (status.force_update) break;
                 vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -746,17 +822,6 @@ void dump_values(bool force)
     if (sps30 != NULL) sps30_dump_values(sps30, force);
     if (qmc5883l != NULL) qmc5883l_dump_values(qmc5883l, force);
     if (adxl345 != NULL) adxl345_dump_values(adxl345, force);
-}
-
-esp_err_t update_startup_counter()
-{
-    char *path = MOUNT_POINT"/startup.cnt";
-    uint32_t cnt = 0;
-
-    read_bin_file(path, &cnt, sizeof(cnt));
-    cnt++;
-    ESP_LOGI(TAG, "Startup counter %d", cnt);
-    return write_bin_file(path, &cnt, sizeof(cnt));
 }
 
 void app_main(void)
@@ -783,12 +848,14 @@ void app_main(void)
     spi_host_id = sd_card_init(SDCARD_PIN_NUM_CS, SPI_PIN_NUM_SCLK, SPI_PIN_NUM_MOSI, SPI_PIN_NUM_MISO);
 
     config_read();
-    update_startup_counter();
 
     // LCD (SPI Mode)
     lcd = lcd_init(spi_host_id, LCD_PIN_NUM_CS, LCD_PIN_NUM_DC, LCD_PIN_NUM_RST, LCD_PIN_NUM_LED, LCD_PIN_NUM_T_CS);
     ui = ui_init(lcd);
     ui_register_callbacks(ui);
+
+    ESP_ERROR_CHECK_WITHOUT_ABORT(update_startup_cnt(1, 0));
+    show_starup_cnt();
 
     led_init();
     sensors_init();

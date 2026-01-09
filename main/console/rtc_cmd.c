@@ -29,7 +29,7 @@ int process_rtc_cmd(int argc, char **argv)
 
             ESP_ERROR_CHECK_WITHOUT_ABORT(rtc_get_datetime(rtc->rtc, &timeinfo));
             ESP_LOGI(TAG, "%d.%02d.%02d %02d:%02d:%02d",
-                timeinfo.tm_year, timeinfo.tm_mon, timeinfo.tm_mday,
+                1900 + timeinfo.tm_year, timeinfo.tm_mon, timeinfo.tm_mday,
                 timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         } else if (strcmp(cmd, "set") == 0) {
             struct tm timeinfo;
@@ -53,7 +53,7 @@ int process_rtc_cmd(int argc, char **argv)
             if (rtc_cmd_args.second->count == 1) {
                 timeinfo.tm_sec = rtc_cmd_args.second->ival[0];
             }
-            ESP_ERROR_CHECK_WITHOUT_ABORT(rtc_set_datetime(rtc->rtc, &timeinfo));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(set_sys_time(&timeinfo));
         } else {
             ESP_LOGE(TAG, "no valid arguments");
             return 1;
