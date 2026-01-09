@@ -2,6 +2,7 @@
 #include "esp_rom_crc.h"
 #include "bmx280.h"
 #include "config.h"
+#include "freertos/portable.h"
 #include "ftp.h"
 #include "gps.h"
 #include "lcd.h"
@@ -659,12 +660,13 @@ esp_err_t update_startup_cnt(uint32_t startup_cnt_inc, uint32_t uptime_cnt_inc)
 
 esp_err_t update_save_time_file()
 {
-    uptime_record_t data[250] = {0};
+    uptime_record_t *data;
     uint32_t size = 250 * sizeof(uptime_record_t);
     uint16_t file_ext = (status.uptime_cnt / 250) % 1000;
     uint16_t pos = status.uptime_cnt % 250;
     char path[32];
 
+    data = pvPortMalloc(size);
     sprintf(path, "%s/uptime.%u", MOUNT_POINT, file_ext);
     read_bin_file(path, &data, size);
     if (data[pos].start_time != status.start_time) {
@@ -676,7 +678,9 @@ esp_err_t update_save_time_file()
         data[pos].start_time = status.start_time;
     }
     data[pos].save_time = status.save_time;
-    return write_bin_file(path, &data, size);
+    esp_err_t err = write_bin_file(path, &data, size);
+    vPortFree(data);
+    return err;
 }
 
 void set_data_filename()
