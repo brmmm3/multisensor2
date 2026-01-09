@@ -636,12 +636,12 @@ static void sensors_recording()
     }
 }
 
-void show_starup_cnt()
+void show_startup_uptime_cnt()
 {
-    char buf[8];
+    char buf[40];
 
-    sprintf(buf, "%lu", (unsigned long)status.startup_cnt);
-    ui_set_label_text(ui->lbl_startup_cnt, buf);
+    sprintf(buf, "startup=%u  uptime=%d", (unsigned int)status.startup_cnt, (unsigned int)status.uptime_cnt);
+    ui_set_label_text(ui->lbl_counter, buf);
 }
 
 esp_err_t update_startup_cnt(uint32_t startup_cnt_inc, uint32_t uptime_cnt_inc)
@@ -895,7 +895,7 @@ void app_main(void)
     ui_register_callbacks(ui);
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(update_startup_cnt(1, 0));
-    show_starup_cnt();
+    show_startup_uptime_cnt();
 
     led_init();
     sensors_init();

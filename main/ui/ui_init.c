@@ -304,7 +304,7 @@ lv_obj_t *add_page_cfg(ui_t *ui)
     ui->lbl_time = add_section_label(tab, 0, 30, 72, "Time");
     ui->lbl_savetime = add_section_label(tab, 30, 30, 72, "Save Time");
     ui->lbl_uptime = add_section_label(tab, 60, 30, 72, "Up Time");
-    ui->lbl_startup_cnt = add_section_label(tab, 90, 30, 72, "Strt Cnt");
+    ui->lbl_counter = add_section_label(tab, 90, 30, 72, "Counter");
     ui->lbl_heap = add_section_label(tab, 120, 30, 72, "Heap");
     ui->lbl_qmc5883L = add_section_label(tab, 150, 30, 72, "QMC5883L");
     ui->lbl_adxl345 = add_section_label(tab, 180, 30, 72, "ADXL345");
