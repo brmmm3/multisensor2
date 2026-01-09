@@ -667,18 +667,18 @@ esp_err_t update_save_time_file()
     char path[32];
 
     data = pvPortMalloc(size);
-    sprintf(path, "%s/uptime.%u", MOUNT_POINT, file_ext);
-    read_bin_file(path, &data, size);
+    sprintf(path, "%s/uptime.%03u", MOUNT_POINT, file_ext);
+    read_bin_file(path, data, size);
     if (data[pos].start_time != status.start_time) {
         if (data[pos].start_time == 0 && ++pos >= 250) {
             pos = 0;
             file_ext++;
-            sprintf(path, "%s/uptime.%u", MOUNT_POINT, file_ext);
+            sprintf(path, "%s/uptime.%03u", MOUNT_POINT, file_ext);
         }
         data[pos].start_time = status.start_time;
     }
     data[pos].save_time = status.save_time;
-    esp_err_t err = write_bin_file(path, &data, size);
+    esp_err_t err = write_bin_file(path, data, size);
     vPortFree(data);
     return err;
 }
@@ -832,11 +832,15 @@ static void update_task(void *arg)
             // Update Cfg tab
             ui_set_time_value(ui->lbl_time, &now);
             ui_set_duration_value(ui->lbl_uptime, (uint32_t)(now - status.start_time));
-            uint32_t free_heap = esp_get_free_heap_size();
-            if (free_heap < 10000) {
-                ESP_LOGW(TAG, "free_heap=%u", (unsigned int)free_heap);
+            // Free HEAP
+            size_t total_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+            size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+            int frag = 100 - (largest_block * 100 / (total_free + 1));
+            if (total_free < 10000 || (debug_main & 256) != 0) {
+                ESP_LOGI(TAG, "Heap: free=%u largest_block=%u frag=%d%%",
+                    total_free, largest_block, frag);
             }
-            sprintf(buf, "%u bytes free", (unsigned int)free_heap);
+            sprintf(buf, "%u B  frag=%d%%", total_free, frag);
             ui_set_label_text(ui->lbl_heap, buf);
             // Wait up to 1s
             for (int i = 0; i < 10; i++) {

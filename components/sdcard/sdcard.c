@@ -160,16 +160,21 @@ esp_err_t remove_data_file(const char *path)
     return ESP_OK;
 }
 
-DIR *sd_open_data_dir()
+DIR *sd_open_dir(char *path)
 {
-    char buf[32];
-
-    sprintf(buf, "%s/data", MOUNT_POINT);
-    ESP_LOGD(TAG, "sd_open_data_dir %s", buf);
+    ESP_LOGD(TAG, "sd_open_dir %s", path);
     if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return NULL;
-    DIR *dp = opendir(buf);
+    DIR *dp = opendir(path);
     lvgl_port_unlock();
     return dp;
+}
+
+DIR *sd_open_data_dir()
+{
+    char path[32];
+
+    sprintf(path, "%s/data", MOUNT_POINT);
+    return sd_open_dir(path);
 }
 
 int sd_read_dir(DIR *dir, char *buf, int maxlen)

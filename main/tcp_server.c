@@ -118,6 +118,22 @@ static esp_err_t client_cmd_ls(int client_sock)
     return ESP_OK;
 }
 
+static esp_err_t client_cmd_lsr(int client_sock)
+{
+    DIR *dir = sd_open_dir(MOUNT_POINT);
+    if (dir == NULL) {
+        ESP_LOGE(TAG, "Failed to open data dir");
+        return ESP_FAIL;
+    }
+    while (true) {
+        int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE);
+        if (len == 0) break;
+        send_data_to_client(client_sock, (uint8_t *)rx_buffer,len);
+    }
+    sd_closedir(dir);
+    return ESP_OK;
+}
+
 static void tcp_server_task(void *pvParameters)
 {
     char addr_str[128];
@@ -222,6 +238,11 @@ static void tcp_server_task(void *pvParameters)
                         force_update_all = true;
                         if (value == 1) update_all_cnt = 2;
                     }
+                } else if (strcmp(rx_buffer, "lsr") == 0) {
+                    // Show root files on SD-Card
+                    if ((err = client_cmd_lsr(client_sock)) != ESP_OK) {
+                        response = "ERR\n";
+                    }
                 } else if (strcmp(rx_buffer, "ls") == 0) {
                     // Show data files on SD-Card
                     if ((err = client_cmd_ls(client_sock)) != ESP_OK) {
@@ -263,8 +284,10 @@ static void tcp_server_task(void *pvParameters)
                     sd_fat_info_t *fat_info = sd_get_fat_info();
                     len = sprintf(rx_buffer, "fs: %" PRIu64 " MB\n", fat_info->bytes_free / (1024 * 1024));
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
-                    uint32_t free_heap = esp_get_free_heap_size();
-                    len = sprintf(rx_buffer, "heap: %.2f kB\n", (float)free_heap / 1024.0);
+                    size_t total_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+                    size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+                    len = sprintf(rx_buffer, "heap: free=%u largest_block=%u frag=%d%%\n",
+                        total_free, largest_block, 100 - (largest_block * 100 / (total_free + 1)));
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                     ESP_LOGI(TAG, "%s", rx_buffer);
                 } else if (strcmp(rx_buffer, "config") == 0) {

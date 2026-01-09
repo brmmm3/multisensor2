@@ -66,6 +66,8 @@ uint32_t read_data_file(const char *path, void *buf, uint32_t size);
 
 esp_err_t remove_data_file(const char *path);
 
+DIR *sd_open_dir(char *path);
+
 DIR *sd_open_data_dir();
 
 int sd_read_dir(DIR *dir, char *buf, int maxlen);
