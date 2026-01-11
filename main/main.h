@@ -187,6 +187,8 @@ void get_current_date_time(uint16_t *year, uint8_t *month, uint8_t *day, uint8_t
 
 void set_data_filename();
 
+void show_sd_card_info(int file_cnt);
+
 #ifdef __cplusplus
 };
 #endif

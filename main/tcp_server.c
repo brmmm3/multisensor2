@@ -327,18 +327,30 @@ static void tcp_server_task(void *pvParameters)
                         if ((err = send_all_data_files(client_sock, true)) != ESP_OK) {
                             ESP_LOGE(TAG, "Failed to send all data files");
                             response = "ERR\n";
+                        } else {
+                            status.file_cnt = 0;
+                            show_sd_card_info(0);
                         }
                     } else if ((err = send_data_file_start(client_sock, &rx_buffer[3], true)) != ESP_OK) {
                         response = "ERR\n";
+                    } else if (status.file_cnt > 0) {
+                        status.file_cnt--;
+                        show_sd_card_info(status.file_cnt);
                     }
                 } else if (strncmp(rx_buffer, "rm ", 3) == 0) {
                     // Remove file on SD-Card. A path "*" removes all data files.
                     if (strcmp(&rx_buffer[3], "*") == 0) {
                         if ((err = remove_all_data_files()) != ESP_OK) {
                             response = "ERR\n";
+                        } else {
+                            status.file_cnt = 0;
+                            show_sd_card_info(0);
                         }
                     } else if ((err = remove_data_file(&rx_buffer[3])) != ESP_OK) {
                         response = "ERR\n";
+                    } else if (status.file_cnt > 0) {
+                        status.file_cnt--;
+                        show_sd_card_info(status.file_cnt);
                     }
                 } else if (strcmp(rx_buffer, "rec 1") == 0) {
                     ui_set_switch_state(ui->sw_record, true);

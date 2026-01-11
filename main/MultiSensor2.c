@@ -728,7 +728,7 @@ esp_err_t set_sys_time(struct tm *timeinfo, bool set_rtc_time)
     return rtc_set_datetime(rtc->rtc, timeinfo);
 }
 
-void show_sd_card_info()
+void show_sd_card_info(int file_cnt)
 {
     char buf[64];
     uint64_t bytes_total, bytes_free;
@@ -737,8 +737,11 @@ void show_sd_card_info()
     ui_set_label_text(ui->lbl_sd_card, buf);
     sprintf(buf, "%llu MB", bytes_free / (1024 * 1024));
     ui_set_label_text(ui->lbl_sd_free, buf);
-    status.file_cnt = sd_card_get_file_count(MOUNT_POINT"/data");
-    sprintf(buf, "%d data files", status.file_cnt);
+    if (file_cnt < 0) {
+        status.file_cnt = sd_card_get_file_count(MOUNT_POINT"/data");
+        file_cnt = status.file_cnt;
+    }
+    sprintf(buf, "%d data files", file_cnt);
     ui_set_label_text(ui->lbl_sd_files, buf);
 }
 
@@ -775,7 +778,7 @@ static void update_task(void *arg)
     esp_task_wdt_add(NULL);
     ESP_ERROR_CHECK_WITHOUT_ABORT(ensure_dir(MOUNT_POINT"/data"));
     ui_set_switch_state(ui->sw_auto_record, config->auto_record);
-    show_sd_card_info();
+    show_sd_card_info(-1);
 
     while (true) {
         if (loop_cnt++ > 0 && !status.recording && config->auto_record) {
@@ -839,7 +842,7 @@ static void update_task(void *arg)
                 // Try to mount FS if writing has failed and try again.
                 if ((err = sd_card_mount_fs()) == ESP_OK) {
                     ESP_ERROR_CHECK_WITHOUT_ABORT(ensure_dir(MOUNT_POINT"/data"));
-                    show_sd_card_info();
+                    show_sd_card_info(-1);
                     ui_sd_record_set_value(config->auto_record);
                 }
                 vTaskDelay(pdMS_TO_TICKS(100));
@@ -860,14 +863,14 @@ static void update_task(void *arg)
                 ui_set_time_value(ui->lbl_time, &now);
                 ui_set_duration_value(ui->lbl_uptime, (uint32_t)(now - status.start_time));
             }
-                // Free HEAP
-                size_t total_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-                size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-                int frag = 100 - (largest_block * 100 / (total_free + 1));
-                if (total_free < 10000 || frag > 50 || (debug_main & 0x100) != 0) {
-                    ESP_LOGW(TAG, "Heap: free=%u largest_block=%u frag=%d%%",
-                        total_free, largest_block, frag);
-                }
+            // Free HEAP
+            size_t total_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+            size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+            int frag = 100 - (largest_block * 100 / (total_free + 1));
+            if (total_free < 10000 || frag > 50 || (debug_main & 0x100) != 0) {
+                ESP_LOGW(TAG, "Heap: free=%u largest_block=%u frag=%d%%",
+                    total_free, largest_block, frag);
+            }
             if ((debug_main & 0x800) == 0) {
                 sprintf(buf, "%u B  frag=%d%%", total_free, frag);
                 ui_set_label_text(ui->lbl_heap, buf);
