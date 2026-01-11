@@ -840,6 +840,7 @@ static void update_task(void *arg)
                 if ((err = sd_card_mount_fs()) == ESP_OK) {
                     ESP_ERROR_CHECK_WITHOUT_ABORT(ensure_dir(MOUNT_POINT"/data"));
                     show_sd_card_info();
+                    ui_sd_record_set_value(config->auto_record);
                 }
                 vTaskDelay(pdMS_TO_TICKS(100));
             }
