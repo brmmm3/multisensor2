@@ -294,12 +294,18 @@ static void sw_sd_auto_record_cb(lv_event_t *e)
 }
 
 
+esp_err_t ui_lcd_set_tmp_lcd_pwr(uint8_t mode)
+{
+    status.lcd_pwr = mode;
+    return lcd_set_bk_pwr(mode);
+}
+
+
 static void sl_lcd_pwr_cb(lv_event_t *e)
 {
     lv_obj_t *obj = lv_event_get_target(e);
-    int32_t mode = lv_slider_get_value(obj);
 
-    lcd_set_bg_pwr(mode);
+    ui_lcd_set_tmp_lcd_pwr(lv_slider_get_value(obj));
 }
 
 
@@ -383,17 +389,6 @@ static void tabview_event_cb(lv_event_t *e)
 }
 
 
-static void screen_event_cb(lv_event_t *e)
-{
-    lv_event_code_t code = lv_event_get_code(e);
-
-    if (code == LV_EVENT_CLICKED) {
-        status.tap_time = time(NULL);
-        lcd_set_bg_pwr(0);
-    }
-}
-
-
 void ui_register_callbacks(ui_t *ui)
 {
     lv_obj_add_event_cb(ui->tbv_main, tabview_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
@@ -411,6 +406,4 @@ void ui_register_callbacks(ui_t *ui)
     lv_obj_add_event_cb(ui->btn_calibrate, btn_calibrate_pressed, LV_EVENT_CLICKED, NULL);
     lv_obj_add_event_cb(ui->btn_save_config, btn_save_config_pressed, LV_EVENT_CLICKED, NULL);
     lv_obj_add_event_cb(ui->sw_cfg_lock, sw_config_lock_cb, LV_EVENT_VALUE_CHANGED, NULL);
-    // Tap event
-    lv_obj_add_event_cb(lv_screen_active(), screen_event_cb, LV_EVENT_CLICKED, NULL);
 }

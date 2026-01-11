@@ -821,10 +821,16 @@ static void update_task(void *arg)
             ESP_LOGW(TAG, "start_time deviation more than 10 days. SYNC");
             status.start_time = now;
         }
-        // Switch OFF backlight after timeout if LCD Power is >0
-        if (config->lcd_pwr > 0 && status.tap_time > 0 && now - status.tap_time > 5) {
-            status.tap_time = 0;
-            lcd_set_bg_pwr(config->lcd_pwr);
+        // On tap temporarily set backlight to max
+        if (lcd_touch_time > 0) {
+            if (now - lcd_touch_time > 5) {
+                lcd_touch_time = 0;
+                if (config->lcd_pwr != status.lcd_pwr) {
+                    ui_lcd_set_tmp_lcd_pwr(config->lcd_pwr);
+                }
+            } else if (config->lcd_pwr > 0 && config->lcd_pwr == status.lcd_pwr) {
+                ui_lcd_set_tmp_lcd_pwr(0);
+            }
         }
 
         update_gps_status();

@@ -112,12 +112,12 @@ esp_err_t config_write(void)
 
 esp_err_t lcd_set_pwr_mode(uint8_t mode)
 {
-    esp_err_t err = lcd_set_bg_pwr(mode);
+    esp_err_t err = lcd_set_bk_pwr(mode);
 
-    if (err == ESP_OK) {
-        config->lcd_pwr = mode;
-    }
-    return err;
+    if (err != ESP_OK) return err;
+    config->lcd_pwr = mode;
+    status.lcd_pwr = mode;
+    return ESP_OK;
 }
 
 esp_err_t gps_set_pwr_mode(uint8_t mode)

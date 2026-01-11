@@ -43,7 +43,6 @@ gpio_config_t bk_gpio_config = {
 };
 uint8_t bk_led_pin = 0;
 
-
 typedef struct {
     esp_lcd_touch_handle_t  handle;     /* LCD touch IO handle */
     lv_indev_t              *indev;     /* LVGL input device driver */
@@ -53,6 +52,9 @@ typedef struct {
     } scale;                            /* Touch scale */
 } lvgl_port_touch_ctx_t;
 
+time_t lcd_touch_time = 0;
+
+
 static void lvgl_touch_cb(lv_indev_t *indev, lv_indev_data_t *data)
 {
     assert(indev);
@@ -60,6 +62,7 @@ static void lvgl_touch_cb(lv_indev_t *indev, lv_indev_data_t *data)
     assert(touch_ctx);
     assert(touch_ctx->handle);
 
+    static uint8_t old_touch_cnt = 0;
     uint8_t touch_cnt = 0;
     esp_lcd_touch_point_data_t touch_data[CONFIG_ESP_LCD_TOUCH_MAX_POINTS] = {0};
 
@@ -75,12 +78,15 @@ static void lvgl_touch_cb(lv_indev_t *indev, lv_indev_data_t *data)
         data->point.x = x < LCD_TOUCH_X_MIN ? 0 : (x - LCD_TOUCH_X_MIN) * LCD_H_RES / (LCD_TOUCH_X_MAX - LCD_TOUCH_X_MIN);
         data->point.y = y < LCD_TOUCH_Y_MIN ? 0 : (y - LCD_TOUCH_Y_MIN) * LCD_V_RES / (LCD_TOUCH_Y_MAX - LCD_TOUCH_Y_MIN);
         data->state = LV_INDEV_STATE_PRESSED;
-    } else {
+    } else if (old_touch_cnt > 0) {
         data->state = LV_INDEV_STATE_RELEASED;
+        lcd_touch_time = time(NULL);
     }
+    old_touch_cnt = touch_cnt;
 }
 
-esp_err_t lcd_set_bg_pwr(uint8_t mode)
+
+esp_err_t lcd_set_bk_pwr(uint8_t mode)
 {
     esp_err_t err;
 
@@ -204,7 +210,6 @@ lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t 
     };
     ESP_LOGI(TAG, "Add touch input to LVGL");
     lv_indev_t *touch_indev = lvgl_port_add_touch(&touch_cfg);
-    ESP_LOGI(TAG, "touch_indev=%p", touch_indev);
     lv_indev_set_read_cb(touch_indev, lvgl_touch_cb);
 
     /* Turn on backlight */
