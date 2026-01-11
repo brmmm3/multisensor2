@@ -36,6 +36,7 @@ int process_config_cmd(int argc, char **argv)
             ESP_LOGI(TAG, "scd4x_pwr=%d", config->scd4x_pwr);
             ESP_LOGI(TAG, "wifi_pwr=%d", config->wifi_pwr);
             ESP_LOGI(TAG, "mode_pwr=%d", config->mode_pwr);
+            ESP_LOGI(TAG, "cfg_locked=%d", config->cfg_locked);
             //ESP_LOGI(TAG, "mqtt_broker=%s", config->mqtt_broker);
             //ESP_LOGI(TAG, "mqtt_auto_connect=%d", config->mqtt_auto_connect);
         } else if (strcmp(cmd, "lock") == 0) {

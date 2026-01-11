@@ -187,6 +187,7 @@ void ui_config_lock(bool lock)
     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_lock_obj(ui->sw_wifi_enable, lock));
     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_lock_obj(ui->sw_record, lock));
     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_lock_obj(ui->sw_auto_record, lock));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(ui_lock_obj(ui->sl_lcd_pwr, lock));
     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_lock_obj(ui->sl_gps_pwr, lock));
     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_lock_obj(ui->sl_scd4x_pwr, lock));
     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_lock_obj(ui->sl_wifi_pwr, lock));
@@ -382,6 +383,17 @@ static void tabview_event_cb(lv_event_t *e)
 }
 
 
+static void screen_event_cb(lv_event_t *e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+
+    if (code == LV_EVENT_CLICKED) {
+        status.tap_time = time(NULL);
+        lcd_set_bg_pwr(0);
+    }
+}
+
+
 void ui_register_callbacks(ui_t *ui)
 {
     lv_obj_add_event_cb(ui->tbv_main, tabview_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
@@ -399,4 +411,6 @@ void ui_register_callbacks(ui_t *ui)
     lv_obj_add_event_cb(ui->btn_calibrate, btn_calibrate_pressed, LV_EVENT_CLICKED, NULL);
     lv_obj_add_event_cb(ui->btn_save_config, btn_save_config_pressed, LV_EVENT_CLICKED, NULL);
     lv_obj_add_event_cb(ui->sw_cfg_lock, sw_config_lock_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    // Tap event
+    lv_obj_add_event_cb(lv_screen_active(), screen_event_cb, LV_EVENT_CLICKED, NULL);
 }

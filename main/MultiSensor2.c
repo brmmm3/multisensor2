@@ -821,6 +821,11 @@ static void update_task(void *arg)
             ESP_LOGW(TAG, "start_time deviation more than 10 days. SYNC");
             status.start_time = now;
         }
+        // Switch OFF backlight after timeout if LCD Power is >0
+        if (config->lcd_pwr > 0 && status.tap_time > 0 && now - status.tap_time > 5) {
+            status.tap_time = 0;
+            lcd_set_bg_pwr(config->lcd_pwr);
+        }
 
         update_gps_status();
 

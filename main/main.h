@@ -128,6 +128,7 @@ typedef struct sensors_data_s {
 typedef struct status_s {
     time_t start_time;
     time_t save_time;
+    time_t tap_time;
     uint32_t startup_cnt;
     uint32_t uptime_cnt;
     bool force_update;
