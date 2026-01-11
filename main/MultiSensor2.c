@@ -796,6 +796,12 @@ static void update_task(void *arg)
         }
         status.force_update = false;
 
+        if (wifi_netif_enabled()) {
+            sprintf(buf, "%d dBm", wifi_get_rssi());
+            ui_set_label_text(ui->lbl_wifi_rssi, "-");
+        } else {
+            ui_set_label_text(ui->lbl_wifi_rssi, "-");
+        }
         if (wifi_connected) {
             if (!old_wifi_connected) {
                 old_wifi_connected = true;
@@ -821,6 +827,7 @@ static void update_task(void *arg)
             ESP_LOGW(TAG, "start_time deviation more than 10 days. SYNC");
             status.start_time = now;
         }
+
         // On tap temporarily set backlight to max
         if (lcd_touch_time > 0) {
             if (now - lcd_touch_time > 5) {

@@ -29,6 +29,10 @@ extern bool wifi_connected;
 
 const char *wifi_ip();
 
+int8_t wifi_get_rssi();
+
+bool wifi_netif_enabled();
+
 esp_err_t wifi_init(bool scan);
 
 void wifi_uninit();

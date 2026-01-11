@@ -192,7 +192,7 @@ void wifi_scan(void)
     selected_ssid = NULL;
     selected_btn = NULL;
     if (!wifi_initialized()) wifi_init(false);
-    ui_set_label_text(ui->lbl_wifi_status1, "Scanning...");
+    ui_set_label_text(ui->lbl_wifi_name, "Scanning...");
     ESP_LOGI(TAG, "Start WiFi scan");
     set_scanning(true);
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
@@ -233,5 +233,5 @@ void wifi_scan(void)
         }
     }
     set_scanning(false);
-    ui_set_label_text(ui->lbl_wifi_status1, "Select network");
+    ui_set_label_text(ui->lbl_wifi_name, "Select network");
 }

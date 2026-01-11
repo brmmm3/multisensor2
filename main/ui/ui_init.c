@@ -286,9 +286,10 @@ lv_obj_t *add_page_gps(ui_t *ui)
 lv_obj_t *add_page_wifi(ui_t *ui)
 {
     lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_WIFI);
-    ui->sw_wifi_enable = add_switch_label(tab, 60, "Enable");
-    ui->lbl_wifi_status1 = add_section_label(tab, 30, 30, 64, "Network");
-    ui->lbl_wifi_status2 = add_section_label(tab, 60, 30, 64, "IP");
+    ui->sw_wifi_enable = add_switch_label(tab, 00, "Enable");
+    ui->lbl_wifi_name = add_section_label(tab, 30, 30, 64, "Network");
+    ui->lbl_wifi_ip = add_section_label_xw(tab, 0, 60, 160, 30, 64, "IP");
+    ui->lbl_wifi_rssi = add_section_label_xw(tab, 160, 60, 160, 30, 64, "RSSI");
     ui->lbl_mqtt_status = add_section_label(tab, 90, 30, 64, "MQTT");
     ui->lbl_ftp_status = add_section_label(tab, 120, 30, 64, "FTP");
     ui->lst_wifi = lv_list_create(tab);

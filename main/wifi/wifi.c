@@ -60,6 +60,26 @@ const char *wifi_ip()
     return buf;
 }
 
+
+bool wifi_netif_enabled()
+{
+    return netif != NULL;
+}
+
+
+int8_t wifi_get_rssi()
+{
+    wifi_ap_record_t ap_info;
+    esp_err_t ret = esp_wifi_sta_get_ap_info(&ap_info);
+
+    if (ret == ESP_OK) {
+        // RSSI in dBm (usually -30 to -90)
+        return ap_info.rssi;
+    }
+    return 0;
+}
+
+
 static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
     if (is_scanning) return;
@@ -82,6 +102,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
+
 
 void wifi_init_sta(void)
 {
@@ -106,6 +127,7 @@ void wifi_init_sta(void)
     ESP_LOGI(TAG,"wifi_init_sta DONE");
 }
 
+
 void wifi_disconnect()
 {
     if (connect_task_handle != NULL) {
@@ -113,10 +135,11 @@ void wifi_disconnect()
         connect_task_handle = NULL;
     }
     esp_wifi_disconnect();             // break connection to AP
-    ui_set_label_text(ui->lbl_wifi_status1, "Disconnected");
-    ui_set_label_text(ui->lbl_wifi_status2, "-");
+    ui_set_label_text(ui->lbl_wifi_name, "Disconnected");
+    ui_set_label_text(ui->lbl_wifi_ip, "-");
     wifi_connected = false;
 }
+
 
 void wifi_deinit_sta(void)
 {
@@ -133,12 +156,13 @@ void wifi_deinit_sta(void)
     ESP_LOGI(TAG,"wifi_deinit_sta DONE");
 }
 
+
 esp_err_t wifi_connect(const char *ssid, const char *password)
 {
     ESP_LOGI(TAG, "wifi_connect: ssid=%s", ssid);
     if (strlen(ssid) == 0 || strlen(password) == 0) return ESP_OK;
-    ui_set_label_text(ui->lbl_wifi_status1, "Connecting...");
-    ui_set_label_text(ui->lbl_wifi_status2, ssid);
+    ui_set_label_text(ui->lbl_wifi_name, "Connecting...");
+    ui_set_label_text(ui->lbl_wifi_ip, ssid);
     wifi_config_t wifi_config = {
         .sta = {
             /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (password len => 8).
@@ -170,14 +194,14 @@ esp_err_t wifi_connect(const char *ssid, const char *password)
     if (bits & WIFI_CONNECTED_BIT) {
         esp_err_t err;
 
-        ui_set_label_text(ui->lbl_wifi_status1, ssid);
+        ui_set_label_text(ui->lbl_wifi_name, ssid);
         ui_set_tab_color(3, LV_PALETTE_GREEN);
         ESP_LOGI(TAG, "Connected to SSID:%s", ssid);
         err = esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info);
         if (err == ESP_OK && ip_info.ip.addr != 0) {
             /* Print the local IP address */
             const char *ip = wifi_ip();
-            ui_set_label_text(ui->lbl_wifi_status2, ip);
+            ui_set_label_text(ui->lbl_wifi_ip, ip);
             ESP_LOGI(TAG, "IP Address : %s", ip);
             ESP_LOGI(TAG, "Subnet mask: " IPSTR, IP2STR(&ip_info.netmask));
             ESP_LOGI(TAG, "Gateway    : " IPSTR, IP2STR(&ip_info.gw));
@@ -200,10 +224,11 @@ esp_err_t wifi_connect(const char *ssid, const char *password)
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT %x", bits);
     }
-    ui_set_label_text(ui->lbl_wifi_status1, "Connecting FAILED");
+    ui_set_label_text(ui->lbl_wifi_name, "Connecting FAILED");
     ui_set_tab_color(3, LV_PALETTE_RED);
     return ESP_FAIL;
 }
+
 
 static void wifi_connect_task(void *arg)
 {
@@ -213,6 +238,7 @@ static void wifi_connect_task(void *arg)
     connect_task_handle = NULL;
     vTaskDelete(NULL);
 }
+
 
 esp_err_t wifi_connect_bg(const char *ssid, const char *password)
 {
@@ -231,6 +257,7 @@ esp_err_t wifi_connect_bg(const char *ssid, const char *password)
     return ESP_OK;
 }
 
+
 esp_err_t wifi_init(bool scan)
 {
     ESP_LOGI(TAG, "Initialize WiFi");
@@ -246,6 +273,7 @@ esp_err_t wifi_init(bool scan)
     return ESP_OK;
 }
 
+
 void wifi_uninit()
 {
     ESP_LOGI(TAG, "Uninitialize WiFi");
@@ -255,9 +283,10 @@ void wifi_uninit()
     wifi_deinit_sta();
     ui_set_tab_color(3, LV_PALETTE_GREY);
     ui_set_switch_state(ui->sw_wifi_enable, false);
-    ui_set_label_text(ui->lbl_wifi_status1, "-");
-    ui_set_label_text(ui->lbl_wifi_status2, "-");
+    ui_set_label_text(ui->lbl_wifi_name, "-");
+    ui_set_label_text(ui->lbl_wifi_ip, "-");
 }
+
 
 esp_err_t wifi_set_pwr_mode(uint8_t mode)
 {
@@ -277,10 +306,12 @@ esp_err_t wifi_set_pwr_mode(uint8_t mode)
     return err;
 }
 
+
 bool wifi_initialized()
 {
     return netif != NULL;
 }
+
 
 void set_scanning(bool scanning)
 {
