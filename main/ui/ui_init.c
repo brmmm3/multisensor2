@@ -229,6 +229,12 @@ lv_obj_t *add_section_label_xw(lv_obj_t *tab, int32_t x, int32_t y, int32_t w, i
     return add_label(lv_obj_get_child(section, 0), 8, 0);
 }
 
+lv_obj_t *add_switch_label(lv_obj_t *tab, int32_t y, const char *title)
+{
+    add_label_text(tab, 0, y, title, lv_color_black());
+    return add_switch(tab, 260, y, 60, 30);
+}
+
 lv_obj_t *add_slider_label(lv_obj_t *tab, int32_t y, int32_t max, const char *title)
 {
     add_label_text(tab, 0, y, title, lv_color_black());
@@ -280,8 +286,7 @@ lv_obj_t *add_page_gps(ui_t *ui)
 lv_obj_t *add_page_wifi(ui_t *ui)
 {
     lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_WIFI);
-    add_label_text(tab, 0, 0, "Enable", lv_color_black());
-    ui->sw_wifi_enable = add_switch(tab, 260, 00, 60, 30);
+    ui->sw_wifi_enable = add_switch_label(tab, 60, "Enable");
     ui->lbl_wifi_status1 = add_section_label(tab, 30, 30, 64, "Network");
     ui->lbl_wifi_status2 = add_section_label(tab, 60, 30, 64, "IP");
     ui->lbl_mqtt_status = add_section_label(tab, 90, 30, 64, "MQTT");
@@ -295,10 +300,8 @@ lv_obj_t *add_page_wifi(ui_t *ui)
 lv_obj_t *add_page_sd(ui_t *ui)
 {
     lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_SD_CARD);
-    add_label_text(tab, 0, 0, "Record", lv_color_black());
-    ui->sw_record = add_switch(tab, 260, 0, 60, 30);
-    add_label_text(tab, 0, 30, "Auto Record", lv_color_black());
-    ui->sw_auto_record = add_switch(tab, 260, 30, 60, 30);
+    ui->sw_record = add_switch_label(tab, 0, "Record");
+    ui->sw_auto_record = add_switch_label(tab, 30, "Auto Record");
     ui->lbl_sd_card = add_section_label(tab, 60, 30, 64, "SD-Card");
     ui->lbl_sd_free = add_section_label(tab, 90, 30, 64, "Free");
     ui->lbl_sd_files = add_section_label(tab, 120, 30, 64, "Files");
@@ -327,6 +330,7 @@ lv_obj_t *add_page_cfg(ui_t *ui)
 
     ui->btn_calibrate = add_button(tab, 0, 430, 200, 0, "Calibrate Sensors");
     ui->btn_save_config = add_button(tab, 0, 480, 200, 0, "Save Config");
+    ui->sw_cfg_lock = add_switch_label(tab, 530, "Lock Config");
     return tab;
 }
 

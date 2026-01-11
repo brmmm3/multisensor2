@@ -81,6 +81,7 @@ typedef struct ui_s {
     lv_obj_t *sl_mode_pwr;
     lv_obj_t *btn_calibrate;
     lv_obj_t *btn_save_config;
+    lv_obj_t *sw_cfg_lock;
 } ui_t;
 
 ui_t *ui_init(lv_display_t *disp);  //, void(*btn_pressed)(lv_event_t *));

@@ -67,7 +67,23 @@ static esp_err_t client_cmd_ls(int client_sock)
         return ESP_FAIL;
     }
     while (true) {
-        int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE);
+        int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE, 0);
+        if (len == 0) break;
+        send_data_to_client(client_sock, (uint8_t *)rx_buffer,len);
+    }
+    sd_closedir(dir);
+    return ESP_OK;
+}
+
+static esp_err_t client_cmd_lsr(int client_sock)
+{
+    DIR *dir = sd_open_dir(MOUNT_POINT);
+    if (dir == NULL) {
+        ESP_LOGE(TAG, "Failed to open data dir");
+        return ESP_FAIL;
+    }
+    while (true) {
+        int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE, 0);
         if (len == 0) break;
         send_data_to_client(client_sock, (uint8_t *)rx_buffer,len);
     }
@@ -146,8 +162,9 @@ static esp_err_t send_all_data_files(int client_sock, bool remove_file)
         return ESP_FAIL;
     }
     while (true) {
-        int len = sd_read_dir(dir, path, BUFFER_SIZE);
-        if (len == 0) break;
+        int len = sd_read_dir(dir, path, 32, 1);
+        if (len < 2) break;
+        path[len - 1] = 0;
         if ((err = send_data_file_start(client_sock, path, remove_file)) != ESP_OK) {
             break;
         }
@@ -167,27 +184,12 @@ static esp_err_t remove_all_data_files()
         return ESP_FAIL;
     }
     while (true) {
-        int len = sd_read_dir(dir, path, BUFFER_SIZE);
-        if (len == 0) break;
+        int len = sd_read_dir(dir, path, 32, 1);
+        if (len < 2) break;
+        path[len - 1] = 0;
         if ((err = remove_data_file(path)) != ESP_OK) {
             break;
         }
-    }
-    sd_closedir(dir);
-    return ESP_OK;
-}
-
-static esp_err_t client_cmd_lsr(int client_sock)
-{
-    DIR *dir = sd_open_dir(MOUNT_POINT);
-    if (dir == NULL) {
-        ESP_LOGE(TAG, "Failed to open data dir");
-        return ESP_FAIL;
-    }
-    while (true) {
-        int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE);
-        if (len == 0) break;
-        send_data_to_client(client_sock, (uint8_t *)rx_buffer,len);
     }
     sd_closedir(dir);
     return ESP_OK;
@@ -383,6 +385,10 @@ static void tcp_server_task(void *pvParameters)
                     }
                     len += sprintf(&rx_buffer[len], "}\n");
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                } else if (strcmp(rx_buffer, "lock") == 0) {
+                    ui_config_lock(true);
+                } else if (strcmp(rx_buffer, "unlock") == 0) {
+                    ui_config_lock(true);
                 } else if (strcmp(rx_buffer, "status") == 0) {
                     // Get status
                     int len = sprintf(rx_buffer, "{id=%d,force_update=%d,recording=%d,record_pos=%d,file_cnt=%d,filename=\"%s\"}\n",

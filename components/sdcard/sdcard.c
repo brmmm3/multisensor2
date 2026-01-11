@@ -177,7 +177,7 @@ DIR *sd_open_data_dir()
     return sd_open_dir(path);
 }
 
-int sd_read_dir(DIR *dir, char *buf, int maxlen)
+int sd_read_dir(DIR *dir, char *buf, int maxlen, int maxcnt)
 {
     struct dirent *dp;
     int pos = 0;
@@ -188,7 +188,7 @@ int sd_read_dir(DIR *dir, char *buf, int maxlen)
         strcpy(&buf[pos], dp->d_name);
         pos += strlen(dp->d_name);
         buf[pos++] = '\n';
-        if (pos >= maxlen) break;
+        if (pos >= maxlen || (maxcnt > 0 && --maxcnt == 0)) break;
     }
     lvgl_port_unlock();
     return pos;

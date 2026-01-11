@@ -42,6 +42,10 @@ esp_err_t ui_wifi_set_pwr_mode(uint8_t mode);
 
 esp_err_t ui_mode_set_pwr_mode(uint8_t mode);
 
+esp_err_t ui_lock_obj(lv_obj_t *obj, bool lock);
+
+void ui_config_lock(bool lock);
+
 void ui_sd_record_set_value(bool enable);
 
 void ui_set_time_value(lv_obj_t *obj, time_t *time);

@@ -38,6 +38,10 @@ int process_config_cmd(int argc, char **argv)
             ESP_LOGI(TAG, "mode_pwr=%d", config->mode_pwr);
             //ESP_LOGI(TAG, "mqtt_broker=%s", config->mqtt_broker);
             //ESP_LOGI(TAG, "mqtt_auto_connect=%d", config->mqtt_auto_connect);
+        } else if (strcmp(cmd, "lock") == 0) {
+            ui_config_lock(true);
+        } else if (strcmp(cmd, "unlock") == 0) {
+            ui_config_lock(true);
         } else {
             ESP_LOGE(TAG, "no valid arguments");
             return 1;

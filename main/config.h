@@ -15,7 +15,7 @@ extern "C" {
 #include <stdbool.h>
 #include "esp_err.h"
 
-#define CONFIG_VERSION 5
+#define CONFIG_VERSION 6
 
 typedef struct wifi_networks_s {
     // Connection info for up to 4 SSIDs and their passwords
@@ -42,6 +42,7 @@ typedef struct config_s {
     bool mqtt_auto_connect;
     bool tcp_auto_start;
     bool ftp_auto_start;
+    bool cfg_locked;
 } config_t;
 
 extern config_t *config;
