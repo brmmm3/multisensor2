@@ -59,6 +59,22 @@ static bool send_data_to_client(int client_sock, uint8_t *data, int to_write)
     return true;
 }
 
+static esp_err_t client_cmd_ls(int client_sock)
+{
+    DIR *dir = sd_open_data_dir();
+    if (dir == NULL) {
+        ESP_LOGE(TAG, "Failed to open data dir");
+        return ESP_FAIL;
+    }
+    while (true) {
+        int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE);
+        if (len == 0) break;
+        send_data_to_client(client_sock, (uint8_t *)rx_buffer,len);
+    }
+    sd_closedir(dir);
+    return ESP_OK;
+}
+
 static esp_err_t send_data_file_part(int client_sock, char *path, char *buf, size_t size)
 {
     uint8_t encoded_data[BUFFER_SIZE];
@@ -84,7 +100,7 @@ static esp_err_t send_data_file(int client_sock, char *path)
     FILE *f = open_data_file(path);
     if (f == NULL) return ESP_FAIL;
     if (!send_data_to_client(client_sock, (uint8_t *)":",1)) {
-        ESP_LOGE(TAG, "Failed to send file %s", path);
+        ESP_LOGE(TAG, "Failed to send data file %s", path);
         err = ESP_FAIL;
     } else {
         while (true) {
@@ -96,23 +112,66 @@ static esp_err_t send_data_file(int client_sock, char *path)
     }
     close_data_file(f);
     if (!send_data_to_client(client_sock, (uint8_t *)"\n",1)) {
-        ESP_LOGE(TAG, "Failed to send file %s", path);
+        ESP_LOGE(TAG, "Failed to send data file %s", path);
         err = ESP_FAIL;
     }
     return err;
 }
 
-static esp_err_t client_cmd_ls(int client_sock)
+static esp_err_t send_data_file_start(int client_sock, char *path, bool remove_file)
 {
+    char buf[32];
+    esp_err_t err;
+
+    int len = sprintf(buf, ":%s:", path);
+    if (!send_data_to_client(client_sock, (uint8_t *)buf,len)) {
+        ESP_LOGE(TAG, "Failed to send data file %s", path);
+        return ESP_FAIL;
+    }
+    if ((err = send_data_file(client_sock, path)) != ESP_OK) {
+        return err;
+    }
+    if (!remove_file) return ESP_OK;
+    return remove_data_file(path);
+}
+
+static esp_err_t send_all_data_files(int client_sock, bool remove_file)
+{
+    char path[32];
+    esp_err_t err;
+
     DIR *dir = sd_open_data_dir();
     if (dir == NULL) {
         ESP_LOGE(TAG, "Failed to open data dir");
         return ESP_FAIL;
     }
     while (true) {
-        int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE);
+        int len = sd_read_dir(dir, path, BUFFER_SIZE);
         if (len == 0) break;
-        send_data_to_client(client_sock, (uint8_t *)rx_buffer,len);
+        if ((err = send_data_file_start(client_sock, path, remove_file)) != ESP_OK) {
+            break;
+        }
+    }
+    sd_closedir(dir);
+    return ESP_OK;
+}
+
+static esp_err_t remove_all_data_files()
+{
+    char path[32];
+    esp_err_t err;
+
+    DIR *dir = sd_open_data_dir();
+    if (dir == NULL) {
+        ESP_LOGE(TAG, "Failed to open data dir");
+        return ESP_FAIL;
+    }
+    while (true) {
+        int len = sd_read_dir(dir, path, BUFFER_SIZE);
+        if (len == 0) break;
+        if ((err = remove_data_file(path)) != ESP_OK) {
+            break;
+        }
     }
     sd_closedir(dir);
     return ESP_OK;
@@ -253,28 +312,32 @@ static void tcp_server_task(void *pvParameters)
                     }
                 } else if (strncmp(rx_buffer, "cp ", 3) == 0) {
                     // Download data file and keep it on SD-Card
-                    char path[32];
-                    strcpy(path, &rx_buffer[3]);
-                    if ((err = send_data_file(client_sock, path)) != ESP_OK) {
+                    if (strcmp(&rx_buffer[3], "*") == 0) {
+                        if ((err = send_all_data_files(client_sock, false)) != ESP_OK) {
+                            ESP_LOGE(TAG, "Failed to send all data files");
+                            response = "ERR\n";
+                        }
+                    } else if ((err = send_data_file_start(client_sock, &rx_buffer[3], false)) != ESP_OK) {
+                        ESP_LOGE(TAG, "Failed to send data file");
                         response = "ERR\n";
                     }
                 } else if (strncmp(rx_buffer, "mv ", 3) == 0) {
                     // Download data file and remove it on SD-Card
-                    char path[32];
-                    strcpy(path, &rx_buffer[3]);
-                    if ((err = send_data_file(client_sock, path)) == ESP_OK) {
-                        if ((err = remove_data_file(path)) != ESP_OK) {
+                    if (strcmp(&rx_buffer[3], "*") == 0) {
+                        if ((err = send_all_data_files(client_sock, true)) != ESP_OK) {
+                            ESP_LOGE(TAG, "Failed to send all data files");
                             response = "ERR\n";
                         }
-                    } else {
-                        ESP_LOGE(TAG, "Failed to send file");
+                    } else if ((err = send_data_file_start(client_sock, &rx_buffer[3], true)) != ESP_OK) {
                         response = "ERR\n";
                     }
                 } else if (strncmp(rx_buffer, "rm ", 3) == 0) {
-                    // Remove file on SD-Card
-                    char path[32];
-                    strcpy(path, &rx_buffer[3]);
-                    if ((err = remove_data_file(path)) != ESP_OK) {
+                    // Remove file on SD-Card. A path "*" removes all data files.
+                    if (strcmp(&rx_buffer[3], "*") == 0) {
+                        if ((err = remove_all_data_files()) != ESP_OK) {
+                            response = "ERR\n";
+                        }
+                    } else if ((err = remove_data_file(&rx_buffer[3])) != ESP_OK) {
                         response = "ERR\n";
                     }
                 } else if (strcmp(rx_buffer, "rec 1") == 0) {
