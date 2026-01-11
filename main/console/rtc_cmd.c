@@ -53,7 +53,7 @@ int process_rtc_cmd(int argc, char **argv)
             if (rtc_cmd_args.second->count == 1) {
                 timeinfo.tm_sec = rtc_cmd_args.second->ival[0];
             }
-            ESP_ERROR_CHECK_WITHOUT_ABORT(set_sys_time(&timeinfo));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(set_sys_time(&timeinfo, true));
         } else {
             ESP_LOGE(TAG, "no valid arguments");
             return 1;

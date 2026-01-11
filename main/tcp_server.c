@@ -415,7 +415,7 @@ static void tcp_server_task(void *pvParameters)
                         timeinfo.tm_hour = atoi(&rx_buffer[13]);
                         timeinfo.tm_min = atoi(&rx_buffer[16]);
                         timeinfo.tm_sec = atoi(&rx_buffer[19]);
-                        if ((err = set_sys_time(&timeinfo)) != ESP_OK) {
+                        if ((err = set_sys_time(&timeinfo, true)) != ESP_OK) {
                             ESP_LOGE(TAG, "Failed to set system date/time: err=%d", err);
                             response = "ERR\n";
                         }

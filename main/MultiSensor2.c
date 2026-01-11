@@ -708,7 +708,7 @@ uint32_t calculate_crc32(const uint8_t *data, size_t len)
 }
 
 
-esp_err_t set_sys_time(struct tm *timeinfo)
+esp_err_t set_sys_time(struct tm *timeinfo, bool set_rtc_time)
 {
     time_t utc_time = mktime(timeinfo);
     if (utc_time == -1) {
@@ -724,21 +724,15 @@ esp_err_t set_sys_time(struct tm *timeinfo)
         ESP_LOGE(TAG, "settimeofday failed");
         return ESP_FAIL;
     }
+    if (!set_rtc_time) return ESP_OK;
     return rtc_set_datetime(rtc->rtc, timeinfo);
 }
 
-static void update_task(void *arg)
+void show_sd_card_info()
 {
     char buf[64];
     uint64_t bytes_total, bytes_free;
-    uint32_t loop_cnt = 0;
-    bool old_wifi_connected = false;
-    esp_err_t err;
 
-    ESP_LOGI(TAG, "Start update_task");
-    esp_task_wdt_add(NULL);
-    // Update SD-Card info
-    ensure_dir(MOUNT_POINT"/data");
     sd_card_get_info(buf, &bytes_total, &bytes_free);
     ui_set_label_text(ui->lbl_sd_card, buf);
     sprintf(buf, "%llu MB", bytes_free / (1024 * 1024));
@@ -746,7 +740,42 @@ static void update_task(void *arg)
     status.file_cnt = sd_card_get_file_count(MOUNT_POINT"/data");
     sprintf(buf, "%d data files", status.file_cnt);
     ui_set_label_text(ui->lbl_sd_files, buf);
+}
+
+esp_err_t write_data_file()
+{
+    char buf[64];
+    esp_err_t err;
+
+    int pos = strlen(MOUNT_POINT);
+    strcpy(buf, MOUNT_POINT);
+    sprintf(&buf[pos], "/data/%s", status.filename);
+    ESP_LOGI(TAG, "Write %d bytes to File %s", status.record_pos, buf);
+    if ((err = write_bin_file(buf, data, status.record_pos)) != ESP_OK) return err;
+    status.record_pos = 0;
+    status.file_cnt++;
+    sprintf(buf, "%d data files", status.file_cnt);
+    ui_set_label_text(ui->lbl_sd_files, buf);
+    ui_set_label_text(ui->lbl_sd_fill, "0.0 %");
+    set_data_filename();
+    if (status.save_time == 0) {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(update_startup_cnt(0, 1));
+    }
+    return ESP_OK;
+}
+
+static void update_task(void *arg)
+{
+    char buf[64];
+    uint32_t loop_cnt = 0;
+    bool old_wifi_connected = false;
+    esp_err_t err;
+
+    ESP_LOGI(TAG, "Start update_task");
+    esp_task_wdt_add(NULL);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(ensure_dir(MOUNT_POINT"/data"));
     ui_set_switch_state(ui->sw_auto_record, config->auto_record);
+    show_sd_card_info();
 
     while (true) {
         if (loop_cnt++ > 0 && !status.recording && config->auto_record) {
@@ -799,24 +828,23 @@ static void update_task(void *arg)
             uint32_t cksum = calculate_crc32(data, status.record_pos);
             data_add_uint32(cksum);
 
-            int pos = strlen(MOUNT_POINT);
-            strcpy(buf, MOUNT_POINT);
-            sprintf(&buf[pos], "/data/%s", status.filename);
-            ESP_LOGI(TAG, "Write %d bytes to File %s", status.record_pos, buf);
-            if ((err = write_bin_file(buf, data, status.record_pos)) == ESP_OK) {
-                status.record_pos = 0;
-                status.file_cnt++;
-                sprintf(buf, "%d data files", status.file_cnt);
-                ui_set_label_text(ui->lbl_sd_files, buf);
-                ui_set_label_text(ui->lbl_sd_fill, "0.0 %");
-                set_data_filename();
-                if (status.save_time == 0) {
-                    ESP_ERROR_CHECK_WITHOUT_ABORT(update_startup_cnt(0, 1));
+            for (int i = 0; i < 2; i++) {
+                if ((err = write_data_file()) == ESP_OK) {
+                    status.save_time = now;
+                    ui_set_time_value(ui->lbl_savetime, &status.save_time);
+                    update_save_time_file();
+                    break;
                 }
-                status.save_time = now;
-                ui_set_time_value(ui->lbl_savetime, &status.save_time);
-                update_save_time_file();
-            } else if (!sd_card_mounted(true)) {
+                ESP_LOGE(TAG, "Failed to write data file. Try to mount FS.");
+                // Try to mount FS if writing has failed and try again.
+                if ((err = sd_card_mount_fs()) == ESP_OK) {
+                    ESP_ERROR_CHECK_WITHOUT_ABORT(ensure_dir(MOUNT_POINT"/data"));
+                    show_sd_card_info();
+                }
+                vTaskDelay(pdMS_TO_TICKS(100));
+            }
+            if (!sd_card_mounted(true)) {
+                ESP_LOGE(TAG, "Failed to mount FS. Giving up! Stop recording.");
                 ui_set_switch_state(ui->sw_record, false);
                 ui_sd_record_set_value(false);
                 ui_set_tab_color(4, LV_PALETTE_RED);
@@ -928,6 +956,23 @@ void app_main(void)
     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_wifi_set_pwr_mode(config->wifi_pwr));
     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_mode_set_pwr_mode(config->mode_pwr));
 
+    // Set system and startup time
+    struct tm timeinfo;
+    char buf[32];
+    esp_err_t err;
+
+    if ((err = (rtc_get_datetime(rtc->rtc, &timeinfo))) == ESP_OK) {
+        uint16_t year = 1900 + timeinfo.tm_year;
+        uint8_t mon = timeinfo.tm_mon + 1;
+
+        sprintf(buf, "%d.%02d.%02d %02d:%02d:%02d",
+            year, mon, timeinfo.tm_mday,
+            timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        ESP_LOGI(TAG, "Set system time to: %s", buf);
+        ESP_ERROR_CHECK_WITHOUT_ABORT(set_sys_time(&timeinfo, false));
+    } else {
+        ESP_LOGE(TAG, "Failed to get date and time from RTC: err=%d", err);
+    }
     status.start_time = time(NULL);
 
     xTaskCreate(update_task, "update_task", 4096, NULL, UPDATE_TASK_PRIORITY, NULL);

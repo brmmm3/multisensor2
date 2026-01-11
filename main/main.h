@@ -181,7 +181,7 @@ extern uint32_t debug_main;
 
 extern bool force_update_all;
 
-esp_err_t set_sys_time(struct tm *timeinfo);
+esp_err_t set_sys_time(struct tm *timeinfo, bool set_rtc_time);
 
 void get_current_date_time(uint16_t *year, uint8_t *month, uint8_t *day, uint8_t *hour, uint8_t *min, uint8_t *sec);
 
