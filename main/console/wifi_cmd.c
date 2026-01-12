@@ -50,6 +50,8 @@ static void cmd_do_wifi_show()
         ESP_LOGI(TAG, "%d: <%s>", i, config_nvs->wifi.ssid[i]);
     }
     ESP_LOGI(TAG, "Auto connect: %d", config->auto_connect);
+    ESP_LOGI(TAG, "IP: %s", wifi_ip());
+    ESP_LOGI(TAG, "RSSI: %d", status.rssi);
 }
 
 int process_wifi_cmd(int argc, char **argv)

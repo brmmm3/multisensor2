@@ -348,8 +348,15 @@ static bool update_scd4x()
         ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_init(&scd4x, bus_handle));
         if (scd4x == NULL) return false;
     }
+    if (scd4x_st_machine_status == SCD4X_ST_IDLE || scd4x_st_machine_status > SCD4X_ST_MEASURE_3MIN) {
+        if (scd4x_st_machine_status > SCD4X_ST_MEASURE_3MIN) {
+            ESP_LOGW(TAG, "SCD4x is busy with status %d. Unable to read values.", scd4x_st_machine_status);
+        }
+        return false;
+    }
     if (scd4x->auto_adjust > 0 && scd4x->auto_adjust-- == 1) {
         bmx280_t *bmx280;
+        esp_err_t err;
 
         scd4x->auto_adjust = 255;
         if (bmx280lo->values.temperature < bmx280hi->values.temperature) bmx280 = bmx280lo;
@@ -357,15 +364,23 @@ static bool update_scd4x()
 
         float temp_offset = scd4x->values.temperature - bmx280->values.temperature + scd4x->temperature_offset;
 
-        scd4x_set_temperature_offset(scd4x, temp_offset);
-        scd4x_set_sensor_altitude(scd4x, bmx280->values.altitude);
-        scd4x_set_ambient_pressure(scd4x, bmx280->values.pressure);
+        ESP_LOGI(TAG, "Temp_Offset for SCD4x set to %f", temp_offset);
+        if ((err = scd4x_stop_periodic_measurement(scd4x)) == ESP_OK) {
+            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_temperature_offset(scd4x, temp_offset));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_sensor_altitude(scd4x, bmx280->values.altitude));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_ambient_pressure(scd4x, bmx280->values.pressure));
+            if ((err = scd4x_start_periodic_measurement(scd4x)) != ESP_OK) {
+                ESP_LOGE(TAG, "Failed start periodic measurement: %d", err);
+            }
+        } else {
+            ESP_LOGE(TAG, "Failed to stop periodic measurement: %d", err);
+        }
         scd4x_calibrate = true;
         ESP_LOGI(TAG, "SCD4X Adjust: TempOffset=%f °C  Alt=%f m  Press=%f hPa",
                     temp_offset, bmx280->values.altitude, bmx280->values.pressure);
     }
     if (!scd4x_get_data_ready_status(scd4x)) {
-        return false;
+        return force_update_all;
     }
     if ((err = scd4x_read_measurement(scd4x)) != ESP_OK) {
         ESP_LOGE(TAG, "SCD4X read error %d", err);
@@ -796,9 +811,10 @@ static void update_task(void *arg)
         }
         status.force_update = false;
 
+        status.rssi = wifi_get_rssi();
         if (wifi_netif_enabled()) {
-            sprintf(buf, "%d dBm", wifi_get_rssi());
-            ui_set_label_text(ui->lbl_wifi_rssi, "-");
+            sprintf(buf, "%d dBm", status.rssi);
+            ui_set_label_text(ui->lbl_wifi_rssi, buf);
         } else {
             ui_set_label_text(ui->lbl_wifi_rssi, "-");
         }

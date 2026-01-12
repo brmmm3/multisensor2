@@ -42,7 +42,7 @@ void register_mqtt_cmd()
 {
     mqtt_cmd_args.cmd = arg_str1(NULL, NULL, "<cmd>", "Command");
     mqtt_cmd_args.auto_connect = arg_int0("a", NULL, "<0-1>", "Auto connect");
-    mqtt_cmd_args.end = arg_end(1);
+    mqtt_cmd_args.end = arg_end(2);
 
     const esp_console_cmd_t cmd = {
         .command = "mqtt",

@@ -60,7 +60,7 @@ void register_pwr_cmd()
     pwr_cmd_args.scd = arg_int0("s", NULL, "<0-2>", "Set power mode (0=full speed, 1=low power, 2=sleep) SCD4x");
     pwr_cmd_args.wifi = arg_int0("w", NULL, "<0-3>", "Set power mode (0=full speed, 1=low power, 2=sleep) WiFi");
     pwr_cmd_args.mode = arg_int0("m", NULL, "<0-3>", "Set power mode (0=full speed, 1=low power, 2=sleep) Mode");
-    pwr_cmd_args.end = arg_end(9);
+    pwr_cmd_args.end = arg_end(5);
 
     const esp_console_cmd_t cmd = {
         .command = "pwr",

@@ -4,7 +4,7 @@ static const char *TAG = "CMD";
 
 struct {
     struct arg_str *cmd;          // TCP command
-    struct arg_int *tcp_auto_start;
+    struct arg_int *value;
     struct arg_end *end;
 } tcp_cmd_args;
 
@@ -25,8 +25,8 @@ int process_tcp_cmd(int argc, char **argv)
             config->tcp_auto_start = false;
             tcp_server_stop();
         } else if (strcmp(cmd, "auto") == 0) {
-            if (tcp_cmd_args.tcp_auto_start->count == 1) {
-                config->tcp_auto_start = tcp_cmd_args.tcp_auto_start->ival[0] != 0;
+            if (tcp_cmd_args.value->count == 1) {
+                config->tcp_auto_start = tcp_cmd_args.value->ival[0] != 0;
             }
         } else {
             ESP_LOGE(TAG, "no valid arguments");
@@ -42,8 +42,8 @@ int process_tcp_cmd(int argc, char **argv)
 void register_tcp_cmd()
 {
     tcp_cmd_args.cmd = arg_str1(NULL, NULL, "<cmd>", "Command");
-    tcp_cmd_args.tcp_auto_start = arg_int0("a", NULL, "<0-1>", "Auto connect");
-    tcp_cmd_args.end = arg_end(1);
+    tcp_cmd_args.value = arg_int0("v", NULL, "<0-1>", "Value");
+    tcp_cmd_args.end = arg_end(2);
 
     const esp_console_cmd_t cmd = {
         .command = "tcp",

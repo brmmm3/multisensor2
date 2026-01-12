@@ -389,11 +389,15 @@ static void tcp_server_task(void *pvParameters)
                     ui_config_lock(true);
                 } else if (strcmp(rx_buffer, "unlock") == 0) {
                     ui_config_lock(true);
+                } else if (strcmp(rx_buffer, "status 1") == 0) {
+                    status.auto_status = true;
+                } else if (strcmp(rx_buffer, "status 0") == 0) {
+                    status.auto_status = false;
                 } else if (strcmp(rx_buffer, "status") == 0) {
                     // Get status
-                    int len = sprintf(rx_buffer, "{id=%d,force_update=%d,recording=%d,record_pos=%d,file_cnt=%d,filename=\"%s\"}\n",
+                    int len = sprintf(rx_buffer, "{id=%d,force_update=%d,recording=%d,record_pos=%d,file_cnt=%d,filename=\"%s\",rssi=%d}\n",
                         E_SENSOR_STATUS,
-                        status.force_update, status.recording, status.record_pos, status.file_cnt, status.filename);
+                        status.force_update, status.recording, status.record_pos, status.file_cnt, status.filename, status.rssi);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                 } else if (strncmp(rx_buffer, "pwr ", 4) == 0) {
                     // Set power status
@@ -437,10 +441,49 @@ static void tcp_server_task(void *pvParameters)
                         ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
                         response = "ERR\n";
                     }
-                } else if (strncmp(rx_buffer, "cal ", 4) == 0) {
+                } else if (strncmp(rx_buffer, "scd ", 4) == 0) {
                     // Set power status
-                    if (strcmp(&rx_buffer[4], "scd") == 0) {
+                    if (strncmp(&rx_buffer[4], "cal ", 4) == 0) {
+                        scd4x_state_machine_cmd(SCD4X_CMD_FRC, atoi(&rx_buffer[8]));
+                    } else if (strcmp(&rx_buffer[4], "cal") == 0) {
                         scd4x_state_machine_cmd(SCD4X_CMD_FRC, mhz19->values.co2);
+                    } else if (strncmp(&rx_buffer[4], "autoadj ", 8) == 0) {
+                        config->scd4x_auto_adjust = atoi(&rx_buffer[12]) != 0;
+                    } else if (strcmp(&rx_buffer[4], "status") == 0) {
+                        esp_err_t err = scd4x_stop_periodic_measurement(scd4x);
+                        if (err == ESP_OK) {
+                            scd4x->temperature_offset = scd4x_get_temperature_offset(scd4x);
+                            scd4x->altitude = scd4x_get_sensor_altitude(scd4x);
+                            err = scd4x_start_periodic_measurement(scd4x);
+                            if (err != ESP_OK) {
+                                ESP_LOGE(TAG, "Failed start periodic measurement: %d", err);
+                                response = "ERR\n";
+                            }
+                        } else {
+                            ESP_LOGE(TAG, "Failed to stop periodic measurement: %d", err);
+                            response = "ERR\n";
+                        }
+                        int len = sprintf(rx_buffer, "{id=%d,temp_offs=%f,altitude=%d,pressure=%d}\n",
+                            E_SENSOR_SCD4XCAL,
+                            scd4x->temperature_offset, scd4x->altitude, scd4x->pressure);
+                        send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                    } else if (strcmp(&rx_buffer[4], "values 1") == 0) {
+                        status.scd4x_auto_values = true;
+                    } else if (strcmp(&rx_buffer[4], "values 0") == 0) {
+                        status.scd4x_auto_values = false;
+                    } else if (strcmp(&rx_buffer[4], "values") == 0) {
+                        scd4x_values_t *values = &scd4x->values;
+
+                        int len = sprintf(rx_buffer, "{id=%d,co2=%d,temp=%f,hum=%f,st=%d}\n",
+                            E_SENSOR_SCD4X,
+                            values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
+                        send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                    } else if (strncmp(&rx_buffer[4], "temp_offs ", 10) == 0) {
+                        scd4x_set_temperature_offset(scd4x, atof(&rx_buffer[14]));
+                    } else if (strncmp(&rx_buffer[4], "altitude ", 9) == 0) {
+                        scd4x_set_sensor_altitude(scd4x, atof(&rx_buffer[13]));
+                    } else if (strncmp(&rx_buffer[4], "pressure ", 9) == 0) {
+                        scd4x_set_ambient_pressure(scd4x, atof(&rx_buffer[13]));
                     } else {
                         ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
                         response = "ERR\n";
@@ -560,9 +603,10 @@ void tcp_server_publish_values()
         ESP_LOGW(TAG, "TX queue full");
         return;
     }
-    if (!tcp_send_values) return;
-    if (!gps_update && !bmx280lo_update && !bmx280hi_update && !mhz19_update && !scd4x_calibrate &&
-        !scd4x_update && !yys_update && !sps30_update && !adxl345_update && !qmc5883l_update) {
+    if (!tcp_send_values && !status.scd4x_auto_values) return;
+    if (!gps_update && !bmx280lo_update && !bmx280hi_update && !mhz19_update && !scd4x_calibrate
+        && !scd4x_update && !yys_update && !sps30_update && !adxl345_update && !qmc5883l_update
+        && !status.scd4x_auto_values) {
         return;
     }
     if (update_all_cnt > 0) {
@@ -578,11 +622,17 @@ void tcp_server_publish_values()
     uint8_t min;
     uint8_t sec;
     get_current_date_time(&year, &month, &day, &hour, &min, &sec);
-    int len = sprintf(buf, "{id=%d,date=\"%d.%d.%d\",time=\"%d:%d:%d\"}\n",
+    int len = sprintf(buf, "{id=%d,date=\"%d.%02d.%02d\",time=\"%02d:%02d:%02d\",rssi=%d}\n",
         E_SENSOR_TIME,
-        year, month, day, hour, min, sec);
+        year, month, day, hour, min, sec, status.rssi);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
-    if (gps_update) {
+    if (status.auto_status) {
+        int len = sprintf(buf, "{id=%d,force_update=%d,recording=%d,record_pos=%d,file_cnt=%d,filename=\"%s\",rssi=%d}\n",
+            E_SENSOR_STATUS,
+            status.force_update, status.recording, status.record_pos, status.file_cnt, status.filename, status.rssi);
+        ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
+    }
+    if (tcp_send_values && gps_update) {
         int len = sprintf(buf, "{id=%d,sat=%s,date=%lu,time=%lu,lat=%f,lng=%f,alt=%f,spd=%f,mode_3d=\"%c\",sats=%d,pdop=%f,hdop=%f,vdop=%f,status=0x%x,data_cnt=%d,error_cnt=%d}\n",
                 E_SENSOR_GPS,
                 gps_values.sat, (unsigned long)gps_values.date, (unsigned long)gps_values.time, gps_values.lat, gps_values.lng,
@@ -590,42 +640,42 @@ void tcp_server_publish_values()
                 gps_values.pdop, gps_values.hdop, gps_values.vdop, gps_values.status, gps_values.data_cnt, gps_values.error_cnt);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (bmx280lo_update) {
+    if (tcp_send_values && bmx280lo_update) {
         bmx280_values_t *values = &bmx280lo->values;
         int len = sprintf(buf, "{id=%d,temp=%f,hum=%f,press=%f,alt=%f}\n",
             E_SENSOR_BMX280_LO,
             values->temperature, values->humidity, values->pressure, values->altitude);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (bmx280hi_update) {
+    if (tcp_send_values && bmx280hi_update) {
         bmx280_values_t *values = &bmx280hi->values;
         int len = sprintf(buf, "{id=%d,temp=%f,hum=%f,press=%f,alt=%f}\n",
             E_SENSOR_BMX280_HI,
             values->temperature, values->humidity, values->pressure, values->altitude);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (mhz19_update) {
+    if (tcp_send_values && mhz19_update) {
         mhz19_values_t *values = &mhz19->values;
         int len = sprintf(buf, "{id=%d,co2=%d,temp=%d,status=%d}\n",
             E_SENSOR_MHZ19,
             values->co2, values->temp, values->status);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (scd4x_update) {
+    if (scd4x_update || status.scd4x_auto_values) {
         scd4x_values_t *values = &scd4x->values;
         int len = sprintf(buf, "{id=%d,co2=%d,temp=%f,hum=%f,st=%d}\n",
             E_SENSOR_SCD4X,
             values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (yys_update) {
+    if (tcp_send_values && yys_update) {
         int len = sprintf(buf, "{id=%d,o2=%f,co=%f,,h2s=%f,ch4=%f}\n",
             E_SENSOR_YYS,
             yys_get_o2(yys_sensor), yys_get_co(yys_sensor),
             yys_get_h2s(yys_sensor), yys_get_ch4(yys_sensor));
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (sps30_update) {
+    if (tcp_send_values && sps30_update) {
         sps30_values_t *values = &sps30->values;
         int len = sprintf(buf, "{id=%d,status=%lu,pm0_5=%f,typ_part_sz=%f",
             E_SENSOR_SPS30,
@@ -636,7 +686,7 @@ void tcp_server_publish_values()
         len += sprintf(&buf[len], "pm10_0=%f,p10_0=%f}\n", values->mc_10p0, values->nc_10p0);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (adxl345_update) {
+    if (tcp_send_values && adxl345_update) {
         adxl345_values_t *values = &adxl345->values;
         int len = sprintf(buf, "{id=%d,x=%f,y=%f,z=%f,abs=%f,offs=%f %f %f}\n",
             E_SENSOR_ADXL345,
@@ -644,7 +694,7 @@ void tcp_server_publish_values()
             values->accel_offset_x, values->accel_offset_y, values->accel_offset_z);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (qmc5883l_update) {
+    if (tcp_send_values && qmc5883l_update) {
         qmc5883l_values_t *values = &qmc5883l->values;
         int len = sprintf(buf, "{id=%d,status=%d,x=%f,y=%f,z=%f,range=%f}\n",
             E_SENSOR_QMC5883L,

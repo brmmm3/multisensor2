@@ -132,10 +132,13 @@ typedef struct status_s {
     uint32_t uptime_cnt;
     bool force_update;
     bool recording;
+    bool auto_status;
+    bool scd4x_auto_values;
     uint16_t record_pos;
     uint16_t file_cnt;
     char filename[32];
     uint8_t lcd_pwr;
+    int8_t rssi;
 } status_t;
 
 extern rtc_t *rtc;
