@@ -32,6 +32,7 @@ static uint8_t update_all_cnt = 0;
 bool tcp_server_running = false;
 bool tcp_send_values = false;
 uint8_t tcp_client_cnt = 0;
+static bool json_format = false;
 
 
 static bool send_message(const char *buf, int len)
@@ -300,7 +301,8 @@ static void tcp_server_task(void *pvParameters)
                     } else {
                         tcp_send_values = true;
                         force_update_all = true;
-                        if (value == 1) update_all_cnt = 2;
+                        json_format = value < 3;
+                        if (value == 1 || value == 3) update_all_cnt = 2;
                     }
                 } else if (strcmp(rx_buffer, "lsr") == 0) {
                     // Show root files on SD-Card
@@ -604,9 +606,9 @@ void tcp_server_publish_values()
         return;
     }
     if (!tcp_send_values && !status.scd4x_auto_values) return;
-    if (!gps_update && !bmx280lo_update && !bmx280hi_update && !mhz19_update && !scd4x_calibrate
-        && !scd4x_update && !yys_update && !sps30_update && !adxl345_update && !qmc5883l_update
-        && !status.scd4x_auto_values) {
+    if (!force_update_all && !gps_update && !bmx280lo_update && !bmx280hi_update && !mhz19_update
+        && !scd4x_calibrate && !scd4x_update && !yys_update && !sps30_update && !adxl345_update
+        && !qmc5883l_update && !status.scd4x_auto_values) {
         return;
     }
     if (update_all_cnt > 0) {
@@ -622,82 +624,90 @@ void tcp_server_publish_values()
     uint8_t min;
     uint8_t sec;
     get_current_date_time(&year, &month, &day, &hour, &min, &sec);
-    int len = sprintf(buf, "{id=%d,date=\"%d.%02d.%02d\",time=\"%02d:%02d:%02d\",rssi=%d}\n",
-        E_SENSOR_TIME,
+    const char *fmt = json_format ? "*%d,%d.%02d.%02d,%02d:%02d:%02d,%d\n"
+                                  : "{id=%d,date=\"%d.%02d.%02d\",time=\"%02d:%02d:%02d\",rssi=%d}\n";
+    int len = sprintf(buf, fmt, E_SENSOR_TIME,
         year, month, day, hour, min, sec, status.rssi);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
-    if (status.auto_status) {
-        int len = sprintf(buf, "{id=%d,force_update=%d,recording=%d,record_pos=%d,file_cnt=%d,filename=\"%s\",rssi=%d}\n",
-            E_SENSOR_STATUS,
+    if (force_update_all || status.auto_status) {
+        const char *fmt = json_format ? "*%d,%d,%d,%d,%d,%s,%d\n"
+                                      : "{id=%d,force_update=%d,recording=%d,record_pos=%d,file_cnt=%d,filename=\"%s\",rssi=%d}\n";
+        int len = sprintf(buf, fmt, E_SENSOR_STATUS,
             status.force_update, status.recording, status.record_pos, status.file_cnt, status.filename, status.rssi);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (tcp_send_values && gps_update) {
-        int len = sprintf(buf, "{id=%d,sat=%s,date=%lu,time=%lu,lat=%f,lng=%f,alt=%f,spd=%f,mode_3d=\"%c\",sats=%d,pdop=%f,hdop=%f,vdop=%f,status=0x%x,data_cnt=%d,error_cnt=%d}\n",
-                E_SENSOR_GPS,
+    if (force_update_all || (tcp_send_values && gps_update)) {
+        const char *fmt = json_format ? "*%d,%s,%lu,%lu,%f,%f,%f,%f,%c,%d,%f,%f,%f,%x,%d,%d\n"
+                                      : "{id=%d,sat=%s,date=%lu,time=%lu,lat=%f,lng=%f,alt=%f,spd=%f,mode_3d=\"%c\",sats=%d,pdop=%f,hdop=%f,vdop=%f,status=0x%x,data_cnt=%d,error_cnt=%d}\n";
+        int len = sprintf(buf, fmt, E_SENSOR_GPS,
                 gps_values.sat, (unsigned long)gps_values.date, (unsigned long)gps_values.time, gps_values.lat, gps_values.lng,
                 gps_values.altitude, gps_values.speed, gps_values.mode_3d, gps_values.sats,
                 gps_values.pdop, gps_values.hdop, gps_values.vdop, gps_values.status, gps_values.data_cnt, gps_values.error_cnt);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (tcp_send_values && bmx280lo_update) {
+    if (force_update_all || (tcp_send_values && bmx280lo_update)) {
         bmx280_values_t *values = &bmx280lo->values;
-        int len = sprintf(buf, "{id=%d,temp=%f,hum=%f,press=%f,alt=%f}\n",
-            E_SENSOR_BMX280_LO,
+        const char *fmt = json_format ? "*%d,%f,%f,%f,%f\n"
+                                      : "{id=%d,temp=%f,hum=%f,press=%f,alt=%f}\n";
+        int len = sprintf(buf, fmt, E_SENSOR_BMX280_LO,
             values->temperature, values->humidity, values->pressure, values->altitude);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (tcp_send_values && bmx280hi_update) {
+    if (force_update_all || (tcp_send_values && bmx280hi_update)) {
         bmx280_values_t *values = &bmx280hi->values;
-        int len = sprintf(buf, "{id=%d,temp=%f,hum=%f,press=%f,alt=%f}\n",
-            E_SENSOR_BMX280_HI,
+        const char *fmt = json_format ? "*%d,%f,%f,%f,%f\n"
+                                      : "{id=%d,temp=%f,hum=%f,press=%f,alt=%f}\n";
+        int len = sprintf(buf, fmt, E_SENSOR_BMX280_HI,
             values->temperature, values->humidity, values->pressure, values->altitude);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (tcp_send_values && mhz19_update) {
+    if (force_update_all || (tcp_send_values && mhz19_update)) {
         mhz19_values_t *values = &mhz19->values;
-        int len = sprintf(buf, "{id=%d,co2=%d,temp=%d,status=%d}\n",
-            E_SENSOR_MHZ19,
+        const char *fmt = json_format ? "*%d,%d,%d,%d,%d\n"
+                                      : "{id=%d,co2=%d,temp=%d,status=%d}\n";
+        int len = sprintf(buf, fmt, E_SENSOR_MHZ19,
             values->co2, values->temp, values->status);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (scd4x_update || status.scd4x_auto_values) {
+    if (force_update_all || (scd4x_update || status.scd4x_auto_values)) {
         scd4x_values_t *values = &scd4x->values;
-        int len = sprintf(buf, "{id=%d,co2=%d,temp=%f,hum=%f,st=%d}\n",
-            E_SENSOR_SCD4X,
+        const char *fmt = json_format ? "*%d,%d,%d,%f,%f,%d\n"
+                                      : "{id=%d,co2=%d,temp=%f,hum=%f,st=%d}\n";
+        int len = sprintf(buf, fmt, E_SENSOR_SCD4X,
             values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (tcp_send_values && yys_update) {
-        int len = sprintf(buf, "{id=%d,o2=%f,co=%f,,h2s=%f,ch4=%f}\n",
-            E_SENSOR_YYS,
+    if (force_update_all || (tcp_send_values && yys_update)) {
+        const char *fmt = json_format ? "*%d,%f,%f,%f,%f\n"
+                                      : "{id=%d,o2=%f,co=%f,h2s=%f,ch4=%f}\n";
+        int len = sprintf(buf, fmt, E_SENSOR_YYS,
             yys_get_o2(yys_sensor), yys_get_co(yys_sensor),
             yys_get_h2s(yys_sensor), yys_get_ch4(yys_sensor));
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (tcp_send_values && sps30_update) {
+    if (force_update_all || (tcp_send_values && sps30_update)) {
         sps30_values_t *values = &sps30->values;
-        int len = sprintf(buf, "{id=%d,status=%lu,pm0_5=%f,typ_part_sz=%f",
-            E_SENSOR_SPS30,
-            (unsigned long)values->status, values->nc_0p5, values->typical_particle_size);
-        len += sprintf(&buf[len], "pm1_0=%f,p1_0=%f,", values->mc_1p0, values->nc_1p0);
-        len += sprintf(&buf[len], "pm2_5=%f,p2_5=%f,", values->mc_2p5, values->nc_2p5);
-        len += sprintf(&buf[len], "pm4_0=%f,p4_0=%f,", values->mc_4p0, values->nc_4p0);
-        len += sprintf(&buf[len], "pm10_0=%f,p10_0=%f}\n", values->mc_10p0, values->nc_10p0);
+        const char *fmt = json_format ? "*%d,%lu,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n"
+                                      : "{id=%d,status=%lu,pm0_5=%f,typ_part_sz=%f,pm1_0=%f,p1_0=%f,pm2_5=%f,p2_5=%f,pm4_0=%f,p4_0=%f,pm10_0=%f,p10_0=%f}\n";
+        int len = sprintf(buf, fmt, E_SENSOR_SPS30,
+            (unsigned long)values->status, values->nc_0p5, values->typical_particle_size, values->mc_1p0, values->nc_1p0,
+            values->mc_2p5, values->nc_2p5, values->mc_4p0, values->nc_4p0, values->mc_10p0, values->nc_10p0);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (tcp_send_values && adxl345_update) {
+    if (force_update_all || (tcp_send_values && adxl345_update)) {
         adxl345_values_t *values = &adxl345->values;
-        int len = sprintf(buf, "{id=%d,x=%f,y=%f,z=%f,abs=%f,offs=%f %f %f}\n",
-            E_SENSOR_ADXL345,
+        const char *fmt = json_format ? "*%d,%f,%f,%f,%f,%f,%f,%f\n"
+                                      : "{id=%d,x=%f,y=%f,z=%f,abs=%f,offs=%f %f %f}\n";
+        int len = sprintf(buf, fmt, E_SENSOR_ADXL345,
             values->accel_x, values->accel_y, values->accel_z, values->accel_abs,
             values->accel_offset_x, values->accel_offset_y, values->accel_offset_z);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (tcp_send_values && qmc5883l_update) {
+    if (force_update_all || (tcp_send_values && qmc5883l_update)) {
         qmc5883l_values_t *values = &qmc5883l->values;
-        int len = sprintf(buf, "{id=%d,status=%d,x=%f,y=%f,z=%f,range=%f}\n",
-            E_SENSOR_QMC5883L,
+        const char *fmt = json_format ? "*%d,%d,%f,%f,%f,%f\n"
+                                      : "{id=%d,status=%d,x=%f,y=%f,z=%f,range=%f}\n";
+        int len = sprintf(buf, fmt, E_SENSOR_QMC5883L,
             values->status, values->mag_x, values->mag_y, values->mag_z, values->range);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
