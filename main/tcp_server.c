@@ -265,7 +265,7 @@ static void tcp_server_task(void *pvParameters)
         len = sprintf(rx_buffer, "{id=%d,lat=\"%c\",lng=\"%c\",co2=\"ppm\",temp=\"°C\",hum=\"%%\",o2=\"%%\",co=\"ppm\",h2s=\"ppm\",ch4=\"ppm\",",
             E_SENSOR_UNITS,
             gps_values.ns, gps_values.ew);
-        len += sprintf(&rx_buffer[len], "pm0_5=\"#/cm3\",typ_part_sz=\"um\",pm1_0=\"ug/cm3\",p1_0=\"#/cm3\"}");
+        len += sprintf(&rx_buffer[len], "pm0_5=\"#/cm3\",typ_part_sz=\"um\",pm1_0=\"ug/cm3\",p1_0=\"#/cm3\",");
         len += sprintf(&rx_buffer[len], "pm2_5=\"ug/cm3\",p2_5=\"#/cm3\",pm4_0=\"ug/cm3\",p4_0=\"#/cm3\",pm10_0=\"ug/cm3\",p10_0=\"#/cm3\",");
         len += sprintf(&rx_buffer[len], "adxl345=\"g\",qmc5883l=\"gauss\"}\n");
         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
@@ -663,7 +663,7 @@ void tcp_server_publish_values()
     }
     if (force_update_all || (tcp_send_values && mhz19_update)) {
         mhz19_values_t *values = &mhz19->values;
-        const char *fmt = json_format ? "*%d,%d,%d,%d,%d\n"
+        const char *fmt = json_format ? "*%d,%d,%d,%d\n"
                                       : "{id=%d,co2=%d,temp=%d,status=%d}\n";
         int len = sprintf(buf, fmt, E_SENSOR_MHZ19,
             values->co2, values->temp, values->status);
@@ -671,7 +671,7 @@ void tcp_server_publish_values()
     }
     if (force_update_all || (scd4x_update || status.scd4x_auto_values)) {
         scd4x_values_t *values = &scd4x->values;
-        const char *fmt = json_format ? "*%d,%d,%d,%f,%f,%d\n"
+        const char *fmt = json_format ? "*%d,%d,%f,%f,%d\n"
                                       : "{id=%d,co2=%d,temp=%f,hum=%f,st=%d}\n";
         int len = sprintf(buf, fmt, E_SENSOR_SCD4X,
             values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
@@ -688,10 +688,10 @@ void tcp_server_publish_values()
     if (force_update_all || (tcp_send_values && sps30_update)) {
         sps30_values_t *values = &sps30->values;
         const char *fmt = json_format ? "*%d,%lu,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n"
-                                      : "{id=%d,status=%lu,pm0_5=%f,typ_part_sz=%f,pm1_0=%f,p1_0=%f,pm2_5=%f,p2_5=%f,pm4_0=%f,p4_0=%f,pm10_0=%f,p10_0=%f}\n";
+                                      : "{id=%d,status=%lu,pm0_5=%f,pm1_0=%f,p1_0=%f,pm2_5=%f,p2_5=%f,pm4_0=%f,p4_0=%f,pm10_0=%f,p10_0=%f,typ_part_sz=%f}\n";
         int len = sprintf(buf, fmt, E_SENSOR_SPS30,
-            (unsigned long)values->status, values->nc_0p5, values->typical_particle_size, values->mc_1p0, values->nc_1p0,
-            values->mc_2p5, values->nc_2p5, values->mc_4p0, values->nc_4p0, values->mc_10p0, values->nc_10p0);
+            (unsigned long)values->status, values->nc_0p5, values->mc_1p0, values->nc_1p0, values->mc_2p5, values->nc_2p5,
+            values->mc_4p0, values->nc_4p0, values->mc_10p0, values->nc_10p0, values->typical_particle_size);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && adxl345_update)) {
