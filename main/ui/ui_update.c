@@ -100,7 +100,7 @@ void update_gps_tab(bool force_update)
         sprintf(buf, "SATs=%d  MODE=%s  TYP=%s",
             gps_status->sats,
             gps_status->mode_3d == 2 ? "2D" : gps_status->mode_3d == 3 ? "3D": "-",
-            gps_status->sat);
+            get_gps_sat_type(gps_status->sat));
         lv_label_set_text(ui->lbl_gps_sats, buf);
         uint8_t st = gps_status->status;
         sprintf(buf, "%c%c%c%c%c%c",

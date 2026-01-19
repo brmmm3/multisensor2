@@ -23,6 +23,17 @@ static hw_serial_t *gps_serial = NULL;
 static TaskHandle_t gps_sensor_task_handle = NULL;
 
 
+const char *get_gps_sat_type(uint8_t sat)
+{
+    switch (sat) {
+        case E_GPS_SAT_GPS: return "GPS";
+        case E_GPS_SAT_GPS_GLN: return "GPS+GLN";
+        case E_GPS_SAT_GLN: return "GLN";
+        case E_GPS_SAT_BDU: return "BDU";
+        default: return "?";
+    }
+}
+
 uint8_t nmea_get_checksum(const char *buf)
 {
     const char *n = buf + 1; // Plus one, skip '$'
@@ -321,12 +332,12 @@ static void gps_sensor_task(void *arg)
         }
         while (end != NULL) {
             if (strncmp(p, "$G", 2) == 0) {
-                if (p[2] == 'P') status->sat = "GPS";
-                else if (p[2] == 'N') status->sat = "GPS+GLN";
-                else if (p[2] == 'L') status->sat = "GLN";
+                if (p[2] == 'P') status->sat = E_GPS_SAT_GPS;
+                else if (p[2] == 'N') status->sat = E_GPS_SAT_GPS_GLN;
+                else if (p[2] == 'L') status->sat = E_GPS_SAT_GLN;
                 else break;
             } else if (strncmp(p, "$BD", 3) == 0) {
-                status->sat = "BDU";
+                status->sat = E_GPS_SAT_BDU;
             } else {
                 //ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, rxBytes, ESP_LOG_ERROR);
                 p = strchr(end + 1, '$');
@@ -474,7 +485,7 @@ esp_err_t gps_init_sensor(gps_sensor_t **sensor_ptr)
     sensor->serial = gps_serial;
     sensor->messages = NULL;
     sensor->msg_size = 0;
-    sensor->status.sat = "?";
+    sensor->status.sat = E_GPS_SAT_UNKNOWN;
     *sensor_ptr = sensor;
 
     xTaskCreate(gps_sensor_task, "gps_sensor_task", 4096, sensor, configMAX_PRIORITIES - 1, &gps_sensor_task_handle);
@@ -547,8 +558,8 @@ void gps_dump_values(gps_sensor_t *sensor, bool force)
     if (force || sensor->debug & 1) {
         gps_status_t *status = &sensor->status;
 
-        ESP_LOGI(TAG, "%s date=%lu time=%lu lat=%f %c lng=%f %c altitude=%f speed=%f mode_3d=%c sats=%d status=0x%x errors=%d",
-                 status->sat, status->date, status->time, status->lat, status->ns, status->lng, status->ew, status->altitude,
+        ESP_LOGI(TAG, "sat=%s date=%lu time=%lu lat=%f %c lng=%f %c altitude=%f speed=%f mode_3d=%c sats=%d status=0x%x errors=%d",
+                 get_gps_sat_type(status->sat), status->date, status->time, status->lat, status->ns, status->lng, status->ew, status->altitude,
                  status->speed, status->mode_3d, status->sats, status->status, status->error_cnt);
     }
     if (force || sensor->debug & 2) {

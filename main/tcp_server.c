@@ -32,7 +32,34 @@ static uint8_t update_all_cnt = 0;
 bool tcp_server_running = false;
 bool tcp_send_values = false;
 uint8_t tcp_client_cnt = 0;
-static bool json_format = false;
+static bool opt_format = false;
+
+static const char *help =
+    "val 0=off,1=send optimized,2=send optimized all,3=send json,4=send json all\n"
+    "lsr  Show root files\n"
+    "ls   Show files in data\n"
+    "cp *|filename  Copy data (all) file(s)\n"
+    "mv *|filename  Move data (all) file(s)\n"
+    "rm *|filename  Remove data (all) file(s)\n"
+    "rec 0|1\n"
+    "free\n"
+    "config\n"
+    "lock\n"
+    "unlock\n"
+    "status [0|1]\n"
+    "pwr lcd 0-3|gps 0-2|scd 0-2|wifi 0-2|mode 0-3\n"
+    "reset gps soft|full\n"
+    "gps\n"
+    "bme280lo\n"
+    "bme280hi\n"
+    "mhz19\n"
+    "scd4x {cal [co2]|autoadj int|status|val [0|1]|temp_offs|altitude|pressure]\n"
+    "yys\n"
+    "sps30\n"
+    "auto con 0-4|rec 0-1|tcp 0-1|ftp 0-1\n"
+    "save\n"
+    "tab 0-5\n"
+    "rtc [yy.mm.dd HH:MM:SS]\n";
 
 
 static bool send_message(const char *buf, int len)
@@ -58,6 +85,126 @@ static bool send_data_to_client(int client_sock, uint8_t *data, int to_write)
         written += ret;
     }
     return true;
+}
+
+static int get_date_time(char *buf)
+{
+   uint16_t year;
+    uint8_t month;
+    uint8_t day;
+    uint8_t hour;
+    uint8_t min;
+    uint8_t sec;
+    get_current_date_time(&year, &month, &day, &hour, &min, &sec);
+    const char *fmt = opt_format ? "*%d,%d.%02d.%02d,%02d:%02d:%02d,%d\n"
+                                 : "{id=%d,date=\"%d.%02d.%02d\",time=\"%02d:%02d:%02d\",rssi=%d}\n";
+    return sprintf(buf, fmt, E_SENSOR_DATETIME,
+        year, month, day, hour, min, sec, status.rssi);
+}
+
+static int get_config(char *buf)
+{
+    const char *fmt = opt_format ? "*%d,%d,%d,%d,"
+                                 : "{id=%d,cfg_version=%d,auto_connect=%d,auto_record=%d,";
+    int len = sprintf(rx_buffer, fmt, E_SENSOR_CONFIG,
+        config->cfg_version, config->auto_connect, config->auto_record);
+    fmt = opt_format ? "%d,%d,%d,%d,%d,"
+                     : "lcd_pwr=%d,gps_pwr=%d,scd4x_pwr=%d,wifi_pwr=%d,mode_pwr=%d,";
+    len += sprintf(&rx_buffer[len], fmt,
+        config->lcd_pwr, config->gps_pwr, config->scd4x_pwr, config->wifi_pwr, config->mode_pwr);
+    fmt = opt_format ? "%d,%d"
+                     : "tcp_auto_start=%d,ftp_auto_start=%d";
+    len += sprintf(&rx_buffer[len], fmt, config->tcp_auto_start, config->ftp_auto_start);
+    fmt = opt_format ? ",%d=%d"
+                     : ",ssid%d=%s";
+    for (int i = 0; i < 4; i++) {
+        if (strlen(config_nvs->wifi.ssid[i]) > 0) {
+            len += sprintf(&rx_buffer[len], fmt, i, config_nvs->wifi.ssid[i]);
+        }
+    }
+    if (opt_format) {
+        len += sprintf(&rx_buffer[len], "\n");
+    } else {
+        len += sprintf(&rx_buffer[len], "}\n");
+    }
+    return len;
+}
+
+static int get_status(char *buf)
+{
+    const char *fmt = opt_format ? "*%d,%d,%d,%d,%d,%s,%d\n"
+                                 : "{id=%d,force_update=%d,recording=%d,record_pos=%d,file_cnt=%d,filename=\"%s\",rssi=%d}\n";
+    return sprintf(buf, fmt, E_SENSOR_STATUS,
+        status.force_update, status.recording, status.record_pos, status.file_cnt, status.filename, status.rssi);
+}
+
+static int get_gps_values(char *buf)
+{
+    const char *fmt = opt_format ? "*%d,%d,%lu,%lu,%f,%c,%f,%c,%f,%f,%c,%d,%f,%f,%f,%x,%d,%d\n"
+                                 : "{id=%d,sat=%d,date=%lu,time=%lu,lat=%f,lat_unit=\"%c\",lng=%f,lng_unit=\"%c\",alt=%f,spd=%f,mode_3d=\"%c\",sats=%d,pdop=%f,hdop=%f,vdop=%f,status=0x%x,data_cnt=%d,error_cnt=%d}\n";
+    return sprintf(buf, fmt, E_SENSOR_GPS,
+            gps_values.sat, (unsigned long)gps_values.date, (unsigned long)gps_values.time, gps_values.lat, gps_values.ns,
+            gps_values.lng, gps_values.ew, gps_values.altitude, gps_values.speed, gps_values.mode_3d, gps_values.sats,
+            gps_values.pdop, gps_values.hdop, gps_values.vdop, gps_values.status, gps_values.data_cnt, gps_values.error_cnt);
+}
+
+static int get_bme280_values(char *buf, bmx280_values_t *values)
+{
+    const char *fmt = opt_format ? "*%d,%f,%f,%f,%f\n"
+                                 : "{id=%d,temp=%f,hum=%f,press=%f,alt=%f}\n";
+    return sprintf(buf, fmt, E_SENSOR_BMX280_LO,
+        values->temperature, values->humidity, values->pressure, values->altitude);
+}
+
+static int get_mhz19_values(char *buf, mhz19_values_t *values)
+{
+    const char *fmt = opt_format ? "*%d,%d,%d,%d\n"
+                                 : "{id=%d,co2=%d,temp=%d,status=%d}\n";
+    return sprintf(buf, fmt, E_SENSOR_MHZ19,
+        values->co2, values->temp, values->status);
+}
+
+static int get_scd4x_values(char *buf, scd4x_values_t *values)
+{
+    const char *fmt = opt_format ? "*%d,%d,%f,%f,%d\n"
+                                 : "{id=%d,co2=%d,temp=%f,hum=%f,st=%d}\n";
+    return sprintf(buf, fmt, E_SENSOR_SCD4X,
+        values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
+}
+
+static int get_yys_values(char *buf)
+{
+    const char *fmt = opt_format ? "*%d,%f,%f,%f,%f\n"
+                                 : "{id=%d,o2=%f,co=%f,h2s=%f,ch4=%f}\n";
+    return sprintf(buf, fmt, E_SENSOR_YYS,
+        yys_get_o2(yys_sensor), yys_get_co(yys_sensor),
+        yys_get_h2s(yys_sensor), yys_get_ch4(yys_sensor));
+}
+
+static int get_sps30_values(char *buf, sps30_values_t *values)
+{
+    const char *fmt = opt_format ? "*%d,%lu,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n"
+                                 : "{id=%d,status=%lu,pm0_5=%f,pm1_0=%f,p1_0=%f,pm2_5=%f,p2_5=%f,pm4_0=%f,p4_0=%f,pm10_0=%f,p10_0=%f,typ_part_sz=%f}\n";
+    return sprintf(buf, fmt, E_SENSOR_SPS30,
+        (unsigned long)values->status, values->nc_0p5, values->mc_1p0, values->nc_1p0, values->mc_2p5, values->nc_2p5,
+        values->mc_4p0, values->nc_4p0, values->mc_10p0, values->nc_10p0, values->typical_particle_size);
+}
+
+static int get_adxl345_values(char *buf, adxl345_values_t *values)
+{
+    const char *fmt = opt_format ? "*%d,%f,%f,%f,%f,%f,%f,%f\n"
+                                 : "{id=%d,x=%f,y=%f,z=%f,abs=%f,offs=%f %f %f}\n";
+    return sprintf(buf, fmt, E_SENSOR_ADXL345,
+        values->accel_x, values->accel_y, values->accel_z, values->accel_abs,
+        values->accel_offset_x, values->accel_offset_y, values->accel_offset_z);
+}
+
+static int get_qmc5883l_values(char *buf, qmc5883l_values_t *values)
+{
+    const char *fmt = opt_format ? "*%d,%d,%f,%f,%f,%f\n"
+                                 : "{id=%d,status=%d,x=%f,y=%f,z=%f,range=%f}\n";
+    return sprintf(buf, fmt, E_SENSOR_QMC5883L,
+        values->status, values->mag_x, values->mag_y, values->mag_z, values->range);
 }
 
 static esp_err_t client_cmd_ls(int client_sock)
@@ -294,14 +441,16 @@ static void tcp_server_task(void *pvParameters)
                 char *response = "OK\n";
 
                 if (strcmp(rx_buffer, "bye") == 0) break;
-                if (strncmp(rx_buffer, "val ", 4) == 0) {
+                if (strcmp(rx_buffer, "help") == 0) {
+                    send_data_to_client(client_sock, (uint8_t *)help, strlen(help));
+                } else if (strncmp(rx_buffer, "val ", 4) == 0) {
                     int value = atoi(&rx_buffer[4]);
                     if (value == 0) {
                         tcp_send_values = false;
                     } else {
                         tcp_send_values = true;
                         force_update_all = true;
-                        json_format = value < 3;
+                        opt_format = value < 3;
                         if (value == 1 || value == 3) update_all_cnt = 2;
                     }
                 } else if (strcmp(rx_buffer, "lsr") == 0) {
@@ -364,29 +513,20 @@ static void tcp_server_task(void *pvParameters)
                     ui_sd_record_set_value(false);
                 } else if (strcmp(rx_buffer, "free") == 0) {
                     sd_fat_info_t *fat_info = sd_get_fat_info();
-                    len = sprintf(rx_buffer, "fs: %" PRIu64 " MB\n", fat_info->bytes_free / (1024 * 1024));
-                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                     size_t total_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
                     size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-                    len = sprintf(rx_buffer, "heap: free=%u largest_block=%u frag=%d%%\n",
-                        total_free, largest_block, 100 - (largest_block * 100 / (total_free + 1)));
+                    const char *fmt = opt_format ? "*%d,%llu,%u,%u,%d\n"
+                                                 : "{id=%d,fs=%llu,ram=%u,largest_block=%u,frag=%d}\n";
+                    int len = sprintf(rx_buffer, fmt, E_SENSOR_FREE,
+                        fat_info->bytes_free, total_free, largest_block, 100 - (largest_block * 100 / (total_free + 1)));
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                     ESP_LOGI(TAG, "%s", rx_buffer);
+                    continue;
                 } else if (strcmp(rx_buffer, "config") == 0) {
                     // Get config
-                    int len = sprintf(rx_buffer, "{id=%d,cfg_version=%d,auto_connect=%d,auto_record=%d,",
-                        E_SENSOR_CONFIG,
-                        config->cfg_version, config->auto_connect, config->auto_record);
-                    len += sprintf(&rx_buffer[len], "lcd_pwr=%d,gps_pwr=%d,scd4x_pwr=%d,wifi_pwr=%d,mode_pwr=%d,",
-                        config->lcd_pwr, config->gps_pwr, config->scd4x_pwr, config->wifi_pwr, config->mode_pwr);
-                    len += sprintf(&rx_buffer[len], "tcp_auto_start=%d,ftp_auto_start=%d", config->tcp_auto_start, config->ftp_auto_start);
-                    for (int i = 0; i < 4; i++) {
-                        if (strlen(config_nvs->wifi.ssid[i]) > 0) {
-                            len += sprintf(&rx_buffer[len], ",ssid%d=%s", i, config_nvs->wifi.ssid[i]);
-                        }
-                    }
-                    len += sprintf(&rx_buffer[len], "}\n");
+                    int len = get_config(rx_buffer);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                    continue;
                 } else if (strcmp(rx_buffer, "lock") == 0) {
                     ui_config_lock(true);
                 } else if (strcmp(rx_buffer, "unlock") == 0) {
@@ -397,10 +537,9 @@ static void tcp_server_task(void *pvParameters)
                     status.auto_status = false;
                 } else if (strcmp(rx_buffer, "status") == 0) {
                     // Get status
-                    int len = sprintf(rx_buffer, "{id=%d,force_update=%d,recording=%d,record_pos=%d,file_cnt=%d,filename=\"%s\",rssi=%d}\n",
-                        E_SENSOR_STATUS,
-                        status.force_update, status.recording, status.record_pos, status.file_cnt, status.filename, status.rssi);
+                    int len = get_status(rx_buffer);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                    continue;
                 } else if (strncmp(rx_buffer, "pwr ", 4) == 0) {
                     // Set power status
                     if (strncmp(&rx_buffer[4], "lcd ", 4) == 0) {
@@ -443,15 +582,36 @@ static void tcp_server_task(void *pvParameters)
                         ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
                         response = "ERR\n";
                     }
-                } else if (strncmp(rx_buffer, "scd ", 4) == 0) {
+                } else if (strcmp(rx_buffer, "gps") == 0) {
+                    int len = get_gps_values(rx_buffer);
+                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                } else if (strcmp(rx_buffer, "bme280lo") == 0) {
+                    int len = get_bme280_values(rx_buffer, &bmx280lo->values);
+                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                } else if (strcmp(rx_buffer, "bme280hi") == 0) {
+                    int len = get_bme280_values(rx_buffer, &bmx280hi->values);
+                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                } else if (strcmp(rx_buffer, "mhz19") == 0) {
+                    int len = get_mhz19_values(rx_buffer, &mhz19->values);
+                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                } else if (strcmp(rx_buffer, "scd4x") == 0) {
+                    int len = get_scd4x_values(rx_buffer, &scd4x->values);
+                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                } else if (strcmp(rx_buffer, "yys") == 0) {
+                    int len = get_yys_values(rx_buffer);
+                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                } else if (strcmp(rx_buffer, "sps30") == 0) {
+                    int len = get_sps30_values(rx_buffer, &sps30->values);
+                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                } else if (strncmp(rx_buffer, "scd4x ", 6) == 0) {
                     // Set power status
-                    if (strncmp(&rx_buffer[4], "cal ", 4) == 0) {
-                        scd4x_state_machine_cmd(SCD4X_CMD_FRC, atoi(&rx_buffer[8]));
-                    } else if (strcmp(&rx_buffer[4], "cal") == 0) {
+                    if (strncmp(&rx_buffer[6], "cal ", 4) == 0) {
+                        scd4x_state_machine_cmd(SCD4X_CMD_FRC, atoi(&rx_buffer[10]));
+                    } else if (strcmp(&rx_buffer[6], "cal") == 0) {
                         scd4x_state_machine_cmd(SCD4X_CMD_FRC, mhz19->values.co2);
-                    } else if (strncmp(&rx_buffer[4], "autoadj ", 8) == 0) {
-                        config->scd4x_auto_adjust = atoi(&rx_buffer[12]) != 0;
-                    } else if (strcmp(&rx_buffer[4], "status") == 0) {
+                    } else if (strncmp(&rx_buffer[6], "autoadj ", 8) == 0) {
+                        config->scd4x_auto_adjust = atoi(&rx_buffer[14]) != 0;
+                    } else if (strcmp(&rx_buffer[6], "status") == 0) {
                         esp_err_t err = scd4x_stop_periodic_measurement(scd4x);
                         if (err == ESP_OK) {
                             scd4x->temperature_offset = scd4x_get_temperature_offset(scd4x);
@@ -465,19 +625,20 @@ static void tcp_server_task(void *pvParameters)
                             ESP_LOGE(TAG, "Failed to stop periodic measurement: %d", err);
                             response = "ERR\n";
                         }
-                        int len = sprintf(rx_buffer, "{id=%d,temp_offs=%f,altitude=%d,pressure=%d}\n",
-                            E_SENSOR_SCD4XCAL,
+                        const char *fmt = opt_format ? "*%d,%f,%d,%d\n"
+                                                     : "{id=%d,temp_offs=%f,altitude=%d,pressure=%d}\n";
+                        int len = sprintf(rx_buffer, fmt, E_SENSOR_SCD4XCAL,
                             scd4x->temperature_offset, scd4x->altitude, scd4x->pressure);
                         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
-                    } else if (strcmp(&rx_buffer[4], "values 1") == 0) {
+                    } else if (strcmp(&rx_buffer[4], "val 1") == 0) {
                         status.scd4x_auto_values = true;
-                    } else if (strcmp(&rx_buffer[4], "values 0") == 0) {
+                    } else if (strcmp(&rx_buffer[4], "val 0") == 0) {
                         status.scd4x_auto_values = false;
-                    } else if (strcmp(&rx_buffer[4], "values") == 0) {
+                    } else if (strcmp(&rx_buffer[4], "val") == 0) {
                         scd4x_values_t *values = &scd4x->values;
-
-                        int len = sprintf(rx_buffer, "{id=%d,co2=%d,temp=%f,hum=%f,st=%d}\n",
-                            E_SENSOR_SCD4X,
+                        const char *fmt = opt_format ? "*%d,%d,%f,%f,%d\n"
+                                                     : "{id=%d,co2=%d,temp=%f,hum=%f,st=%d}\n";
+                        int len = sprintf(rx_buffer, fmt, E_SENSOR_SCD4X,
                             values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
                         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                     } else if (strncmp(&rx_buffer[4], "temp_offs ", 10) == 0) {
@@ -617,98 +778,46 @@ void tcp_server_publish_values()
         }
     }
  
-    uint16_t year;
-    uint8_t month;
-    uint8_t day;
-    uint8_t hour;
-    uint8_t min;
-    uint8_t sec;
-    get_current_date_time(&year, &month, &day, &hour, &min, &sec);
-    const char *fmt = json_format ? "*%d,%d.%02d.%02d,%02d:%02d:%02d,%d\n"
-                                  : "{id=%d,date=\"%d.%02d.%02d\",time=\"%02d:%02d:%02d\",rssi=%d}\n";
-    int len = sprintf(buf, fmt, E_SENSOR_TIME,
-        year, month, day, hour, min, sec, status.rssi);
+    int len = get_date_time(buf);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     if (force_update_all || status.auto_status) {
-        const char *fmt = json_format ? "*%d,%d,%d,%d,%d,%s,%d\n"
-                                      : "{id=%d,force_update=%d,recording=%d,record_pos=%d,file_cnt=%d,filename=\"%s\",rssi=%d}\n";
-        int len = sprintf(buf, fmt, E_SENSOR_STATUS,
-            status.force_update, status.recording, status.record_pos, status.file_cnt, status.filename, status.rssi);
+        len = get_status(buf);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && gps_update)) {
-        const char *fmt = json_format ? "*%d,%s,%lu,%lu,%f,%f,%f,%f,%c,%d,%f,%f,%f,%x,%d,%d\n"
-                                      : "{id=%d,sat=%s,date=%lu,time=%lu,lat=%f,lng=%f,alt=%f,spd=%f,mode_3d=\"%c\",sats=%d,pdop=%f,hdop=%f,vdop=%f,status=0x%x,data_cnt=%d,error_cnt=%d}\n";
-        int len = sprintf(buf, fmt, E_SENSOR_GPS,
-                gps_values.sat, (unsigned long)gps_values.date, (unsigned long)gps_values.time, gps_values.lat, gps_values.lng,
-                gps_values.altitude, gps_values.speed, gps_values.mode_3d, gps_values.sats,
-                gps_values.pdop, gps_values.hdop, gps_values.vdop, gps_values.status, gps_values.data_cnt, gps_values.error_cnt);
+        len = get_gps_values(buf);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && bmx280lo_update)) {
-        bmx280_values_t *values = &bmx280lo->values;
-        const char *fmt = json_format ? "*%d,%f,%f,%f,%f\n"
-                                      : "{id=%d,temp=%f,hum=%f,press=%f,alt=%f}\n";
-        int len = sprintf(buf, fmt, E_SENSOR_BMX280_LO,
-            values->temperature, values->humidity, values->pressure, values->altitude);
+        len = get_bme280_values(buf, &bmx280lo->values);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && bmx280hi_update)) {
-        bmx280_values_t *values = &bmx280hi->values;
-        const char *fmt = json_format ? "*%d,%f,%f,%f,%f\n"
-                                      : "{id=%d,temp=%f,hum=%f,press=%f,alt=%f}\n";
-        int len = sprintf(buf, fmt, E_SENSOR_BMX280_HI,
-            values->temperature, values->humidity, values->pressure, values->altitude);
+        len = get_bme280_values(buf, &bmx280hi->values);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && mhz19_update)) {
-        mhz19_values_t *values = &mhz19->values;
-        const char *fmt = json_format ? "*%d,%d,%d,%d\n"
-                                      : "{id=%d,co2=%d,temp=%d,status=%d}\n";
-        int len = sprintf(buf, fmt, E_SENSOR_MHZ19,
-            values->co2, values->temp, values->status);
+        len = get_mhz19_values(buf, &mhz19->values);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (scd4x_update || status.scd4x_auto_values)) {
-        scd4x_values_t *values = &scd4x->values;
-        const char *fmt = json_format ? "*%d,%d,%f,%f,%d\n"
-                                      : "{id=%d,co2=%d,temp=%f,hum=%f,st=%d}\n";
-        int len = sprintf(buf, fmt, E_SENSOR_SCD4X,
-            values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
+        len = get_scd4x_values(buf, &scd4x->values);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && yys_update)) {
-        const char *fmt = json_format ? "*%d,%f,%f,%f,%f\n"
-                                      : "{id=%d,o2=%f,co=%f,h2s=%f,ch4=%f}\n";
-        int len = sprintf(buf, fmt, E_SENSOR_YYS,
-            yys_get_o2(yys_sensor), yys_get_co(yys_sensor),
-            yys_get_h2s(yys_sensor), yys_get_ch4(yys_sensor));
+        len = get_yys_values(buf);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && sps30_update)) {
-        sps30_values_t *values = &sps30->values;
-        const char *fmt = json_format ? "*%d,%lu,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n"
-                                      : "{id=%d,status=%lu,pm0_5=%f,pm1_0=%f,p1_0=%f,pm2_5=%f,p2_5=%f,pm4_0=%f,p4_0=%f,pm10_0=%f,p10_0=%f,typ_part_sz=%f}\n";
-        int len = sprintf(buf, fmt, E_SENSOR_SPS30,
-            (unsigned long)values->status, values->nc_0p5, values->mc_1p0, values->nc_1p0, values->mc_2p5, values->nc_2p5,
-            values->mc_4p0, values->nc_4p0, values->mc_10p0, values->nc_10p0, values->typical_particle_size);
+        len = get_sps30_values(buf, &sps30->values);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && adxl345_update)) {
-        adxl345_values_t *values = &adxl345->values;
-        const char *fmt = json_format ? "*%d,%f,%f,%f,%f,%f,%f,%f\n"
-                                      : "{id=%d,x=%f,y=%f,z=%f,abs=%f,offs=%f %f %f}\n";
-        int len = sprintf(buf, fmt, E_SENSOR_ADXL345,
-            values->accel_x, values->accel_y, values->accel_z, values->accel_abs,
-            values->accel_offset_x, values->accel_offset_y, values->accel_offset_z);
+        len = get_adxl345_values(buf, &adxl345->values);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && qmc5883l_update)) {
-        qmc5883l_values_t *values = &qmc5883l->values;
-        const char *fmt = json_format ? "*%d,%d,%f,%f,%f,%f\n"
-                                      : "{id=%d,status=%d,x=%f,y=%f,z=%f,range=%f}\n";
-        int len = sprintf(buf, fmt, E_SENSOR_QMC5883L,
-            values->status, values->mag_x, values->mag_y, values->mag_z, values->range);
+        len = get_qmc5883l_values(buf, &qmc5883l->values);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
 }

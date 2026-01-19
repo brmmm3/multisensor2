@@ -57,9 +57,10 @@ typedef enum {
     E_SENSOR_STATUS,
     E_SENSOR_UNITS,
     E_SENSOR_FREE,
-    E_SENSOR_DATE = 0x0F,
+    E_SENSOR_DATE = 0x10,
     E_SENSOR_TIME,
-    E_SENSOR_GPS,
+    E_SENSOR_DATETIME,
+    E_SENSOR_GPS = 0x20,
     E_SENSOR_BMX280_LO,
     E_SENSOR_BMX280_HI,
     E_SENSOR_MHZ19,
@@ -72,7 +73,7 @@ typedef enum {
 } sensors_enum_t;
 
 typedef struct gps_values_s {
-    const char *sat;
+    uint8_t sat;        // gps_sat_enum_t
     uint32_t date;
     uint32_t time;
     float lat;

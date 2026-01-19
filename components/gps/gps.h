@@ -23,6 +23,14 @@ extern "C" {
 #define NMEA_END_CHAR_1 '\n'
 #define NMEA_MAX_LENGTH 70
 
+typedef enum {
+    E_GPS_SAT_UNKNOWN = 0,
+    E_GPS_SAT_GPS,
+    E_GPS_SAT_GPS_GLN,
+    E_GPS_SAT_GLN,
+    E_GPS_SAT_BDU
+} gps_sat_enum_t;
+
 // RMC - Recommended Minimum Navigation Information
 typedef struct gps_rmc_s {
     uint16_t cnt;
@@ -119,7 +127,7 @@ typedef struct gps_zda_s {
 } gps_zda_t;
 
 typedef struct gps_status_s {
-    const char *sat;    // Statellite types
+    uint8_t sat;        // Statellites type (gps_sat_enum_t)
     uint32_t date;      // Date DDMMYY
     uint32_t time;      // UTC time HHMMSS
     float lat;          // Latitude
@@ -165,6 +173,8 @@ typedef struct gps_sensor_s {
     gps_status_t status;
     uint8_t debug;
 } gps_sensor_t;
+
+const char *get_gps_sat_type(uint8_t sat);
 
 esp_err_t gps_init_sensor(gps_sensor_t **sensor_ptr);
 
