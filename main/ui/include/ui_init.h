@@ -52,6 +52,7 @@ typedef struct ui_s {
     // Tab WiFi
     lv_obj_t *tab_wifi;
     lv_obj_t *sw_wifi_enable;
+    lv_obj_t *sw_tcp_server_enable;
     lv_obj_t *lbl_wifi_name;
     lv_obj_t *lbl_wifi_ip;
     lv_obj_t *lbl_wifi_rssi;

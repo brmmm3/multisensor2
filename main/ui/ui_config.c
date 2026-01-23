@@ -14,6 +14,7 @@
 #include "core/lv_obj_style_gen.h"
 #include "freertos/projdefs.h"
 #include "main.h"
+#include "tcp_server.h"
 
 static const char *TAG = "UIC";
 
@@ -185,6 +186,7 @@ void ui_config_lock(bool lock)
 {
     config->cfg_locked = lock;
     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_lock_obj(ui->sw_wifi_enable, lock));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(ui_lock_obj(ui->sw_tcp_server_enable, lock));
     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_lock_obj(ui->sw_record, lock));
     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_lock_obj(ui->sw_auto_record, lock));
     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_lock_obj(ui->sl_lcd_pwr, lock));
@@ -204,6 +206,18 @@ static void sw_wifi_pwr_cb(lv_event_t *e)
         wifi_init(true);
     } else {
         wifi_uninit();
+    }
+}
+
+
+static void sw_tcp_server_cb(lv_event_t *e)
+{
+    lv_obj_t * obj = lv_event_get_target(e);
+
+    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
+        tcp_server_start();
+    } else {
+        tcp_server_stop();
     }
 }
 
@@ -394,6 +408,7 @@ void ui_register_callbacks(ui_t *ui)
     lv_obj_add_event_cb(ui->tbv_main, tabview_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
     // Tab WiFi
     lv_obj_add_event_cb(ui->sw_wifi_enable, sw_wifi_pwr_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(ui->sw_tcp_server_enable, sw_tcp_server_cb, LV_EVENT_VALUE_CHANGED, NULL);
     // Tab SD
     lv_obj_add_event_cb(ui->sw_record, sw_sd_record_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(ui->sw_auto_record, sw_sd_auto_record_cb, LV_EVENT_VALUE_CHANGED, NULL);

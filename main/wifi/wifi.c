@@ -10,6 +10,7 @@
 #include "include/wifi_sntp.h"
 #include "config.h"
 #include "misc/lv_palette.h"
+#include "tcp_server.h"
 #include "ui/include/ui_config.h"
 #include "include/wifi.h"
 
@@ -217,6 +218,9 @@ esp_err_t wifi_connect(const char *ssid, const char *password)
             ui_set_tab_color(3, LV_PALETTE_RED);
         }
         wifi_connected = true;
+        if (config->tcp_auto_start) {
+            tcp_server_start();
+        }
         return ESP_OK;
     }
     if (bits & WIFI_FAIL_BIT) {
@@ -282,6 +286,7 @@ void wifi_uninit()
     connect_task_handle = NULL;
     wifi_deinit_sta();
     ui_set_tab_color(3, LV_PALETTE_GREY);
+    ui_set_switch_state(ui->sw_tcp_server_enable, false);
     ui_set_switch_state(ui->sw_wifi_enable, false);
     ui_set_label_text(ui->lbl_wifi_name, "-");
     ui_set_label_text(ui->lbl_wifi_ip, "-");
