@@ -20,13 +20,14 @@ int process_tcp_cmd(int argc, char **argv)
     if (tcp_cmd_args.cmd->count == 1) {
         const char *cmd = tcp_cmd_args.cmd->sval[0];
         if (strcmp(cmd, "start") == 0) {
-            tcp_server_start();
+            ui_set_switch_state(ui->sw_tcp_server_enable, true);
         } else if (strcmp(cmd, "stop") == 0) {
             config->tcp_auto_start = false;
-            tcp_server_stop();
+            ui_set_switch_state(ui->sw_tcp_server_enable, false);
         } else if (strcmp(cmd, "auto") == 0) {
             if (tcp_cmd_args.value->count == 1) {
                 config->tcp_auto_start = tcp_cmd_args.value->ival[0] != 0;
+                ui_set_switch_state(ui->sw_tcp_server_auto, config->tcp_auto_start);
             }
         } else {
             ESP_LOGE(TAG, "no valid arguments");

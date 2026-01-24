@@ -14,6 +14,7 @@
 #include "include/tcp_cmd.h"
 //#include "include/mqtt_cmd.h"
 #include "include/config_cmd.h"
+#include "include/sd_cmd.h"
 #include "include/reset_cmd.h"
 
 static const char *TAG = "CMD";
@@ -39,6 +40,7 @@ esp_err_t console_init()
     register_tcp_cmd();
     //register_mqtt_cmd();
     register_config_cmd();
+    register_sd_cmd();
     register_reset_cmd();
 
     repl_config.prompt = "MS>";

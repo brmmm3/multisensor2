@@ -17,7 +17,7 @@
 #include "include/wifi_cmd.h"
 #include "ui/include/ui_config.h"
 
-const static char *TAG = "WiFi";
+const static char *TAG = "CMD";
 
 typedef struct {
     struct arg_str *cmd;
@@ -31,25 +31,12 @@ typedef struct {
 static sta_connect_args_t wifi_cmd_args;
 
 
-static esp_err_t cmd_do_wifi_connect(const char *ssid, const char *password)
-{
-    esp_err_t err;
-
-    if ((err = esp_wifi_set_mode(WIFI_MODE_STA)) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set WIFI_MODE_STA. err(%d)=%s", err, strerror(err));
-        return err;
-    }
-    err = ui_wifi_set_pwr_mode(true);
-    ESP_LOGI(TAG, "WIFI_CONNECT_START, ret: 0x%x", err);
-    return err;
-}
-
 static void cmd_do_wifi_show()
 {
     for (uint8_t i = 0; i < 4; i++) {
         ESP_LOGI(TAG, "%d: <%s>", i, config_nvs->wifi.ssid[i]);
     }
-    ESP_LOGI(TAG, "Auto connect: %d", config->auto_connect);
+    ESP_LOGI(TAG, "Auto connect: %d", config->wifi_auto_connect_idx);
     ESP_LOGI(TAG, "IP: %s", wifi_ip());
     ESP_LOGI(TAG, "RSSI: %d", status.rssi);
 }
@@ -66,11 +53,12 @@ int process_wifi_cmd(int argc, char **argv)
         const char *cmd = wifi_cmd_args.cmd->sval[0];
         if (strcmp(cmd, "show") == 0) {
             cmd_do_wifi_show();
-        } else if (strcmp(cmd, "init") == 0) {
-            ESP_ERROR_CHECK_WITHOUT_ABORT(ui_wifi_set_pwr_mode(true));
+        } else if (strcmp(cmd, "up") == 0) {
+            ui_set_switch_state(ui->sw_wifi_enable, true);
         } else if (strcmp(cmd, "down") == 0) {
-            config->auto_connect = 4;
-            ESP_ERROR_CHECK_WITHOUT_ABORT(ui_wifi_set_pwr_mode(false));
+            config->wifi_auto_connect_idx = 4;
+            config->wifi_auto_connect = false;
+            ui_set_switch_state(ui->sw_wifi_enable, false);
         } else if (strcmp(cmd, "scan") == 0) {
             wifi_scan();
         } else if (strcmp(cmd, "pwr") == 0) {
@@ -87,21 +75,30 @@ int process_wifi_cmd(int argc, char **argv)
                 return 1;
             }
             uint8_t index = (uint8_t)wifi_cmd_args.auto_connect->ival[0];
-            config->auto_connect = index;
-            ESP_ERROR_CHECK_WITHOUT_ABORT(ui_wifi_set_pwr_mode(true));
+            config->wifi_auto_connect_idx = index;
+            config->wifi_auto_connect = index < 4;
+            if (config->wifi_auto_connect) {
+                ui_set_switch_state(ui->sw_wifi_enable, config->wifi_auto_connect);
+            }
+            ui_set_switch_state(ui->sw_wifi_auto, config->wifi_auto_connect);
         } else if (strcmp(cmd, "connect") == 0) {
+            const char *ssid = NULL;
+            const char *password = NULL;
+            uint8_t index = 0;
+            if (wifi_cmd_args.index->count == 1) {
+                index = (uint8_t)wifi_cmd_args.index->ival[0];
+            }
             if (wifi_cmd_args.ssid->count < 1) {
-                ESP_LOGE(TAG, "SSID missing");
-                return 1;
+                ssid = config_nvs->wifi.ssid[index];
+            } else {
+                ssid = wifi_cmd_args.ssid->sval[0];
             }
             if (wifi_cmd_args.password->count < 1) {
-                ESP_LOGE(TAG, "Password missing");
-                return 1;
+                password = config_nvs->wifi.password[index];
+            } else {
+                password = wifi_cmd_args.password->sval[0];
             }
-            const char *ssid = wifi_cmd_args.ssid->sval[0];
-            const char *password = wifi_cmd_args.password->sval[0];
             if (wifi_cmd_args.index->count == 1) {
-                uint8_t index = (uint8_t)wifi_cmd_args.index->ival[0];
                 ESP_LOGI(TAG, "Save to index=%d", index);
                 if (index < 4) {
                     strcpy(config_nvs->wifi.ssid[index], ssid);
@@ -111,9 +108,10 @@ int process_wifi_cmd(int argc, char **argv)
             if (wifi_cmd_args.auto_connect->count == 1) {
                 uint8_t index = (uint8_t)wifi_cmd_args.auto_connect->ival[0];
                 ESP_LOGI(TAG, "Auto connect index=%d", index);
-                config->auto_connect = index;
+                config->wifi_auto_connect_idx = index;
+                config->wifi_auto_connect = index < 4;
+                ui_set_switch_state(ui->sw_wifi_auto, config->wifi_auto_connect);
             }
-            cmd_do_wifi_connect(ssid, password);
         } else {
             ESP_LOGE(TAG, "no valid arguments");
             return 1;
@@ -137,7 +135,7 @@ void register_wifi_cmd(void)
 
     const esp_console_cmd_t cmd = {
         .command = "wifi",
-        .help = "WiFi. Command: show, init, down, scan, pwr -m mode, auto -i index, connect ssid pwd [-i index] [-a index]",
+        .help = "WiFi. Command: show, up, down, scan, pwr -m mode, auto -i index, connect ssid pwd [-i index] [-a index]",
         .hint = NULL,
         .func = &process_wifi_cmd,
         .argtable = &wifi_cmd_args,

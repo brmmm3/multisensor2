@@ -218,9 +218,6 @@ esp_err_t wifi_connect(const char *ssid, const char *password)
             ui_set_tab_color(3, LV_PALETTE_RED);
         }
         wifi_connected = true;
-        if (config->tcp_auto_start) {
-            tcp_server_start();
-        }
         return ESP_OK;
     }
     if (bits & WIFI_FAIL_BIT) {
@@ -238,7 +235,7 @@ static void wifi_connect_task(void *arg)
 {
     wifi_network_t *network = arg;
 
-    wifi_connect(network->ssid, network->password);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(wifi_connect(network->ssid, network->password));
     connect_task_handle = NULL;
     vTaskDelete(NULL);
 }
@@ -247,12 +244,7 @@ static void wifi_connect_task(void *arg)
 esp_err_t wifi_connect_bg(const char *ssid, const char *password)
 {
     if (strlen(ssid) == 0 || strlen(password) == 0) return ESP_OK;
-    if (connect_task_handle != NULL) {
-        for (int i = 0; i < 60; i++) {
-            if (eTaskGetState(connect_task_handle) == eDeleted) break;
-            vTaskDelay(pdMS_TO_TICKS(100));
-        }
-    }
+    if (connect_task_handle != NULL) return ESP_FAIL;
     wifi_network_t *network = pvPortMalloc(sizeof(wifi_network_t));
     memset(network, 0, sizeof(wifi_network_t));
     network->ssid = ssid;
@@ -268,13 +260,11 @@ esp_err_t wifi_init(bool scan)
     wifi_init_sta();
     ui_set_switch_state(ui->sw_wifi_enable, true);
     if (scan) wifi_scan();
-
-    uint8_t auto_connect = config->auto_connect;
+    uint8_t auto_connect = config->wifi_auto_connect_idx;
     if (auto_connect > 3) return ESP_OK;
     const char *ssid = config_nvs->wifi.ssid[auto_connect];
     const char *password = config_nvs->wifi.password[auto_connect];
-    wifi_connect_bg(ssid, password);
-    return ESP_OK;
+    return wifi_connect_bg(ssid, password);
 }
 
 
@@ -282,6 +272,12 @@ void wifi_uninit()
 {
     ESP_LOGI(TAG, "Uninitialize WiFi");
     if (connect_task_handle == NULL) return;
+    if (ftp_server_running()) {
+        ui_set_switch_state(ui->sw_ftp_server_enable, false);
+    }
+    if (tcp_server_running) {
+        ui_set_switch_state(ui->sw_tcp_server_enable, false);
+    }
     vTaskDelete(connect_task_handle);
     connect_task_handle = NULL;
     wifi_deinit_sta();

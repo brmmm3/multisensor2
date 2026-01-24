@@ -16,6 +16,8 @@ extern "C" {
 #include <esp_lvgl_port.h>
 #include "main.h"
 
+void ensure_wifi_init(bool auto_connect);
+
 void ui_set_label_text(lv_obj_t *obj, const char *text);
 
 void ui_set_switch_state(lv_obj_t *obj, bool enabled);

@@ -166,16 +166,16 @@ static void wifi_selected_cb(lv_event_t *e)
         lvgl_port_unlock();
         selected_btn = btn;
         selected_ssid = lv_list_get_button_text(list, btn);
-        config->auto_connect = 0;
-        while (config->auto_connect < 4) {
-            ESP_LOGI(TAG,"Try %i %s", config->auto_connect, config_nvs->wifi.ssid[config->auto_connect]);
-            if (strcmp(selected_ssid, config_nvs->wifi.ssid[config->auto_connect]) == 0) {
+        config->wifi_auto_connect_idx = 0;
+        while (config->wifi_auto_connect_idx < 4) {
+            ESP_LOGI(TAG,"Try %i %s", config->wifi_auto_connect_idx, config_nvs->wifi.ssid[config->wifi_auto_connect_idx]);
+            if (strcmp(selected_ssid, config_nvs->wifi.ssid[config->wifi_auto_connect_idx]) == 0) {
                 if (wifi_init(false) == ESP_OK) {
                     config_write();
                 }
                 break;
             }
-            config->auto_connect++;
+            config->wifi_auto_connect_idx++;
         }
     }
 }
@@ -191,14 +191,16 @@ void wifi_scan(void)
     ui_list_clear(ui->lst_wifi);
     selected_ssid = NULL;
     selected_btn = NULL;
-    if (!wifi_initialized()) wifi_init(false);
+    if (!wifi_initialized()) {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(wifi_init(false));
+    }
     ui_set_label_text(ui->lbl_wifi_name, "Scanning...");
     ESP_LOGI(TAG, "Start WiFi scan");
     set_scanning(true);
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    esp_wifi_disconnect();  // Stop any connection attempt
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_disconnect());  // Stop any connection attempt
 
 #ifdef USE_CHANNEL_BITMAP
     wifi_scan_config_t *scan_config = (wifi_scan_config_t *)pvPortMalloc(sizeof(wifi_scan_config_t));

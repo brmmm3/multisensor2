@@ -15,6 +15,7 @@
 #include "freertos/projdefs.h"
 #include "main.h"
 #include "tcp_server.h"
+#include "wifi/include/wifi.h"
 
 static const char *TAG = "UIC";
 
@@ -198,26 +199,112 @@ void ui_config_lock(bool lock)
 }
 
 
-static void sw_wifi_pwr_cb(lv_event_t *e)
+static void sw_wifi_enable_cb(lv_event_t *e)
 {
     lv_obj_t * obj = lv_event_get_target(e);
 
+    ESP_LOGI(TAG, "sw_wifi_enable_cb");
     if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-        wifi_init(true);
+        ESP_ERROR_CHECK_WITHOUT_ABORT(wifi_init(false));
     } else {
         wifi_uninit();
     }
 }
 
 
-static void sw_tcp_server_cb(lv_event_t *e)
+static void sw_wifi_auto_cb(lv_event_t *e)
 {
     lv_obj_t * obj = lv_event_get_target(e);
 
+    ESP_LOGI(TAG, "sw_wifi_auto_cb");
     if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
+        ui_set_switch_state(ui->sw_wifi_enable, true);
+        config->wifi_auto_connect = true;
+    } else {
+        ESP_LOGI(TAG, "sw_wifi_auto_cb: wifi_auto_connect=false");
+        config->wifi_auto_connect = false;
+    }
+}
+
+
+void ensure_wifi_init(bool auto_connect)
+{
+    if (!wifi_connected) {
+        ui_set_switch_state(ui->sw_wifi_enable, true);
+        ESP_ERROR_CHECK_WITHOUT_ABORT(wifi_init(false));
+    }
+    if (auto_connect) {
+        ui_set_switch_state(ui->sw_wifi_auto, true);
+        config->wifi_auto_connect = true;
+    }
+}
+
+static void sw_tcp_server_enable_cb(lv_event_t *e)
+{
+    lv_obj_t * obj = lv_event_get_target(e);
+
+    ESP_LOGI(TAG, "sw_tcp_server_enable_cb");
+    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
+        ensure_wifi_init(false);
         tcp_server_start();
     } else {
         tcp_server_stop();
+    }
+}
+
+
+static void sw_tcp_server_auto_cb(lv_event_t *e)
+{
+    lv_obj_t * obj = lv_event_get_target(e);
+
+    ESP_LOGI(TAG, "sw_tcp_server_auto_cb");
+    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
+        ensure_wifi_init(true);
+        ui_set_switch_state(ui->sw_tcp_server_enable, true);
+        config->tcp_auto_start = true;
+    } else {
+        ESP_LOGI(TAG, "sw_tcp_server_auto_cb: tcp_auto_start=false");
+        config->tcp_auto_start = false;
+    }
+}
+
+
+static void sw_ftp_server_enable_cb(lv_event_t *e)
+{
+    lv_obj_t * obj = lv_event_get_target(e);
+
+    ESP_LOGI(TAG, "sw_ftp_server_enable_cb");
+    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
+        ensure_wifi_init(false);
+        ftp_server_start();
+    } else {
+        ftp_server_stop();
+    }
+}
+
+
+static void sw_ftp_server_auto_cb(lv_event_t *e)
+{
+    lv_obj_t * obj = lv_event_get_target(e);
+
+    ESP_LOGI(TAG, "sw_ftp_server_auto_cb");
+    if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
+        ensure_wifi_init(true);
+        ui_set_switch_state(ui->sw_ftp_server_enable, true);
+        config->ftp_auto_start = true;
+    } else {
+        ESP_LOGI(TAG, "sw_ftp_server_enable_cb: ftp_auto_start=false");
+        config->ftp_auto_start = false;
+    }
+}
+
+
+static void btn_wifi_scan_pressed(lv_event_t *e)
+{
+    if (wifi_initialized()) {
+        wifi_scan();
+    } else {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(wifi_init(true));
     }
 }
 
@@ -407,8 +494,13 @@ void ui_register_callbacks(ui_t *ui)
 {
     lv_obj_add_event_cb(ui->tbv_main, tabview_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
     // Tab WiFi
-    lv_obj_add_event_cb(ui->sw_wifi_enable, sw_wifi_pwr_cb, LV_EVENT_VALUE_CHANGED, NULL);
-    lv_obj_add_event_cb(ui->sw_tcp_server_enable, sw_tcp_server_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(ui->sw_wifi_enable, sw_wifi_enable_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(ui->sw_wifi_auto, sw_wifi_auto_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(ui->sw_tcp_server_enable, sw_tcp_server_enable_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(ui->sw_tcp_server_auto, sw_tcp_server_auto_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(ui->sw_ftp_server_enable, sw_ftp_server_enable_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(ui->sw_ftp_server_auto, sw_ftp_server_auto_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(ui->btn_wifi_scan, btn_wifi_scan_pressed, LV_EVENT_CLICKED, NULL);
     // Tab SD
     lv_obj_add_event_cb(ui->sw_record, sw_sd_record_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(ui->sw_auto_record, sw_sd_auto_record_cb, LV_EVENT_VALUE_CHANGED, NULL);

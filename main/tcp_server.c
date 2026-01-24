@@ -107,7 +107,7 @@ static int get_config(char *buf)
     const char *fmt = opt_format ? "*%d,%d,%d,%d,"
                                  : "{id=%d,cfg_version=%d,auto_connect=%d,auto_record=%d,";
     int len = sprintf(rx_buffer, fmt, E_SENSOR_CONFIG,
-        config->cfg_version, config->auto_connect, config->auto_record);
+        config->cfg_version, config->wifi_auto_connect_idx, config->auto_record);
     fmt = opt_format ? "%d,%d,%d,%d,%d,"
                      : "lcd_pwr=%d,gps_pwr=%d,scd4x_pwr=%d,wifi_pwr=%d,mode_pwr=%d,";
     len += sprintf(&rx_buffer[len], fmt,
@@ -287,7 +287,7 @@ static esp_err_t send_data_file_start(int client_sock, char *path, bool remove_f
     char buf[32];
     esp_err_t err;
 
-    int len = sprintf(buf, ":%s:", path);
+    int len = sprintf(buf, ":%s", path);
     if (!send_data_to_client(client_sock, (uint8_t *)buf,len)) {
         ESP_LOGE(TAG, "Failed to send data file %s", path);
         return ESP_FAIL;
@@ -654,7 +654,7 @@ static void tcp_server_task(void *pvParameters)
                 } else if (strncmp(rx_buffer, "auto ", 5) == 0) {
                     // Set auto configs
                     if (strncmp(&rx_buffer[5], "con ", 4) == 0) {
-                        config->auto_connect = rx_buffer[9] - '0';
+                        config->wifi_auto_connect_idx = rx_buffer[9] - '0';
                     } else if (strncmp(&rx_buffer[5], "rec ", 4) == 0) {
                         config->auto_record = rx_buffer[5] - '0';
                     } else if (strncmp(&rx_buffer[5], "tcp ", 4) == 0) {

@@ -213,10 +213,10 @@ bool ftp_terminate(void);
 bool ftp_stop_requested();
 int32_t ftp_get_maxstack(void);
 
-esp_err_t ftp_start();
-esp_err_t ftp_stop();
+esp_err_t ftp_server_start();
+esp_err_t ftp_server_stop();
 
-bool ftp_running();
+bool ftp_server_running();
 
 #ifdef __cplusplus
 };

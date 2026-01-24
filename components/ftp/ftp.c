@@ -1387,7 +1387,7 @@ void ftp_task(void *arg)
 	vTaskDelete(NULL);
 }
 
-esp_err_t ftp_start()
+esp_err_t ftp_server_start()
 {
 	if (ftp_task_handle != NULL && eTaskGetState(ftp_task_handle) != eDeleted) return ESP_OK;
 	if (!ftp_init()) {
@@ -1399,7 +1399,7 @@ esp_err_t ftp_start()
 	return ESP_OK;
 }
 
-esp_err_t ftp_stop()
+esp_err_t ftp_server_stop()
 {
 	if (ftp_task_handle == NULL) return ESP_OK;
 	vTaskDelete(ftp_task_handle);
@@ -1408,7 +1408,7 @@ esp_err_t ftp_stop()
 	return ESP_OK;
 }
 
-bool ftp_running()
+bool ftp_server_running()
 {
 	return ftp_task_handle != NULL;
 }

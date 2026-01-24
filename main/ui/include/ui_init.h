@@ -52,12 +52,17 @@ typedef struct ui_s {
     // Tab WiFi
     lv_obj_t *tab_wifi;
     lv_obj_t *sw_wifi_enable;
+    lv_obj_t *sw_wifi_auto;
     lv_obj_t *sw_tcp_server_enable;
+    lv_obj_t *sw_tcp_server_auto;
+    lv_obj_t *sw_ftp_server_enable;
+    lv_obj_t *sw_ftp_server_auto;
     lv_obj_t *lbl_wifi_name;
     lv_obj_t *lbl_wifi_ip;
     lv_obj_t *lbl_wifi_rssi;
     lv_obj_t *lbl_mqtt_status;
     lv_obj_t *lbl_ftp_status;
+    lv_obj_t *btn_wifi_scan;
     lv_obj_t *lst_wifi;
     // Tab SD-Card
     lv_obj_t *tab_sd;

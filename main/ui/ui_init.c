@@ -231,8 +231,15 @@ lv_obj_t *add_section_label_xw(lv_obj_t *tab, int32_t x, int32_t y, int32_t w, i
 
 lv_obj_t *add_switch_label(lv_obj_t *tab, int32_t y, const char *title)
 {
-    add_label_text(tab, 0, y, title, lv_color_black());
+    add_label_text(tab, 0, y + 4, title, lv_color_black());
     return add_switch(tab, 260, y, 60, 30);
+}
+
+void add_2switch_label(lv_obj_t *tab, int32_t y, const char *title, lv_obj_t **sw1, lv_obj_t **sw2)
+{
+    add_label_text(tab, 0, y + 4, title, lv_color_black());
+    *sw1 = add_switch(tab, 180, y, 60, 30);
+    *sw2 = add_switch(tab, 260, y, 60, 30);
 }
 
 lv_obj_t *add_slider_label(lv_obj_t *tab, int32_t y, int32_t max, const char *title)
@@ -286,15 +293,17 @@ lv_obj_t *add_page_gps(ui_t *ui)
 lv_obj_t *add_page_wifi(ui_t *ui)
 {
     lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_WIFI);
-    ui->sw_wifi_enable = add_switch_label(tab, 0, "Enable WiFi");
-    ui->sw_tcp_server_enable = add_switch_label(tab, 30, "Enable TCP Server");
-    ui->lbl_wifi_name = add_section_label(tab, 60, 30, 64, "Network");
-    ui->lbl_wifi_ip = add_section_label_xw(tab, 0, 90, 170, 30, 64, "IP");
-    ui->lbl_wifi_rssi = add_section_label_xw(tab, 170, 90, 150, 30, 64, "RSSI");
-    ui->lbl_mqtt_status = add_section_label(tab, 120, 30, 64, "MQTT");
-    ui->lbl_ftp_status = add_section_label(tab, 150, 30, 64, "FTP");
+    add_2switch_label(tab, 0, "WiFi Enable/Auto", &ui->sw_wifi_enable, &ui->sw_wifi_auto);
+    add_2switch_label(tab, 32, "TCP Server Enable/Auto", &ui->sw_tcp_server_enable, &ui->sw_tcp_server_auto);
+    add_2switch_label(tab, 64, "FTP Server Enable/Auto", &ui->sw_ftp_server_enable, &ui->sw_ftp_server_auto);
+    ui->lbl_wifi_name = add_section_label(tab, 100, 30, 64, "Network");
+    ui->lbl_wifi_ip = add_section_label_xw(tab, 0, 130, 170, 30, 64, "IP");
+    ui->lbl_wifi_rssi = add_section_label_xw(tab, 170, 130, 150, 30, 64, "RSSI");
+    ui->lbl_ftp_status = add_section_label(tab, 160, 30, 64, "FTP");
+    ui->lbl_mqtt_status = add_section_label(tab, 190, 30, 64, "MQTT");
+    ui->btn_wifi_scan = add_button(tab, 0, 220, 200, 0, "WiFi Scan");
     ui->lst_wifi = lv_list_create(tab);
-    lv_obj_set_pos(ui->lst_wifi, 0, 180);
+    lv_obj_set_pos(ui->lst_wifi, 0, 260);
     lv_obj_set_size(ui->lst_wifi, 320, 120);
     return tab;
 }

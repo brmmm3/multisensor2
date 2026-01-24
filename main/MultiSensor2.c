@@ -743,6 +743,28 @@ esp_err_t set_sys_time(struct tm *timeinfo, bool set_rtc_time)
     return rtc_set_datetime(rtc->rtc, timeinfo);
 }
 
+esp_err_t ensure_sd_card_mounted()
+{
+    if (sd_card_mounted(true)) return ESP_OK;
+    esp_err_t err;
+    ESP_LOGW(TAG, "SD-Card NOT mounted. Try to mount...");
+    if ((err = sd_card_mount_fs()) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to mount SD-Card.");
+        ui_set_tab_color(4, LV_PALETTE_RED);
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "SD-Card mount success.");
+    if ((err = ensure_dir(MOUNT_POINT"/data")) != ESP_OK) {
+        ESP_LOGE(TAG, "SD-Card has no data folder!");
+        ui_set_tab_color(4, LV_PALETTE_RED);
+        return ESP_FAIL;
+    }
+    ui_set_tab_color(4, LV_PALETTE_GREEN);
+    show_sd_card_info(-1);
+    ui_sd_record_set_value(config->auto_record);
+    return ESP_OK;
+}
+
 void show_sd_card_info(int file_cnt)
 {
     char buf[64];
@@ -792,12 +814,46 @@ static void update_task(void *arg)
     ESP_LOGI(TAG, "Start update_task");
     esp_task_wdt_add(NULL);
     ESP_ERROR_CHECK_WITHOUT_ABORT(ensure_dir(MOUNT_POINT"/data"));
+    ui_set_switch_state(ui->sw_wifi_auto, config->wifi_auto_connect);
+    ui_set_switch_state(ui->sw_tcp_server_auto, config->tcp_auto_start);
+    ui_set_switch_state(ui->sw_ftp_server_auto, config->ftp_auto_start);
     ui_set_switch_state(ui->sw_auto_record, config->auto_record);
     show_sd_card_info(-1);
 
     while (true) {
-        if (loop_cnt++ > 0 && !status.recording && config->auto_record) {
-            ui_sd_record_set_value(true);
+        if (loop_cnt > 1) {
+            if (wifi_connected) {
+                if (!tcp_server_running && config->tcp_auto_start) {
+                    ui_set_switch_state(ui->sw_tcp_server_enable, true);
+                    ESP_ERROR_CHECK_WITHOUT_ABORT(tcp_server_start());
+                }
+                if (!ftp_server_running() && config->ftp_auto_start) {
+                    ui_set_switch_state(ui->sw_ftp_server_enable, true);
+                    ESP_ERROR_CHECK_WITHOUT_ABORT(ftp_server_start());
+                }
+            } else {
+                if (config->wifi_auto_connect) {
+                    if (config->wifi_auto_connect_idx < 4) {
+                        ensure_wifi_init(false);
+                    }
+                }
+                if (tcp_server_running) {
+                    ui_set_switch_state(ui->sw_tcp_server_enable, false);
+                    ESP_ERROR_CHECK_WITHOUT_ABORT(tcp_server_stop());
+                }
+                if (ftp_server_running()) {
+                    ui_set_switch_state(ui->sw_ftp_server_enable, false);
+                    ESP_ERROR_CHECK_WITHOUT_ABORT(ftp_server_stop());
+                }
+            }
+        }
+        // Check if SD card is mounted. Try to mount if not mounted
+        if (loop_cnt % 10 == 0) {
+            ESP_ERROR_CHECK_WITHOUT_ABORT(ensure_sd_card_mounted());
+        } else if (loop_cnt++ > 0 && !status.recording && config->auto_record) {
+            if (ensure_sd_card_mounted() == ESP_OK) {
+                ui_sd_record_set_value(true);
+            }
         }
         if ((debug_main & 0x200) == 0) {
             sensors_update();
@@ -824,12 +880,12 @@ static void update_task(void *arg)
             }
             //mqtt_publish_values();
             tcp_server_publish_values();
-            if (!ftp_running() && config->ftp_auto_start) {
-                ftp_start();
+            if (!ftp_server_running() && config->ftp_auto_start) {
+                ftp_server_start();
             }
         } else {
             if (tcp_server_running) tcp_server_stop();
-            if (ftp_running()) ftp_stop();
+            if (ftp_server_running()) ftp_server_stop();
         }
 
         // Dump data for debugging
@@ -873,19 +929,13 @@ static void update_task(void *arg)
                     break;
                 }
                 ESP_LOGE(TAG, "Failed to write data file. Try to mount FS.");
-                // Try to mount FS if writing has failed and try again.
-                if ((err = sd_card_mount_fs()) == ESP_OK) {
-                    ESP_ERROR_CHECK_WITHOUT_ABORT(ensure_dir(MOUNT_POINT"/data"));
-                    show_sd_card_info(-1);
-                    ui_sd_record_set_value(config->auto_record);
-                }
+                ESP_ERROR_CHECK_WITHOUT_ABORT(ensure_sd_card_mounted());
                 vTaskDelay(pdMS_TO_TICKS(100));
             }
-            if (!sd_card_mounted(true)) {
+            if (!ensure_sd_card_mounted()) {
                 ESP_LOGE(TAG, "Failed to mount FS. Giving up! Stop recording.");
                 ui_set_switch_state(ui->sw_record, false);
                 ui_sd_record_set_value(false);
-                ui_set_tab_color(4, LV_PALETTE_RED);
             }
         } else {
             if ((debug_main & 0x800) == 0) {
@@ -979,9 +1029,6 @@ void app_main(void)
     led_init();
     sensors_init();
     rtc_init(&rtc, &bus_handle);
-    if (config->auto_connect < 4) {
-        wifi_init(false);
-    }
 
     if (!sd_card_mounted(true)) {
         ui_set_tab_color(4, LV_PALETTE_RED);
