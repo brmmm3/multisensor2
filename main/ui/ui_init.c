@@ -161,6 +161,24 @@ lv_obj_t *add_filled_rectangle(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, i
     return obj;
 }
 
+lv_obj_t *add_progress_bar(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, int32_t h, lv_color_t bg_color, lv_color_t bar_color)
+{
+    lv_obj_t *obj = lv_bar_create(scr);
+    
+    lv_obj_set_pos(obj , x, y);
+    lv_obj_set_size(obj, w, h);
+
+    lv_bar_set_range(obj, 0, 100);
+    lv_bar_set_value(obj, 42, LV_ANIM_ON);
+
+    lv_obj_set_style_bg_color(obj , bg_color, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(obj, bar_color, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(obj, 1, LV_PART_MAIN);
+    lv_obj_set_style_border_width(obj, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_color(obj, lv_color_black(), LV_PART_MAIN);
+    return obj;
+}
+
 lv_obj_t *add_switch(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, int32_t h)
 {
     lv_obj_t *obj = lv_switch_create(scr);
@@ -311,12 +329,13 @@ lv_obj_t *add_page_wifi(ui_t *ui)
 lv_obj_t *add_page_sd(ui_t *ui)
 {
     lv_obj_t *tab = add_tab(ui->tbv_main, LV_SYMBOL_SD_CARD);
-    ui->sw_record = add_switch_label(tab, 0, "Record");
-    ui->sw_auto_record = add_switch_label(tab, 30, "Auto Record");
-    ui->lbl_sd_card = add_section_label(tab, 60, 30, 64, "SD-Card");
-    ui->lbl_sd_free = add_section_label(tab, 90, 30, 64, "Free");
+    add_2switch_label(tab, 0, "Record Enable/Auto", &ui->sw_record, &ui->sw_auto_record);
+    ui->lbl_sd_card = add_section_label(tab, 30, 30, 64, "SD-Card");
+    ui->lbl_sd_free = add_section_label(tab, 60, 30, 64, "Free");
+    ui->lbl_sd_used = add_section_label(tab, 90, 30, 64, "Used");
     ui->lbl_sd_files = add_section_label(tab, 120, 30, 64, "Files");
     ui->lbl_sd_fill = add_section_label(tab, 150, 30, 64, "FillLvl");
+    ui->pb_sd_fill = add_progress_bar(tab, 0, 180, 320, 30, lv_color_white(), lv_palette_main(LV_PALETTE_BLUE));
     return tab;
 }
 

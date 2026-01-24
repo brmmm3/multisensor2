@@ -752,6 +752,8 @@ void show_sd_card_info(int file_cnt)
     ui_set_label_text(ui->lbl_sd_card, buf);
     sprintf(buf, "%llu MB", bytes_free / (1024 * 1024));
     ui_set_label_text(ui->lbl_sd_free, buf);
+    sprintf(buf, "%llu kB", (bytes_total - bytes_free) / 1024);
+    ui_set_label_text(ui->lbl_sd_used, buf);
     if (file_cnt < 0) {
         status.file_cnt = sd_card_get_file_count(MOUNT_POINT"/data");
         file_cnt = status.file_cnt;
@@ -796,7 +798,7 @@ esp_err_t write_data_file()
     status.file_cnt++;
     sprintf(buf, "%d data files", status.file_cnt);
     ui_set_label_text(ui->lbl_sd_files, buf);
-    ui_set_label_text(ui->lbl_sd_fill, "0.0 %");
+    ui_sd_set_fill_level(0.0);
     set_data_filename();
     if (status.save_time == 0) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(update_startup_cnt(0, 1));
@@ -824,12 +826,10 @@ static void update_task(void *arg)
         if (loop_cnt > 1) {
             if (wifi_connected) {
                 if (!tcp_server_running && config->tcp_auto_start) {
-                    ui_set_switch_state(ui->sw_tcp_server_enable, true);
-                    ESP_ERROR_CHECK_WITHOUT_ABORT(tcp_server_start());
+                    ESP_ERROR_CHECK_WITHOUT_ABORT(ui_tcp_server_enable(true));
                 }
                 if (!ftp_server_running() && config->ftp_auto_start) {
-                    ui_set_switch_state(ui->sw_ftp_server_enable, true);
-                    ESP_ERROR_CHECK_WITHOUT_ABORT(ftp_server_start());
+                    ESP_ERROR_CHECK_WITHOUT_ABORT(ui_ftp_server_enable(true));
                 }
             } else {
                 if (config->wifi_auto_connect) {
@@ -838,19 +838,18 @@ static void update_task(void *arg)
                     }
                 }
                 if (tcp_server_running) {
-                    ui_set_switch_state(ui->sw_tcp_server_enable, false);
-                    ESP_ERROR_CHECK_WITHOUT_ABORT(tcp_server_stop());
+                    ESP_ERROR_CHECK_WITHOUT_ABORT(ui_tcp_server_enable(false));
                 }
                 if (ftp_server_running()) {
-                    ui_set_switch_state(ui->sw_ftp_server_enable, false);
-                    ESP_ERROR_CHECK_WITHOUT_ABORT(ftp_server_stop());
+                    ESP_ERROR_CHECK_WITHOUT_ABORT(ui_ftp_server_enable(false));
                 }
             }
         }
         // Check if SD card is mounted. Try to mount if not mounted
+        loop_cnt++;
         if (loop_cnt % 10 == 0) {
             ESP_ERROR_CHECK_WITHOUT_ABORT(ensure_sd_card_mounted());
-        } else if (loop_cnt++ > 0 && !status.recording && config->auto_record) {
+        } else if (loop_cnt > 0 && !status.recording && config->auto_record) {
             if (ensure_sd_card_mounted() == ESP_OK) {
                 ui_sd_record_set_value(true);
             }
@@ -941,8 +940,7 @@ static void update_task(void *arg)
             if ((debug_main & 0x800) == 0) {
                 // Update SD-Card tab
                 float fill_level = 100.0 * (float) status.record_pos / (float)DATA_MAX_SIZE;
-                sprintf(buf, "%.1f %%", fill_level);
-                ui_set_label_text(ui->lbl_sd_fill, buf);
+                ui_sd_set_fill_level(fill_level);
                 // Update Cfg tab
                 ui_set_time_value(ui->lbl_time, &now);
                 ui_set_duration_value(ui->lbl_uptime, (uint32_t)(now - status.start_time));
@@ -1017,6 +1015,7 @@ void app_main(void)
     spi_host_id = sd_card_init(SDCARD_PIN_NUM_CS, SPI_PIN_NUM_SCLK, SPI_PIN_NUM_MOSI, SPI_PIN_NUM_MISO);
 
     config_read();
+    config_show();
 
     // LCD (SPI Mode)
     lcd = lcd_init(spi_host_id, LCD_PIN_NUM_CS, LCD_PIN_NUM_DC, LCD_PIN_NUM_RST, LCD_PIN_NUM_LED, LCD_PIN_NUM_T_CS);

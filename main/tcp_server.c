@@ -764,9 +764,6 @@ void tcp_server_publish_values()
 {
     static char buf[256];
 
-    if (!tcp_server_running && config->tcp_auto_start) {
-        if (tcp_server_start() != ESP_OK) return;
-    }
     if (tcp_server_task_handle == NULL) return;
     if (!wifi_connected || !tcp_server_running || tcp_client_cnt == 0) return;
     if (uxQueueMessagesWaiting(tx_queue) == 10) {

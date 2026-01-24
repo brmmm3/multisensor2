@@ -50,6 +50,8 @@ typedef struct config_s {
 extern config_t *config;
 extern config_nvs_t *config_nvs;
 
+void config_show();
+
 esp_err_t create_default_config_sd();
 
 esp_err_t config_nvs_read(void);

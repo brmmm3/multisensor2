@@ -229,6 +229,7 @@ static void sw_wifi_auto_cb(lv_event_t *e)
 
 void ensure_wifi_init(bool auto_connect)
 {
+    ESP_LOGI(TAG, "ensure_wifi_init: auto_connect=%d", auto_connect);
     if (!wifi_connected) {
         ui_set_switch_state(ui->sw_wifi_enable, true);
         ESP_ERROR_CHECK_WITHOUT_ABORT(wifi_init(false));
@@ -238,6 +239,15 @@ void ensure_wifi_init(bool auto_connect)
         config->wifi_auto_connect = true;
     }
 }
+
+
+esp_err_t ui_tcp_server_enable(bool enable)
+{
+    ui_set_switch_state(ui->sw_tcp_server_enable, enable);
+    if (enable) return tcp_server_start();
+    return tcp_server_stop();
+}
+
 
 static void sw_tcp_server_enable_cb(lv_event_t *e)
 {
@@ -266,6 +276,14 @@ static void sw_tcp_server_auto_cb(lv_event_t *e)
         ESP_LOGI(TAG, "sw_tcp_server_auto_cb: tcp_auto_start=false");
         config->tcp_auto_start = false;
     }
+}
+
+
+esp_err_t ui_ftp_server_enable(bool enable)
+{
+    ui_set_switch_state(ui->sw_ftp_server_enable, enable);
+    if (enable) return ftp_server_start();
+    return ftp_server_stop();
 }
 
 
@@ -316,13 +334,25 @@ void ui_sd_record_set_value(bool enable)
         status.record_pos = 0;
         set_data_filename();
         ui_set_tab_color(4, LV_PALETTE_GREEN);
-        ui_set_label_text(ui->lbl_sd_fill, "0.0 %");
+        ui_sd_set_fill_level(0.0);
         ui_set_switch_state(ui->sw_record, true);
     } else {
         status.recording = false;
         ui_set_tab_color(4, LV_PALETTE_GREY);
         ui_set_switch_state(ui->sw_record, false);
     }
+}
+
+
+void ui_sd_set_fill_level(float fill_level)
+{
+    char buf[8];
+
+    sprintf(buf, "%.1f %%", fill_level);
+    ui_set_label_text(ui->lbl_sd_fill, buf);
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return;
+    lv_bar_set_value(ui->pb_sd_fill, (int32_t)fill_level, LV_ANIM_OFF);
+    lvgl_port_unlock();
 }
 
 

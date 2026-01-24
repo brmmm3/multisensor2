@@ -178,7 +178,10 @@ lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t 
     lv_display_t *display = lvgl_port_add_disp(&disp_cfg);
 
     /* Rotate to 270° (common for many 320x240 modules in portrait) - adjust as needed */
+    ESP_LOGI(TAG, "lv_display_set_rotation=%d", LV_DISPLAY_ROTATION_270);
+    lvgl_port_lock(0);
     lv_display_set_rotation(display, LV_DISPLAY_ROTATION_270);
+    lvgl_port_unlock();
 
     /* Touch controller (XPT2046) - shares the same SPI bus */
     esp_lcd_panel_io_handle_t tp_io_handle = NULL;
