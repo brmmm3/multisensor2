@@ -743,6 +743,23 @@ esp_err_t set_sys_time(struct tm *timeinfo, bool set_rtc_time)
     return rtc_set_datetime(rtc->rtc, timeinfo);
 }
 
+void show_sd_card_info(int file_cnt)
+{
+    char buf[64];
+    uint64_t bytes_total, bytes_free;
+
+    sd_card_get_info(buf, &bytes_total, &bytes_free);
+    ui_set_label_text(ui->lbl_sd_card, buf);
+    sprintf(buf, "%llu MB", bytes_free / (1024 * 1024));
+    ui_set_label_text(ui->lbl_sd_free, buf);
+    if (file_cnt < 0) {
+        status.file_cnt = sd_card_get_file_count(MOUNT_POINT"/data");
+        file_cnt = status.file_cnt;
+    }
+    sprintf(buf, "%d data files", file_cnt);
+    ui_set_label_text(ui->lbl_sd_files, buf);
+}
+
 esp_err_t ensure_sd_card_mounted()
 {
     if (sd_card_mounted(true)) return ESP_OK;
@@ -763,23 +780,6 @@ esp_err_t ensure_sd_card_mounted()
     show_sd_card_info(-1);
     ui_sd_record_set_value(config->auto_record);
     return ESP_OK;
-}
-
-void show_sd_card_info(int file_cnt)
-{
-    char buf[64];
-    uint64_t bytes_total, bytes_free;
-
-    sd_card_get_info(buf, &bytes_total, &bytes_free);
-    ui_set_label_text(ui->lbl_sd_card, buf);
-    sprintf(buf, "%llu MB", bytes_free / (1024 * 1024));
-    ui_set_label_text(ui->lbl_sd_free, buf);
-    if (file_cnt < 0) {
-        status.file_cnt = sd_card_get_file_count(MOUNT_POINT"/data");
-        file_cnt = status.file_cnt;
-    }
-    sprintf(buf, "%d data files", file_cnt);
-    ui_set_label_text(ui->lbl_sd_files, buf);
 }
 
 esp_err_t write_data_file()
@@ -834,7 +834,7 @@ static void update_task(void *arg)
             } else {
                 if (config->wifi_auto_connect) {
                     if (config->wifi_auto_connect_idx < 4) {
-                        ensure_wifi_init(false);
+                        ensure_wifi_init(true);
                     }
                 }
                 if (tcp_server_running) {
@@ -932,7 +932,7 @@ static void update_task(void *arg)
                 ESP_ERROR_CHECK_WITHOUT_ABORT(ensure_sd_card_mounted());
                 vTaskDelay(pdMS_TO_TICKS(100));
             }
-            if (!ensure_sd_card_mounted()) {
+            if (ensure_sd_card_mounted() != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to mount FS. Giving up! Stop recording.");
                 ui_set_switch_state(ui->sw_record, false);
                 ui_sd_record_set_value(false);

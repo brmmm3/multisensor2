@@ -103,7 +103,7 @@ uint32_t read_bin_file_part(FILE *f, void *buf, uint32_t size)
 {
     if (buf == NULL) return 0;
     if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return 0;
-    uint32_t len = fread(buf, size, 1, f);
+    uint32_t len = fread(buf, 1, size, f);
     lvgl_port_unlock();
    return len;
 }

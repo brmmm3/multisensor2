@@ -267,11 +267,17 @@ static esp_err_t send_data_file(int client_sock, char *path)
         ESP_LOGE(TAG, "Failed to send data file %s", path);
         err = ESP_FAIL;
     } else {
+        uint32_t cnt;
         while (true) {
             uint32_t len = read_data_file_part(f, rx_buffer, BUFFER_SIZE);
             if (len == 0) break;
-            if ((err = send_data_file_part(client_sock, path, rx_buffer, buffer_size2)) != ESP_OK) break;
-            if ((err = send_data_file_part(client_sock, path, &rx_buffer[buffer_size2], buffer_size2)) != ESP_OK) break;
+            cnt = buffer_size2;
+            if (len < cnt) cnt = len;
+            if ((err = send_data_file_part(client_sock, path, rx_buffer, cnt)) != ESP_OK) break;
+            if (len > buffer_size2) {
+                len -= buffer_size2;
+                if ((err = send_data_file_part(client_sock, path, &rx_buffer[buffer_size2], len)) != ESP_OK) break;
+            }
         }
     }
     close_data_file(f);
@@ -313,6 +319,7 @@ static esp_err_t send_all_data_files(int client_sock, bool remove_file)
         int len = sd_read_dir(dir, path, 32, 1);
         if (len < 2) break;
         path[len - 1] = 0;
+        ESP_LOGI(TAG, "Send file %s", path);
         if ((err = send_data_file_start(client_sock, path, remove_file)) != ESP_OK) {
             break;
         }
