@@ -161,7 +161,8 @@ lv_obj_t *add_filled_rectangle(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, i
     return obj;
 }
 
-lv_obj_t *add_progress_bar(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, int32_t h, lv_color_t bg_color, lv_color_t bar_color)
+lv_obj_t *add_progress_bar(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, int32_t h,
+                           lv_color_t bg_color, lv_color_t border_color, lv_color_t bar_color)
 {
     lv_obj_t *obj = lv_bar_create(scr);
     
@@ -174,8 +175,9 @@ lv_obj_t *add_progress_bar(lv_obj_t *scr, int32_t x, int32_t y, int32_t w, int32
     lv_obj_set_style_bg_color(obj , bg_color, LV_PART_MAIN);
     lv_obj_set_style_bg_color(obj, bar_color, LV_PART_INDICATOR);
     lv_obj_set_style_radius(obj, 1, LV_PART_MAIN);
+    lv_obj_set_style_radius(obj, 1, LV_PART_INDICATOR);
     lv_obj_set_style_border_width(obj, 2, LV_PART_MAIN);
-    lv_obj_set_style_border_color(obj, lv_color_black(), LV_PART_MAIN);
+    lv_obj_set_style_border_color(obj, border_color, LV_PART_MAIN);
     return obj;
 }
 
@@ -335,7 +337,7 @@ lv_obj_t *add_page_sd(ui_t *ui)
     ui->lbl_sd_used = add_section_label(tab, 90, 30, 64, "Used");
     ui->lbl_sd_files = add_section_label(tab, 120, 30, 64, "Files");
     ui->lbl_sd_fill = add_section_label(tab, 150, 30, 64, "FillLvl");
-    ui->pb_sd_fill = add_progress_bar(tab, 0, 180, 320, 30, lv_color_white(), lv_palette_main(LV_PALETTE_BLUE));
+    ui->pb_sd_fill = add_progress_bar(tab, 0, 180, 320, 28, lv_color_white(), lv_palette_main(LV_PALETTE_LIGHT_GREEN), lv_palette_main(LV_PALETTE_BLUE));
     return tab;
 }
 
