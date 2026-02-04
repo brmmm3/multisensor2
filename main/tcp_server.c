@@ -1,4 +1,5 @@
 #include <string.h>
+#include <sys/errno.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include "config.h"
@@ -75,9 +76,16 @@ static bool send_message(const char *buf, int len)
 static bool send_data_to_client(int client_sock, uint8_t *data, int to_write)
 {
     int written = 0;
+    int retries = 50;
     while (to_write > 0) {
         int ret = send(client_sock, data + written, to_write, 0);
         if (ret < 0) {
+            if (errno == EAGAIN) {
+                if (--retries > 0) {
+                    vTaskDelay(pdMS_TO_TICKS(100));
+                    continue;
+                }
+            }
             ESP_LOGE(TAG, "SEND failed: errno %d", errno);
             return false;
         }
@@ -447,6 +455,7 @@ static void tcp_server_task(void *pvParameters)
             if (len > 0) {
                 char *response = "OK\n";
 
+                ESP_LOGI(TAG, "CMD: %s", rx_buffer);
                 if (strcmp(rx_buffer, "bye") == 0) break;
                 if (strcmp(rx_buffer, "help") == 0) {
                     send_data_to_client(client_sock, (uint8_t *)help, strlen(help));

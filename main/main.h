@@ -72,7 +72,7 @@ typedef enum {
     E_SENSOR_QMC5883L
 } sensors_enum_t;
 
-typedef struct gps_values_s {
+typedef struct  __attribute__((__packed__)) {
     uint8_t sat;        // gps_sat_enum_t
     uint32_t date;
     uint32_t time;
@@ -92,7 +92,7 @@ typedef struct gps_values_s {
     uint8_t error_cnt;
 } gps_values_t;
 
-typedef struct scd4x_cal_values_s {
+typedef struct  __attribute__((__packed__)) {
     float temperature_offset;
     uint16_t altitude;
     uint16_t pressure;
@@ -114,7 +114,7 @@ typedef adxl345_values_t sensors_data_adxl345_t;
 
 typedef qmc5883l_values_t sensors_data_qmc5883l_t;
 
-typedef struct sensors_data_s {
+typedef struct  __attribute__((__packed__)) {
     sensors_data_gps_t gps;
     sensors_data_bmx280_t bmx280lo;
     sensors_data_bmx280_t bmx280hi;
@@ -126,7 +126,7 @@ typedef struct sensors_data_s {
     sensors_data_qmc5883l_t qmc5883l;
 } sensors_data_t;
 
-typedef struct status_s {
+typedef struct {
     time_t start_time;
     time_t save_time;
     uint32_t startup_cnt;

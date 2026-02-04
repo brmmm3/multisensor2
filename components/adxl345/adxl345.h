@@ -17,7 +17,7 @@ extern "C" {
 #include <stdint.h>
 #include "driver/i2c_master.h"
 
-typedef struct __attribute__((packed)) adxl345_values_s {
+typedef struct __attribute__((packed)) {
     float accel_x;  // [g]
     float accel_y;
     float accel_z;

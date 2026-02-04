@@ -30,7 +30,7 @@ enum MHZ19_RANGE {
     MHZ19_RANGE_INVALID
 };
 
-typedef struct __attribute__((packed)) mhz19_values_s {
+typedef struct __attribute__((packed)) {
     uint16_t co2;
     uint8_t temp;
     uint8_t status;

@@ -47,7 +47,7 @@ extern "C" {
 /** The fan speed is out of range */
 #define SPS30_DEVICE_FAN_SPEED_WRN(s)   ((s & (1 << 21)) != 0)
 
-typedef struct __attribute__((packed)) sps30_values_s {
+typedef struct __attribute__((packed)) {
     float mc_1p0;
     float mc_2p5;
     float mc_4p0;

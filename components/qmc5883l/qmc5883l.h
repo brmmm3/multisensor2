@@ -34,7 +34,7 @@ extern "C" {
 #define QMC5883L_OSR_64          0b11000000
 
 
-typedef struct __attribute__((packed)) qmc5883l_values_s {
+typedef struct __attribute__((packed)) {
     float mag_x;  // [Gauss]
     float mag_y;
     float mag_z;
