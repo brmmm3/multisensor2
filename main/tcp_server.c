@@ -585,6 +585,11 @@ static void tcp_server_task(void *pvParameters)
                                 ESP_LOGE(TAG, "GPS sensor soft reset failed");
                                 response = "ERR\n";
                             }
+                        } else if (strcmp(&rx_buffer[10], "partial") == 0) {
+                            if (gps_partial_reset(gps) == -1) {
+                                ESP_LOGE(TAG, "GPS sensor partial reset failed");
+                                response = "ERR\n";
+                            }
                         } else if (strcmp(&rx_buffer[10], "full") == 0) {
                             if (gps_full_reset(gps) == -1) {
                                 ESP_LOGE(TAG, "GPS sensor full reset failed");

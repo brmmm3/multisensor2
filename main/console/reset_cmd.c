@@ -28,6 +28,11 @@ int process_reset_cmd(int argc, char **argv)
                 return 1;
             }
         } else if (value == 1) {
+            if (gps_partial_reset(gps) == -1) {
+                ESP_LOGE(TAG, "GPS partial reset failed");
+                return 1;
+            }
+        } else if (value == 2) {
             if (gps_full_reset(gps) == -1) {
                 ESP_LOGE(TAG, "GPS full reset failed");
                 return 1;
@@ -42,7 +47,7 @@ int process_reset_cmd(int argc, char **argv)
 
 void register_reset_cmd()
 {
-    reset_cmd_args.gps = arg_int0("g", NULL, "<0-1>", "GPS: 0=soft reset, 1=full reset");
+    reset_cmd_args.gps = arg_int0("g", NULL, "<0-2>", "GPS: 0=soft, 1=partial, 2=full");
     reset_cmd_args.end = arg_end(1);
 
     const esp_console_cmd_t cmd = {

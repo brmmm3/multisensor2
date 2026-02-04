@@ -188,6 +188,8 @@ int gps_set_power_mode(gps_sensor_t *sensor, uint8_t mode);
 
 int gps_soft_reset(gps_sensor_t *sensor);
 
+int gps_partial_reset(gps_sensor_t *sensor);
+
 int gps_full_reset(gps_sensor_t *sensor);
 
 int gps_power_off(gps_sensor_t *sensor);
