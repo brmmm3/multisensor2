@@ -548,10 +548,17 @@ static void tcp_server_task(void *pvParameters)
                         status.file_cnt--;
                         show_sd_card_info(status.file_cnt);
                     }
+                } else if (strcmp(rx_buffer, "rec 2") == 0) {
+                    ui_set_switch_state(ui->sw_record, true);
+                    ui_sd_record_set_value(true);
+                    config->auto_record = true;
+                    ui_set_switch_state(ui->sw_auto_record, true);
                 } else if (strcmp(rx_buffer, "rec 1") == 0) {
                     ui_set_switch_state(ui->sw_record, true);
                     ui_sd_record_set_value(true);
                 } else if (strcmp(rx_buffer, "rec 0") == 0) {
+                    config->auto_record = false;
+                    ui_set_switch_state(ui->sw_auto_record, false);
                     ui_set_switch_state(ui->sw_record, false);
                     ui_sd_record_set_value(false);
                 } else if (strcmp(rx_buffer, "free") == 0) {
