@@ -367,8 +367,10 @@ static void gps_sensor_task(void *arg)
             //ESP_LOGI(sensor->name, "#SAT=%s", sat);
             p += 3;
             if (strncmp(p, "TXT,", 4) == 0) {
+                status->txt_cnt++;
                 gps_cmd_txt(sensor, p + 4, end);
             } else if (strncmp(p, "RMC,", 4) == 0) {
+                status->rmc_cnt++;
                 gps_cmd_rmc(sensor, p + 4, end);
                 if (rmc->status == 'A') {
                     if (rmc->date > 10125) {
@@ -383,6 +385,7 @@ static void gps_sensor_task(void *arg)
                     status->status |= 1;
                 }
             } else if (strncmp(p, "GLL,", 4) == 0) {
+                status->gll_cnt++;
                 gps_cmd_gll(sensor, p + 4, end);
                 if (gll->status == 'A') {
                     status->time = (uint32_t)gll->time;
@@ -393,6 +396,7 @@ static void gps_sensor_task(void *arg)
                     status->status |= 2;
                 }
             } else if (strncmp(p, "GSA,", 4) == 0) {
+                status->gsa_cnt++;
                 gps_cmd_gsa(sensor, p + 4, end);
                 for (int i = 0; i < 12; i++) {
                     if (gsa->sats[i] == 0) {
@@ -405,8 +409,10 @@ static void gps_sensor_task(void *arg)
                 status->mode_3d = gsa->mode_3d;
                 status->status |= 4;
             } else if (strncmp(p, "GSV,", 4) == 0) {
+                status->gsv_cnt++;
                 gps_cmd_gsv(sensor, p + 4, end);
             } else if (strncmp(p, "GGA,", 4) == 0) {
+                status->gga_cnt++;
                 gps_cmd_gga(sensor, p + 4, end);
                 if (gga->alt_unit == 'M') {
                     status->time = (uint32_t)gga->time;
@@ -419,12 +425,14 @@ static void gps_sensor_task(void *arg)
                     status->status |= 8;
                 }
             } else if (strncmp(p, "VTG,", 4) == 0) {
+                status->vtg_cnt++;
                 gps_cmd_vtg(sensor, p + 4, end);
                 if (vtg->kmh_unit == 'K') {
                     status->speed = vtg->speed_kmh;
                     status->status |= 16;
                 }
             } else if (strncmp(p, "ZDA,", 4) == 0) {
+                status->zda_cnt++;
                 gps_cmd_zda(sensor, p + 4, end);
                 if (zda->year > 24) {
                     status->date = (uint32_t)zda->year * 10000 + (uint32_t)zda->month * 100 + (uint32_t)zda->day;
@@ -434,6 +442,7 @@ static void gps_sensor_task(void *arg)
             } else {
                 //ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, rxBytes, ESP_LOG_INFO);
                 //ESP_LOGE(sensor->name, "#UNK=%s", p);
+                status->unk_cnt++;
                 p = strchr(end + 1, '$');
                 if (p != NULL) {
                     end = strchr(p + 1, '*');
@@ -621,5 +630,12 @@ void gps_dump_values(gps_sensor_t *sensor, bool force)
         // ZDA Date & Time
         ESP_LOGI(TAG, "ZDA: %u time=%lu date=%02d.%02d.%02d zone: h=%d m=%d",
                 zda->cnt, (uint32_t)zda->time, zda->year, zda->month, zda->day, zda->zone_hours, zda->zone_minutes);
+    }
+    if (force || sensor->debug & 4) {
+        gps_status_t *status = &sensor->status;
+
+        ESP_LOGI(TAG, "CNT: txt=%u rmc=%u gll=%u gsa=%u gsv=%u gga=%u vtg=%u zda=%u unk=%u",
+                 status->txt_cnt, status->rmc_cnt, status->gll_cnt, status->gsa_cnt, status->gsv_cnt,
+                 status->gga_cnt, status->vtg_cnt, status->zda_cnt, status->unk_cnt);
     }
 }

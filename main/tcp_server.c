@@ -148,12 +148,17 @@ static int get_status(char *buf)
 
 static int get_gps_values(char *buf)
 {
-    const char *fmt = opt_format ? "*%u,%u,%lu,%lu,%f,%c,%f,%c,%f,%f,%c,%u,%f,%f,%f,%x,%u,%u\n"
-                                 : "{id=%u,sat=%u,date=%lu,time=%lu,lat=%f,lat_unit=\"%c\",lng=%f,lng_unit=\"%c\",alt=%f,spd=%f,mode_3d=\"%c\",sats=%u,pdop=%f,hdop=%f,vdop=%f,status=0x%x,data_cnt=%u,error_cnt=%u}\n";
+    const char *fmt = opt_format ? "*%u,%u,%lu,%lu,%f,%c,%f,%c,%f,%f,%c,%u,%f,%f,%f,%x,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n"
+                                 : "{id=%u,sat=%u,date=%lu,time=%lu,lat=%f,lat_unit=\"%c\",lng=%f,lng_unit=\"%c\",alt=%f,spd=%f,"
+                                   "mode_3d=\"%c\",sats=%u,pdop=%f,hdop=%f,vdop=%f,status=0x%x,data_cnt=%u,error_cnt=%u,"
+                                   "txt_cnt=%u,rmc_cnt=%u,gll_cnt=%u,gsa_cnt=%u,gsv_cnt=%u,gga_cnt=%u,vtg_cnt=%u,zda_cnt=%u,unk_cnt=%u}\n";
+    gps_status_t *status = &gps->status;
     return sprintf(buf, fmt, E_SENSOR_GPS,
             gps_values.sat, (unsigned long)gps_values.date, (unsigned long)gps_values.time, gps_values.lat, gps_values.ns,
             gps_values.lng, gps_values.ew, gps_values.altitude, gps_values.speed, gps_values.mode_3d, gps_values.sats,
-            gps_values.pdop, gps_values.hdop, gps_values.vdop, gps_values.status, gps_values.data_cnt, gps_values.error_cnt);
+            gps_values.pdop, gps_values.hdop, gps_values.vdop, gps_values.status, gps_values.data_cnt, gps_values.error_cnt,
+            status->txt_cnt, status->rmc_cnt, status->gll_cnt, status->gsa_cnt, status->gsv_cnt,
+            status->gga_cnt, status->vtg_cnt, status->zda_cnt, status->unk_cnt);
 }
 
 static int get_bme280_values(char *buf, bmx280_values_t *values)

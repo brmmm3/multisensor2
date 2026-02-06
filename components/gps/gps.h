@@ -139,9 +139,19 @@ typedef struct gps_status_s {
     char mode_3d;       // Fix mode; 1 = no fix, 2 = 2D, 3 = 3D
     uint8_t sats;       // Number of satellites
     uint8_t status;     // Data status. 0=OK
+    // Counter
     uint8_t data_cnt;   // Data counter.
     uint8_t old_data_cnt; // Old Data counter.
     uint8_t error_cnt;
+    uint8_t txt_cnt;
+    uint8_t rmc_cnt;
+    uint8_t gll_cnt;
+    uint8_t gsa_cnt;
+    uint8_t gsv_cnt;
+    uint8_t gga_cnt;
+    uint8_t vtg_cnt;
+    uint8_t zda_cnt;
+    uint8_t unk_cnt;
 } gps_status_t;
 
 typedef struct __attribute__((packed)) gps_data_s {
