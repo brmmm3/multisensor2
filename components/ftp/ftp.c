@@ -263,7 +263,7 @@ static ftp_result_t ftp_list_dir(char *list, uint32_t maxlistsize, uint32_t *lis
 	ftp_result_t result = E_FTP_RESULT_CONTINUE;
 	struct dirent *de;
 
-	ESP_LOGD(TAG, "ftp_list_dir maxlistsize=%d", maxlistsize);
+	ESP_LOGD(TAG, "ftp_list_dir maxlistsize=%u", maxlistsize);
 	// read up to 8 directory items
 	while (((maxlistsize - next) > 64) && (listcount < 8)) {
 		de = readdir(ftp_data.dp);															// Read a directory item
@@ -698,7 +698,7 @@ static void ftp_process_cmd(void) {
 			ESP_LOGD(TAG, "CMD: %s", ftp_cmd_table[cmd].cmd);
 		}
 		else {
-			ESP_LOGD(TAG, "CMD: %d", cmd);
+			ESP_LOGD(TAG, "CMD: %u", cmd);
 		}
 		char fullname[128];
 		char fullname2[128];

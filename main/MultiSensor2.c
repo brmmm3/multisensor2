@@ -317,7 +317,7 @@ static bool update_bmx280(int num, bmx280_t **sensor, sensors_data_bmx280_t *las
     bool force_update = force_update_all || (debug_main & 1) != 0;
 
     if ((err = bmx280_readout(*sensor)) != ESP_OK) {
-        ESP_LOGE(TAG, "BME280_%d: err=%d", num, err);
+        ESP_LOGE(TAG, "BME280_%u: err=%u", num, err);
         return false;
     }
     if (force_update || memcmp(last_values, &(*sensor)->values, sizeof(sensors_data_bmx280_t)) != 0) {
@@ -350,7 +350,7 @@ static bool update_scd4x()
     }
     if (scd4x_st_machine_status == SCD4X_ST_IDLE || scd4x_st_machine_status > SCD4X_ST_MEASURE_3MIN) {
         if (scd4x_st_machine_status > SCD4X_ST_MEASURE_3MIN) {
-            ESP_LOGW(TAG, "SCD4x is busy with status %d. Unable to read values.", scd4x_st_machine_status);
+            ESP_LOGW(TAG, "SCD4x is busy with status %u. Unable to read values.", scd4x_st_machine_status);
         }
         return false;
     }
@@ -370,10 +370,10 @@ static bool update_scd4x()
             ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_sensor_altitude(scd4x, bmx280->values.altitude));
             ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_ambient_pressure(scd4x, bmx280->values.pressure));
             if ((err = scd4x_start_periodic_measurement(scd4x)) != ESP_OK) {
-                ESP_LOGE(TAG, "Failed start periodic measurement: %d", err);
+                ESP_LOGE(TAG, "Failed start periodic measurement: %u", err);
             }
         } else {
-            ESP_LOGE(TAG, "Failed to stop periodic measurement: %d", err);
+            ESP_LOGE(TAG, "Failed to stop periodic measurement: %u", err);
         }
         scd4x_calibrate = true;
         ESP_LOGI(TAG, "SCD4X Adjust: TempOffset=%f °C  Alt=%f m  Press=%f hPa",
@@ -383,7 +383,7 @@ static bool update_scd4x()
         return force_update_all;
     }
     if ((err = scd4x_read_measurement(scd4x)) != ESP_OK) {
-        ESP_LOGE(TAG, "SCD4X read error %d", err);
+        ESP_LOGE(TAG, "SCD4X read error %u", err);
         return false;
     }
 
@@ -436,7 +436,7 @@ static bool update_sps30()
     }
     sps30_not_ready_cnt = 0;
     if ((err = sps30_read_measurement(sps30)) != ESP_OK) {
-        ESP_LOGE(TAG, "SPS30: Failed to read measurement values err=%d", err);
+        ESP_LOGE(TAG, "SPS30: Failed to read measurement values err=%u", err);
         return false;
     }
 
@@ -458,7 +458,7 @@ static bool update_adxl345()
         if (adxl345 == NULL) return false;
     }
     if ((err = adxl345_read_data(adxl345)) != ESP_OK) {
-        ESP_LOGE(TAG, "ADXL345 read error %d", err);
+        ESP_LOGE(TAG, "ADXL345 read error %u", err);
         return false;
     }
 
@@ -480,7 +480,7 @@ static bool update_qmc5883l()
         if (qmc5883l == NULL) return false;
     }
     if ((err = qmc5883l_read_data(qmc5883l)) != ESP_OK) {
-        ESP_LOGE(TAG, "ADXL345 read error %d", err);
+        ESP_LOGE(TAG, "QMC5883L read error %u", err);
         return false;
     }
 
@@ -565,7 +565,7 @@ static void sensors_recording()
     if (gps_update) {
         data_add(E_SENSOR_GPS, &last_values.gps, sizeof(sensors_data_gps_t));
         if (log_values || (debug_main & 4) != 0) {
-            ESP_LOGI(TAG, "GPS: %s date=%lu time=%lu lat=%f %c lng=%f %c alt=%.1f spd=%.1f mode_3d=%c sats=%d pdop=%.1f hdop=%.1f vdop=%.1f st=%d dc=%d err=%d",
+            ESP_LOGI(TAG, "GPS: %s date=%lu time=%lu lat=%f %c lng=%f %c alt=%.1f spd=%.1f mode_3d=%c sats=%u pdop=%.1f hdop=%.1f vdop=%.1f st=%u dc=%u err=%u",
                     gps_values.sat, gps_values.date, gps_values.time, gps_values.lat, gps_values.ns, gps_values.lng,
                     gps_values.ew, gps_values.altitude, gps_values.speed, gps_values.mode_3d, gps_values.sats,
                     gps_values.pdop, gps_values.hdop, gps_values.vdop, gps_values.status, gps_values.data_cnt, gps_values.error_cnt);
@@ -591,7 +591,7 @@ static void sensors_recording()
         data_add(E_SENSOR_MHZ19, &last_values.mhz19, sizeof(sensors_data_mhz19_t));
         if (log_values || (debug_main & 16) != 0) {
             sensors_data_mhz19_t *values = &last_values.mhz19;
-            ESP_LOGI(TAG, "MHZ19: co2=%d ppm  temp=%d °C  st=%d", values->co2, values->temp, values->status);
+            ESP_LOGI(TAG, "MHZ19: co2=%u ppm  temp=%u °C  st=%u", values->co2, values->temp, values->status);
         }
     }
     if (scd4x_calibrate) {
@@ -602,14 +602,14 @@ static void sensors_recording()
         };
         data_add(E_SENSOR_SCD4XCAL, &values, sizeof(scd4x_cal_values_t));
         if (log_values || (debug_main & 16) != 0) {
-            ESP_LOGI(TAG, "SCD4XCAL: temp_offs=%f  alt=%d  press=%d", values.temperature_offset, values.altitude, values.pressure);
+            ESP_LOGI(TAG, "SCD4XCAL: temp_offs=%f  alt=%u  press=%u", values.temperature_offset, values.altitude, values.pressure);
         }
     }
     if (scd4x_update) {
         data_add(E_SENSOR_SCD4X, &last_values.scd4x, sizeof(sensors_data_scd4x_t));
         if (log_values || (debug_main & 16) != 0) {
             sensors_data_scd4x_t *values = &last_values.scd4x;
-            ESP_LOGI(TAG, "SCD4X: co2=%d ppm  temp=%.1f °C  hum=%.1f %%", values->co2, values->temperature, values->humidity);
+            ESP_LOGI(TAG, "SCD4X: co2=%u ppm  temp=%.1f °C  hum=%.1f %%", values->co2, values->temperature, values->humidity);
         }
     }
     if (yys_update) {
@@ -646,12 +646,12 @@ static void sensors_recording()
         data_add(E_SENSOR_QMC5883L, &last_values.qmc5883l, sizeof(sensors_data_qmc5883l_t));
         if (log_values || (debug_main & 128) != 0) {
             sensors_data_qmc5883l_t *values = &last_values.qmc5883l;
-            ESP_LOGI(TAG, "QMC5883L: x=%f gauss  y=%f gauss  z=%f gauss  range=%d  st=%d",
+            ESP_LOGI(TAG, "QMC5883L: x=%f gauss  y=%f gauss  z=%f gauss  range=%f  st=%" PRIu8,
                 values->mag_x, values->mag_y, values->mag_z, values->range, values->status);
         }
     }
     if (log_values) {
-        ESP_LOGI(TAG, "WRITTEN: %d bytes", status.record_pos - record_pos);
+        ESP_LOGI(TAG, "WRITTEN: %u bytes", status.record_pos - record_pos);
     }
 }
 
@@ -659,7 +659,7 @@ void show_startup_uptime_cnt()
 {
     char buf[40];
 
-    sprintf(buf, "startup=%u  uptime=%d", (unsigned int)status.startup_cnt, (unsigned int)status.uptime_cnt);
+    sprintf(buf, "startup=%u  uptime=%u", (unsigned int)status.startup_cnt, (unsigned int)status.uptime_cnt);
     ui_set_label_text(ui->lbl_counter, buf);
 }
 
@@ -673,7 +673,7 @@ esp_err_t update_startup_cnt(uint32_t startup_cnt_inc, uint32_t uptime_cnt_inc)
     cnt.uptime_cnt += uptime_cnt_inc;
     status.startup_cnt = cnt.startup_cnt;
     status.uptime_cnt = cnt.uptime_cnt;
-    ESP_LOGI(TAG, "startup_cnt=%d  uptime_cnt=%d", cnt.startup_cnt, cnt.uptime_cnt);
+    ESP_LOGI(TAG, "startup_cnt=%u  uptime_cnt=%u", cnt.startup_cnt, cnt.uptime_cnt);
     return write_bin_file(path, &cnt, sizeof(cnt));
 }
 
@@ -758,7 +758,7 @@ void show_sd_card_info(int file_cnt)
         status.file_cnt = sd_card_get_file_count(MOUNT_POINT"/data");
         file_cnt = status.file_cnt;
     }
-    sprintf(buf, "%d data files", file_cnt);
+    sprintf(buf, "%u data files", file_cnt);
     ui_set_label_text(ui->lbl_sd_files, buf);
 }
 
@@ -792,11 +792,11 @@ esp_err_t write_data_file()
     int pos = strlen(MOUNT_POINT);
     strcpy(buf, MOUNT_POINT);
     sprintf(&buf[pos], "/data/%s", status.filename);
-    ESP_LOGI(TAG, "Write %d bytes to File %s", status.record_pos, buf);
+    ESP_LOGI(TAG, "Write %u bytes to File %s", status.record_pos, buf);
     if ((err = write_bin_file(buf, data, status.record_pos)) != ESP_OK) return err;
     status.record_pos = 0;
     status.file_cnt++;
-    sprintf(buf, "%d data files", status.file_cnt);
+    sprintf(buf, "%u data files", status.file_cnt);
     ui_set_label_text(ui->lbl_sd_files, buf);
     ui_sd_set_fill_level(0.0);
     set_data_filename();
@@ -1049,13 +1049,13 @@ void app_main(void)
         uint16_t year = 1900 + timeinfo.tm_year;
         uint8_t mon = timeinfo.tm_mon + 1;
 
-        sprintf(buf, "%d.%02d.%02d %02d:%02d:%02d",
+        sprintf(buf, "%u.%02d.%02d %02d:%02d:%02d",
             year, mon, timeinfo.tm_mday,
             timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         ESP_LOGI(TAG, "Set system time to: %s", buf);
         ESP_ERROR_CHECK_WITHOUT_ABORT(set_sys_time(&timeinfo, false));
     } else {
-        ESP_LOGE(TAG, "Failed to get date and time from RTC: err=%d", err);
+        ESP_LOGE(TAG, "Failed to get date and time from RTC: err=%u", err);
     }
     status.start_time = time(NULL);
 

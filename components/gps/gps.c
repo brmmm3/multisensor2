@@ -171,7 +171,7 @@ void gps_cmd_txt(gps_sensor_t *sensor, char *p, char *end)
         p = n + 1;
     }
     *msg = 0;
-    ESP_LOGI(TAG, "TXT msg_size=%d %d\nMSG=%s", msg_size, sensor->msg_size, sensor->messages);
+    ESP_LOGI(TAG, "TXT msg_size=%u %u\nMSG=%s", msg_size, sensor->msg_size, sensor->messages);
 }
 
 // RMC-Recommended Minimum Specific GNSS Data
@@ -459,7 +459,7 @@ static void gps_sensor_task(void *arg)
         uint16_t cnt = p - buf;
 
         if (cnt < rxBytes) {
-            //ESP_LOGW(sensor->name, "#OFF=%d %s", cnt, p);
+            //ESP_LOGW(sensor->name, "#OFF=%u %s", cnt, p);
             offset = rxBytes - (uint8_t)cnt;
             strncpy(buf, p, offset);
         }
@@ -531,7 +531,7 @@ int gps_set_power_mode(gps_sensor_t *sensor, uint8_t mode)
     uint8_t a = 0, b = 0;
     char buf[sizeof(ubxPSM) + 4];
 
-    ESP_LOGI(TAG, "gps_set_power_mode %d", mode);
+    ESP_LOGI(TAG, "gps_set_power_mode %u", mode);
     if (sensor == NULL) return -1;
     if (mode > 1) return gps_power_off(sensor);
     buf[0] = 0xB5;
@@ -578,7 +578,7 @@ void gps_dump_values(gps_sensor_t *sensor, bool force)
     if (force || sensor->debug & 1) {
         gps_status_t *status = &sensor->status;
 
-        ESP_LOGI(TAG, "sat=%s date=%lu time=%lu lat=%f %c lng=%f %c altitude=%f speed=%f mode_3d=%c sats=%d status=0x%x errors=%d",
+        ESP_LOGI(TAG, "sat=%s date=%lu time=%lu lat=%f %c lng=%f %c altitude=%f speed=%f mode_3d=%c sats=%u status=0x%x errors=%u",
                  get_gps_sat_type(status->sat), status->date, status->time, status->lat, status->ns, status->lng, status->ew, status->altitude,
                  status->speed, status->mode_3d, status->sats, status->status, status->error_cnt);
     }
@@ -593,36 +593,36 @@ void gps_dump_values(gps_sensor_t *sensor, bool force)
         gps_zda_t *zda = &sensor->zda;
 
         // RMC - Recommended Minimum Navigation Information
-        ESP_LOGI(TAG, "RMC: %d date=%lu time=%lu status=%c lat=%f %c lng=%f %c speed=%f course=%f mv=%f %c",
+        ESP_LOGI(TAG, "RMC: %u date=%lu time=%lu status=%c lat=%f %c lng=%f %c speed=%f course=%f mv=%f %c",
                 rmc->cnt, rmc->date, (uint32_t)rmc->time, rmc->status, rmc->lat, rmc->ns, rmc->lng, rmc->ew, rmc->speed, rmc->course, rmc->mv, rmc->mv_ew);
         // GLL-Geographic Position-Latitude/Longitude
-        ESP_LOGI(TAG, "GLL: %d lat=%f %c lng=%f %c time=%lu status=%c",
+        ESP_LOGI(TAG, "GLL: %u lat=%f %c lng=%f %c time=%lu status=%c",
                 gll->cnt, gll->lat, gll->ns, gll->lng, gll->ew, (uint32_t)gll->time, gll->status);
         // GSA-GNSS DOP and Active Satallites
-        ESP_LOGI(TAG, "GSA: %d auto=%c 3d=%c sats=%d %d %d %d %d %d %d %d %d %d %d %d pdop=%f hdop=%f vdop=%f",
+        ESP_LOGI(TAG, "GSA: %u auto=%c 3d=%c sats=%u %u %u %u %u %u %u %u %u %u %u %u pdop=%f hdop=%f vdop=%f",
                 gsa->cnt, gsa->mode_auto, gsa->mode_3d,
                 gsa_sats[0], gsa_sats[1], gsa_sats[2], gsa_sats[3], gsa_sats[4], gsa_sats[5], gsa_sats[6], gsa_sats[7],
                 gsa_sats[8], gsa_sats[9], gsa_sats[10], gsa_sats[11],
                 gsa->pdop, gsa->hdop, gsa->vdop);
         // GSV-GNSS Satallites in View
-        ESP_LOGI(TAG, "GSV: %d num_sv=%d", gsv->cnt, gsv->num_sv);
+        ESP_LOGI(TAG, "GSV: %u num_sv=%u", gsv->cnt, gsv->num_sv);
         for (int i = 0; i < 9; i++) {
             gps_gsv_sat_t *sat = &gsv->sats[i];
 
             if (sat->svid == 0) break;
-            ESP_LOGI(TAG, "GSV-SAT%d: svid=%d elv=%d az=%d snr=%d",
+            ESP_LOGI(TAG, "GSV-SAT%u: svid=%u elv=%u az=%u snr=%u",
                     i, sat->svid, sat->elv, sat->az, sat->snr);
         }
         // GGA-Global Postioning System Fixed Data
-        ESP_LOGI(TAG, "GGA: %d time=%lu lat=%f %c lng=%f %c pos_fix=%d sat_used=%d hdop=%f alt=%f %c goid=%f %c age=%f diff_stat_id=%d",
+        ESP_LOGI(TAG, "GGA: %u time=%lu lat=%f %c lng=%f %c pos_fix=%u sat_used=%u hdop=%f alt=%f %c goid=%f %c age=%f diff_stat_id=%u",
                 gga->cnt, (uint32_t)gga->time, gga->lat, gga->ns, gga->lng, gga->ew, gga->pos_fix, gga->sat_used, gga->hdop, gga->altitude,
                 gga->alt_unit, gga->goid, gga->goid_unit, gga->age, gga->diff_stat_id);
         // VTG-Course Over Ground and Ground Speed
-        ESP_LOGI(TAG, "VTG: %d track=%f %c mag=%f %c knots=%f %c kmh=%f %c",
+        ESP_LOGI(TAG, "VTG: %u track=%f %c mag=%f %c knots=%f %c kmh=%f %c",
                 vtg->cnt, vtg->true_track, vtg->true_unit, vtg->magnetic_track, vtg->magnetic_unit, vtg->speed_knots, vtg->knot_unit,
                 vtg->speed_kmh, vtg->kmh_unit);
         // ZDA Date & Time
-        ESP_LOGI(TAG, "ZDA: %d time=%lu date=%02d.%02d.%02d zone: h=%d m=%d",
+        ESP_LOGI(TAG, "ZDA: %u time=%lu date=%02d.%02d.%02d zone: h=%d m=%d",
                 zda->cnt, (uint32_t)zda->time, zda->year, zda->month, zda->day, zda->zone_hours, zda->zone_minutes);
     }
 }

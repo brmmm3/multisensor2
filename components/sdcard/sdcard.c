@@ -33,7 +33,7 @@ esp_err_t write_text_file(const char *path, char *data)
     FILE *f = fopen(path, "w");
     if (f == NULL) {
         lvgl_port_unlock();
-        ESP_LOGE(TAG, "Failed to open file for writing: %s (errno=%d)", strerror(errno), errno);
+        ESP_LOGE(TAG, "Failed to open file for writing: %s (errno=%u)", strerror(errno), errno);
         return ESP_FAIL;
     }
     fwrite(data, strlen(data), 1, f);
@@ -49,7 +49,7 @@ esp_err_t read_text_file(const char *path, char *buf, uint32_t size)
     FILE *f = fopen(path, "r");
     if (f == NULL) {
         lvgl_port_unlock();
-        ESP_LOGE(TAG, "Failed to open file for reading: %s (errno=%d)", strerror(errno), errno);
+        ESP_LOGE(TAG, "Failed to open file for reading: %s (errno=%u)", strerror(errno), errno);
         return ESP_FAIL;
     }
     fgets(buf, size, f);
@@ -65,7 +65,7 @@ esp_err_t write_bin_file(const char *path, void *data, uint32_t size)
     FILE *f = fopen(path, "wb");
     if (f == NULL) {
         lvgl_port_unlock();
-        ESP_LOGE(TAG, "Failed to open file for writing: err(%d)=%s", errno, strerror(errno));
+        ESP_LOGE(TAG, "Failed to open file for writing: err(%u)=%s", errno, strerror(errno));
         return ESP_FAIL;
     }
     fwrite(data, size, 1, f);
@@ -81,7 +81,7 @@ uint32_t read_bin_file(const char *path, void *buf, uint32_t size)
     FILE *f = fopen(path, "rb");
     if (f == NULL) {
         lvgl_port_unlock();
-        ESP_LOGE(TAG, "Failed to open file for reading: %s (errno=%d)", strerror(errno), errno);
+        ESP_LOGE(TAG, "Failed to open file for reading: %s (errno=%u)", strerror(errno), errno);
         return 0;
     }
     if (buf == NULL) return 0;
@@ -153,7 +153,7 @@ esp_err_t remove_data_file(const char *path)
     if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
     if (remove((get_data_file_path(path))) != 0) {
         lvgl_port_unlock();
-        ESP_LOGE(TAG, "Failed to delete file: %s (error: %d)", path, errno);
+        ESP_LOGE(TAG, "Failed to delete file: %s (error: %u)", path, errno);
         return ESP_FAIL;
     }
     lvgl_port_unlock();
@@ -405,6 +405,6 @@ esp_err_t ensure_dir(const char *path)
         return ESP_OK;  // 0755 = rwxr-xr-x permissions
     }
     lvgl_port_unlock();
-    ESP_LOGE(TAG, "Failed to create directory %s (errno: %d)", path, errno);
+    ESP_LOGE(TAG, "Failed to create directory %s (errno: %u)", path, errno);
     return ESP_FAIL;
 }

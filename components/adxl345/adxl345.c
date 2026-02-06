@@ -251,7 +251,7 @@ void adxl345_dump_values(adxl345_t *sensor, bool force)
     if (force || sensor->debug & 1) {
         adxl345_values_t *values = &sensor->values;
 
-        ESP_LOGI(TAG, "x=%f g  y=%f g  z=%f g  abs=%f g  offsets=%f %f %f  moving_cnt=%d",
+        ESP_LOGI(TAG, "x=%f g  y=%f g  z=%f g  abs=%f g  offsets=%f %f %f  moving_cnt=%u",
                  values->accel_x, values->accel_y, values->accel_z, values->accel_abs,
                  values->accel_offset_x, values->accel_offset_y, values->accel_offset_z,
                  sensor->moving_cnt);

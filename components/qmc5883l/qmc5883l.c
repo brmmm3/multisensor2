@@ -33,10 +33,10 @@ void qmc5883l_close(qmc5883l_t *sensor);
 
 esp_err_t qmc5883l_read(qmc5883l_t *sensor, uint8_t addr, uint8_t *dout, size_t size)
 {
-    //ESP_LOGI(TAG, "qmc5883l_read %02X dout=%d size=%d", addr, *dout, size);
+    //ESP_LOGI(TAG, "qmc5883l_read %02X dout=%u size=%u", addr, *dout, size);
     //esp_err_t err = i2c_master_transmit(sensor->i2c_dev, &addr, 1, CONFIG_QMC5883L_TIMEOUT);
 
-    //ESP_LOGI(TAG, "qmc5883l_read err1=%d", err);
+    //ESP_LOGI(TAG, "qmc5883l_read err1=%u", err);
     //if (err != ESP_OK) return err;
     return i2c_master_transmit_receive(sensor->i2c_dev, &addr, 1, dout, size, CONFIG_QMC5883L_TIMEOUT);
     //return i2c_master_receive(sensor->i2c_dev, dout, size, CONFIG_QMC5883L_TIMEOUT);
@@ -44,12 +44,12 @@ esp_err_t qmc5883l_read(qmc5883l_t *sensor, uint8_t addr, uint8_t *dout, size_t 
 
 static esp_err_t qmc5883l_write(qmc5883l_t *sensor, uint8_t addr, uint8_t *din, size_t size)
 {
-    ESP_LOGI(TAG, "qmc5883l_write %02X data=%p size=%d", addr, din, size);
+    ESP_LOGI(TAG, "qmc5883l_write %02X data=%p size=%u", addr, din, size);
     if (din == NULL || size == 0) {
         return i2c_master_transmit(sensor->i2c_dev, &addr, 1, CONFIG_QMC5883L_TIMEOUT);
     }
 
-    ESP_LOGI(TAG, "qmc5883l_write data=%d", *din);
+    ESP_LOGI(TAG, "qmc5883l_write data=%u", *din);
     i2c_master_transmit_multi_buffer_info_t buffer[2] = {
         {.write_buffer = &addr, .buffer_size = 1},
         {.write_buffer = din, .buffer_size = size},
@@ -128,7 +128,7 @@ esp_err_t qmc5883l_read_data(qmc5883l_t *sensor)
     values->mag_y = (float)mag_y * values->range;
     values->mag_z = (float)mag_z * values->range;
     values->status = data[6];
-    //ESP_LOGI(TAG, "status=%X bx=%d by=%d bz=%d", sensor->status, mag_x, mag_y, mag_z);
+    //ESP_LOGI(TAG, "status=%X bx=%u by=%u bz=%u", sensor->status, mag_x, mag_y, mag_z);
     //ESP_LOG_BUFFER_HEXDUMP(TAG, data, sizeof(data), ESP_LOG_INFO);
     return ESP_OK;
 }
@@ -238,7 +238,7 @@ void qmc5883l_dump_values(qmc5883l_t *sensor, bool force)
     if (force || sensor->debug & 1) {
         qmc5883l_values_t *values = &sensor->values;
 
-        ESP_LOGI(TAG, "x=%f gauss  y=%f gauss  z=%f gauss  range=%d  status=%d",
+        ESP_LOGI(TAG, "x=%f gauss  y=%f gauss  z=%f gauss  range=%f  st=%u",
             values->mag_x, values->mag_y, values->mag_z, values->range, values->status);
     }
 }

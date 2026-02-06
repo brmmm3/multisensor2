@@ -18,7 +18,7 @@ static void show_bmx280_status(int num, bmx280_t *sensor)
 {
     if (sensor == NULL) return;
     bmx280_getMode(sensor);
-    ESP_LOGI(TAG, "BME280 %d:", num);
+    ESP_LOGI(TAG, "BME280 %u:", num);
     bmx280_dump_info(sensor);
     bmx280_dump_values(sensor, true);
 }

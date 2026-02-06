@@ -139,7 +139,7 @@ void mqtt_publish_values()
  
     static char buf[256];
 
-    ESP_LOGI(TAG, "Publish %d", bmx280lo_update);
+    ESP_LOGI(TAG, "Publish %u", bmx280lo_update);
     if (bmx280lo_update) {
         bmx280_values_t *values = &bmx280lo->values;
         sprintf(buf, "{temp=%f,hum=%f,press=%f,alt=%f}", values->temperature, values->humidity, values->pressure, values->altitude);

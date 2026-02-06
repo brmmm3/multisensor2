@@ -373,7 +373,7 @@ esp_err_t sps30_init(sps30_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
 
 void sps30_dump_info(sps30_t *sensor)
 {
-    ESP_LOGI(TAG, "DevInfo=%s  Serial=%s  FW=%d.%d",
+    ESP_LOGI(TAG, "DevInfo=%s  Serial=%s  FW=%u.%u",
         sensor->device_info, sensor->serial,
         sensor->fw_version >> 8, sensor->fw_version & 0xff);
     if (strncmp(sensor->device_info, "00080000", 8)) {

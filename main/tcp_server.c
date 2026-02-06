@@ -86,7 +86,7 @@ static bool send_data_to_client(int client_sock, uint8_t *data, int to_write)
                     continue;
                 }
             }
-            ESP_LOGE(TAG, "SEND failed: errno %d", errno);
+            ESP_LOGE(TAG, "SEND failed: errno %u", errno);
             return false;
         }
         to_write -= ret;
@@ -104,27 +104,27 @@ static int get_date_time(char *buf)
     uint8_t min;
     uint8_t sec;
     get_current_date_time(&year, &month, &day, &hour, &min, &sec);
-    const char *fmt = opt_format ? "*%d,%d.%02d.%02d,%02d:%02d:%02d,%d\n"
-                                 : "{id=%d,date=\"%d.%02d.%02d\",time=\"%02d:%02d:%02d\",rssi=%d}\n";
+    const char *fmt = opt_format ? "*%u,%u.%02d.%02d,%02d:%02d:%02d,%d\n"
+                                 : "{id=%u,date=\"%u.%02d.%02d\",time=\"%02d:%02d:%02d\",rssi=%d}\n";
     return sprintf(buf, fmt, E_SENSOR_DATETIME,
         year, month, day, hour, min, sec, status.rssi);
 }
 
 static int get_config(char *buf)
 {
-    const char *fmt = opt_format ? "*%d,%d,%d,%d,"
-                                 : "{id=%d,cfg_version=%d,auto_connect=%d,auto_record=%d,";
+    const char *fmt = opt_format ? "*%u,%u,%u,%u,"
+                                 : "{id=%u,cfg_version=%u,auto_connect=%u,auto_record=%u,";
     int len = sprintf(rx_buffer, fmt, E_SENSOR_CONFIG,
         config->cfg_version, config->wifi_auto_connect_idx, config->auto_record);
-    fmt = opt_format ? "%d,%d,%d,%d,%d,"
-                     : "lcd_pwr=%d,gps_pwr=%d,scd4x_pwr=%d,wifi_pwr=%d,mode_pwr=%d,";
+    fmt = opt_format ? "%u,%u,%u,%u,%u,"
+                     : "lcd_pwr=%u,gps_pwr=%u,scd4x_pwr=%u,wifi_pwr=%u,mode_pwr=%u,";
     len += sprintf(&rx_buffer[len], fmt,
         config->lcd_pwr, config->gps_pwr, config->scd4x_pwr, config->wifi_pwr, config->mode_pwr);
-    fmt = opt_format ? "%d,%d"
-                     : "tcp_auto_start=%d,ftp_auto_start=%d";
+    fmt = opt_format ? "%u,%u"
+                     : "tcp_auto_start=%u,ftp_auto_start=%u";
     len += sprintf(&rx_buffer[len], fmt, config->tcp_auto_start, config->ftp_auto_start);
-    fmt = opt_format ? ",%d=%d"
-                     : ",ssid%d=%s";
+    fmt = opt_format ? ",%u=%s"
+                     : ",ssid%u=%s";
     for (int i = 0; i < 4; i++) {
         if (strlen(config_nvs->wifi.ssid[i]) > 0) {
             len += sprintf(&rx_buffer[len], fmt, i, config_nvs->wifi.ssid[i]);
@@ -140,16 +140,16 @@ static int get_config(char *buf)
 
 static int get_status(char *buf)
 {
-    const char *fmt = opt_format ? "*%d,%d,%d,%d,%d,%s,%d\n"
-                                 : "{id=%d,force_update=%d,recording=%d,record_pos=%d,file_cnt=%d,filename=\"%s\",rssi=%d}\n";
+    const char *fmt = opt_format ? "*%u,%u,%u,%u,%u,%s,%d\n"
+                                 : "{id=%u,force_update=%u,recording=%u,record_pos=%u,file_cnt=%u,filename=\"%s\",rssi=%d}\n";
     return sprintf(buf, fmt, E_SENSOR_STATUS,
         status.force_update, status.recording, status.record_pos, status.file_cnt, status.filename, status.rssi);
 }
 
 static int get_gps_values(char *buf)
 {
-    const char *fmt = opt_format ? "*%d,%d,%lu,%lu,%f,%c,%f,%c,%f,%f,%c,%d,%f,%f,%f,%x,%d,%d\n"
-                                 : "{id=%d,sat=%d,date=%lu,time=%lu,lat=%f,lat_unit=\"%c\",lng=%f,lng_unit=\"%c\",alt=%f,spd=%f,mode_3d=\"%c\",sats=%d,pdop=%f,hdop=%f,vdop=%f,status=0x%x,data_cnt=%d,error_cnt=%d}\n";
+    const char *fmt = opt_format ? "*%u,%u,%lu,%lu,%f,%c,%f,%c,%f,%f,%c,%u,%f,%f,%f,%x,%u,%u\n"
+                                 : "{id=%u,sat=%u,date=%lu,time=%lu,lat=%f,lat_unit=\"%c\",lng=%f,lng_unit=\"%c\",alt=%f,spd=%f,mode_3d=\"%c\",sats=%u,pdop=%f,hdop=%f,vdop=%f,status=0x%x,data_cnt=%u,error_cnt=%u}\n";
     return sprintf(buf, fmt, E_SENSOR_GPS,
             gps_values.sat, (unsigned long)gps_values.date, (unsigned long)gps_values.time, gps_values.lat, gps_values.ns,
             gps_values.lng, gps_values.ew, gps_values.altitude, gps_values.speed, gps_values.mode_3d, gps_values.sats,
@@ -158,32 +158,32 @@ static int get_gps_values(char *buf)
 
 static int get_bme280_values(char *buf, bmx280_values_t *values)
 {
-    const char *fmt = opt_format ? "*%d,%f,%f,%f,%f\n"
-                                 : "{id=%d,temp=%f,hum=%f,press=%f,alt=%f}\n";
+    const char *fmt = opt_format ? "*%u,%f,%f,%f,%f\n"
+                                 : "{id=%u,temp=%f,hum=%f,press=%f,alt=%f}\n";
     return sprintf(buf, fmt, E_SENSOR_BMX280_LO,
         values->temperature, values->humidity, values->pressure, values->altitude);
 }
 
 static int get_mhz19_values(char *buf, mhz19_values_t *values)
 {
-    const char *fmt = opt_format ? "*%d,%d,%d,%d\n"
-                                 : "{id=%d,co2=%d,temp=%d,status=%d}\n";
+    const char *fmt = opt_format ? "*%u,%u,%u,%u\n"
+                                 : "{id=%u,co2=%u,temp=%u,st=%u}\n";
     return sprintf(buf, fmt, E_SENSOR_MHZ19,
         values->co2, values->temp, values->status);
 }
 
 static int get_scd4x_values(char *buf, scd4x_values_t *values)
 {
-    const char *fmt = opt_format ? "*%d,%d,%f,%f,%d\n"
-                                 : "{id=%d,co2=%d,temp=%f,hum=%f,st=%d}\n";
+    const char *fmt = opt_format ? "*%u,%u,%f,%f,%u\n"
+                                 : "{id=%u,co2=%u,temp=%f,hum=%f,st=%u}\n";
     return sprintf(buf, fmt, E_SENSOR_SCD4X,
         values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
 }
 
 static int get_yys_values(char *buf)
 {
-    const char *fmt = opt_format ? "*%d,%f,%f,%f,%f\n"
-                                 : "{id=%d,o2=%f,co=%f,h2s=%f,ch4=%f}\n";
+    const char *fmt = opt_format ? "*%u,%f,%f,%f,%f\n"
+                                 : "{id=%u,o2=%f,co=%f,h2s=%f,ch4=%f}\n";
     return sprintf(buf, fmt, E_SENSOR_YYS,
         yys_get_o2(yys_sensor), yys_get_co(yys_sensor),
         yys_get_h2s(yys_sensor), yys_get_ch4(yys_sensor));
@@ -191,8 +191,8 @@ static int get_yys_values(char *buf)
 
 static int get_sps30_values(char *buf, sps30_values_t *values)
 {
-    const char *fmt = opt_format ? "*%d,%lu,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n"
-                                 : "{id=%d,status=%lu,pm0_5=%f,pm1_0=%f,p1_0=%f,pm2_5=%f,p2_5=%f,pm4_0=%f,p4_0=%f,pm10_0=%f,p10_0=%f,typ_part_sz=%f}\n";
+    const char *fmt = opt_format ? "*%u,%lu,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n"
+                                 : "{id=%u,status=%lu,pm0_5=%f,pm1_0=%f,p1_0=%f,pm2_5=%f,p2_5=%f,pm4_0=%f,p4_0=%f,pm10_0=%f,p10_0=%f,typ_part_sz=%f}\n";
     return sprintf(buf, fmt, E_SENSOR_SPS30,
         (unsigned long)values->status, values->nc_0p5, values->mc_1p0, values->nc_1p0, values->mc_2p5, values->nc_2p5,
         values->mc_4p0, values->nc_4p0, values->mc_10p0, values->nc_10p0, values->typical_particle_size);
@@ -200,8 +200,8 @@ static int get_sps30_values(char *buf, sps30_values_t *values)
 
 static int get_adxl345_values(char *buf, adxl345_values_t *values)
 {
-    const char *fmt = opt_format ? "*%d,%f,%f,%f,%f,%f,%f,%f\n"
-                                 : "{id=%d,x=%f,y=%f,z=%f,abs=%f,offs=%f %f %f}\n";
+    const char *fmt = opt_format ? "*%u,%f,%f,%f,%f,%f,%f,%f\n"
+                                 : "{id=%u,x=%f,y=%f,z=%f,abs=%f,offs=%f %f %f}\n";
     return sprintf(buf, fmt, E_SENSOR_ADXL345,
         values->accel_x, values->accel_y, values->accel_z, values->accel_abs,
         values->accel_offset_x, values->accel_offset_y, values->accel_offset_z);
@@ -209,8 +209,8 @@ static int get_adxl345_values(char *buf, adxl345_values_t *values)
 
 static int get_qmc5883l_values(char *buf, qmc5883l_values_t *values)
 {
-    const char *fmt = opt_format ? "*%d,%d,%f,%f,%f,%f\n"
-                                 : "{id=%d,status=%d,x=%f,y=%f,z=%f,range=%f}\n";
+    const char *fmt = opt_format ? "*%u,%u,%f,%f,%f,%f\n"
+                                 : "{id=%u,st=%u,x=%f,y=%f,z=%f,range=%f}\n";
     return sprintf(buf, fmt, E_SENSOR_QMC5883L,
         values->status, values->mag_x, values->mag_y, values->mag_z, values->range);
 }
@@ -369,7 +369,7 @@ static void tcp_server_task(void *pvParameters)
     // Create TCP socket
     listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
     if (listen_sock < 0) {
-        ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+        ESP_LOGE(TAG, "Unable to create socket: errno %u", errno);
         tcp_server_task_handle = NULL;
         vTaskDelete(NULL);
         return;
@@ -382,7 +382,7 @@ static void tcp_server_task(void *pvParameters)
 
     int err = bind(listen_sock, (struct sockaddr *)&server_addr, sizeof(server_addr));
     if (err < 0) {
-        ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
+        ESP_LOGE(TAG, "Socket unable to bind: errno %u", errno);
         close(listen_sock);
         tcp_server_task_handle = NULL;
         vTaskDelete(NULL);
@@ -392,21 +392,21 @@ static void tcp_server_task(void *pvParameters)
     // Listen
     err = listen(listen_sock, MAX_CLIENTS);
     if (err < 0) {
-        ESP_LOGE(TAG, "Error listening: errno %d", errno);
+        ESP_LOGE(TAG, "Error listening: errno %u", errno);
         close(listen_sock);
         tcp_server_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
 
-    ESP_LOGI(TAG, "TCP server listening on port %d", PORT);
+    ESP_LOGI(TAG, "TCP server listening on port %u", PORT);
     tcp_server_running = true;
 
     while (true) {
         // Accept new client
         int client_sock = accept(listen_sock, (struct sockaddr *)&client_addr, &client_len);
         if (client_sock < 0) {
-            ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
+            ESP_LOGE(TAG, "Unable to accept connection: errno %u", errno);
             continue;
         }
         tcp_client_cnt++;
@@ -421,10 +421,10 @@ static void tcp_server_task(void *pvParameters)
         int flags = fcntl(client_sock, F_GETFL, 0);
         fcntl(client_sock, F_SETFL, flags | O_NONBLOCK);
 
-        int len = sprintf(rx_buffer, "{id=%d,name=\"MultiSensor V2.0\"}\n", E_SENSOR_INFO);
+        int len = sprintf(rx_buffer, "{id=%u,name=\"MultiSensor V2.0\"}\n", E_SENSOR_INFO);
         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
 
-        len = sprintf(rx_buffer, "{id=%d,lat=\"%c\",lng=\"%c\",co2=\"ppm\",temp=\"°C\",hum=\"%%\",o2=\"%%\",co=\"ppm\",h2s=\"ppm\",ch4=\"ppm\",",
+        len = sprintf(rx_buffer, "{id=%u,lat=\"%c\",lng=\"%c\",co2=\"ppm\",temp=\"°C\",hum=\"%%\",o2=\"%%\",co=\"ppm\",h2s=\"ppm\",ch4=\"ppm\",",
             E_SENSOR_UNITS,
             gps_values.ns, gps_values.ew);
         len += sprintf(&rx_buffer[len], "pm0_5=\"#/cm3\",typ_part_sz=\"um\",pm1_0=\"ug/cm3\",p1_0=\"#/cm3\",");
@@ -439,7 +439,7 @@ static void tcp_server_task(void *pvParameters)
                 if (errno == EWOULDBLOCK || errno == EAGAIN) {
                     // No data available right now - normal in non-blocking mode
                 } else {
-                    ESP_LOGE(TAG, "recv failed: errno %d", errno);
+                    ESP_LOGE(TAG, "recv failed: errno %u", errno);
                     break;
                 }
             }
@@ -531,8 +531,8 @@ static void tcp_server_task(void *pvParameters)
                     sd_fat_info_t *fat_info = sd_get_fat_info();
                     size_t total_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
                     size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-                    const char *fmt = opt_format ? "*%d,%llu,%u,%u,%d\n"
-                                                 : "{id=%d,fs=%llu,ram=%u,largest_block=%u,frag=%d}\n";
+                    const char *fmt = opt_format ? "*%u,%llu,%u,%u,%d\n"
+                                                 : "{id=%u,fs=%llu,ram=%u,largest_block=%u,frag=%d}\n";
                     int len = sprintf(rx_buffer, fmt, E_SENSOR_FREE,
                         fat_info->bytes_free, total_free, largest_block, 100 - (largest_block * 100 / (total_free + 1)));
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
@@ -639,15 +639,15 @@ static void tcp_server_task(void *pvParameters)
                             scd4x->altitude = scd4x_get_sensor_altitude(scd4x);
                             err = scd4x_start_periodic_measurement(scd4x);
                             if (err != ESP_OK) {
-                                ESP_LOGE(TAG, "Failed start periodic measurement: %d", err);
+                                ESP_LOGE(TAG, "Failed start periodic measurement: %u", err);
                                 response = "ERR\n";
                             }
                         } else {
-                            ESP_LOGE(TAG, "Failed to stop periodic measurement: %d", err);
+                            ESP_LOGE(TAG, "Failed to stop periodic measurement: %u", err);
                             response = "ERR\n";
                         }
-                        const char *fmt = opt_format ? "*%d,%f,%d,%d\n"
-                                                     : "{id=%d,temp_offs=%f,altitude=%d,pressure=%d}\n";
+                        const char *fmt = opt_format ? "*%u,%f,%u,%u\n"
+                                                     : "{id=%u,temp_offs=%f,altitude=%u,pressure=%u}\n";
                         int len = sprintf(rx_buffer, fmt, E_SENSOR_SCD4XCAL,
                             scd4x->temperature_offset, scd4x->altitude, scd4x->pressure);
                         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
@@ -657,8 +657,8 @@ static void tcp_server_task(void *pvParameters)
                         status.scd4x_auto_values = false;
                     } else if (strcmp(&rx_buffer[4], "val") == 0) {
                         scd4x_values_t *values = &scd4x->values;
-                        const char *fmt = opt_format ? "*%d,%d,%f,%f,%d\n"
-                                                     : "{id=%d,co2=%d,temp=%f,hum=%f,st=%d}\n";
+                        const char *fmt = opt_format ? "*%u,%u,%f,%f,%u\n"
+                                                     : "{id=%u,co2=%u,temp=%f,hum=%f,st=%u}\n";
                         int len = sprintf(rx_buffer, fmt, E_SENSOR_SCD4X,
                             values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
                         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
@@ -689,7 +689,7 @@ static void tcp_server_task(void *pvParameters)
                 } else if (strcmp(rx_buffer, "save") == 0) {
                     // Save config
                     if ((err = config_write()) != ESP_OK) {
-                        ESP_LOGE(TAG, "Writing config failed err=%d", err);
+                        ESP_LOGE(TAG, "Writing config failed err=%u", err);
                         response = "ERR\n";
                     }
                 } else if (strncmp(rx_buffer, "tab ", 4) == 0) {
@@ -705,7 +705,7 @@ static void tcp_server_task(void *pvParameters)
                     // Get RTC date and time
                     struct tm timeinfo;
                     rtc_get_datetime(rtc->rtc, &timeinfo);
-                    int len = sprintf(rx_buffer, "%d.%02d.%02d %02d:%02d:%02d",
+                    int len = sprintf(rx_buffer, "%u.%02d.%02d %02d:%02d:%02d",
                         1900 + timeinfo.tm_year, timeinfo.tm_mon + 1, timeinfo.tm_mday,
                         timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
@@ -724,7 +724,7 @@ static void tcp_server_task(void *pvParameters)
                         timeinfo.tm_min = atoi(&rx_buffer[16]);
                         timeinfo.tm_sec = atoi(&rx_buffer[19]);
                         if ((err = set_sys_time(&timeinfo, true)) != ESP_OK) {
-                            ESP_LOGE(TAG, "Failed to set system date/time: err=%d", err);
+                            ESP_LOGE(TAG, "Failed to set system date/time: err=%u", err);
                             response = "ERR\n";
                         }
                     }

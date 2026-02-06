@@ -28,7 +28,7 @@ int process_rtc_cmd(int argc, char **argv)
             struct tm timeinfo;
 
             ESP_ERROR_CHECK_WITHOUT_ABORT(rtc_get_datetime(rtc->rtc, &timeinfo));
-            ESP_LOGI(TAG, "%d.%02d.%02d %02d:%02d:%02d",
+            ESP_LOGI(TAG, "%u.%02d.%02d %02d:%02d:%02d",
                 1900 + timeinfo.tm_year, timeinfo.tm_mon, timeinfo.tm_mday,
                 timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         } else if (strcmp(cmd, "set") == 0) {

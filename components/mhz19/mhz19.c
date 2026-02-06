@@ -96,7 +96,7 @@ static void rx_task_mhz19_sensor(void *arg)
     uint8_t response_cnt;
     bool ready = false;
 
-    ESP_LOGI(TAG, "rx_task_co2_sensor STARTED on UART %d", serial->uart_num);
+    ESP_LOGI(TAG, "rx_task_co2_sensor STARTED on UART %u", serial->uart_num);
     while (true) {
         if (ready) {
             buf[0] = 0xff;
@@ -112,7 +112,7 @@ static void rx_task_mhz19_sensor(void *arg)
             if (buf[0] == 0xff && buf[1] == cmd_byte && mhz19_checksum(buf, RESPONSE_SIZE - 1) == buf[RESPONSE_SIZE - 1]) {
                 switch (cmd_byte) {
                     case MHZ19_SET_ABC:
-                    ESP_LOGI(TAG, "MHZ19 SET ABC=%d", buf[2]);
+                    ESP_LOGI(TAG, "MHZ19 SET ABC=%u", buf[2]);
                     break;
                     case MHZ19_GET_TEMP_INT:
                     sensor->values.co2 = buf[2] * 256 + buf[3];
@@ -126,7 +126,7 @@ static void rx_task_mhz19_sensor(void *arg)
                     ESP_LOGI(TAG, "MHZ19 FW: %s", sensor->fw_version);
                     break;
                     case MHZ19_SET_RANGE:
-                    ESP_LOGI(TAG, "MHZ19 SET RANGE=%d", buf[2]);
+                    ESP_LOGI(TAG, "MHZ19 SET RANGE=%u", buf[2]);
                     break;
                     case MHZ19_GET_RANGE:
                     if (buf[4] == 0x03 && buf[5] == 0xe8) sensor->range = MHZ19_RANGE_1000;
@@ -135,7 +135,7 @@ static void rx_task_mhz19_sensor(void *arg)
                     else if (buf[4] == 0x13 && buf[5] == 0x88) sensor->range = MHZ19_RANGE_5000;
                     else if (buf[4] == 0x27 && buf[5] == 0x10) sensor->range = MHZ19_RANGE_10000;
                     else sensor->range = MHZ19_RANGE_INVALID;
-                    ESP_LOGI(TAG, "MHZ19 RANGE: %d", sensor->range);
+                    ESP_LOGI(TAG, "MHZ19 RANGE: %u", sensor->range);
                     break;
                     default:
                     ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, response_cnt, ESP_LOG_INFO);
@@ -277,6 +277,6 @@ void mhz19_dump_values(mhz19_t *sensor, bool force)
 {
     if (force || sensor->debug & 1) {
         mhz19_values_t *values = &sensor->values;
-        ESP_LOGI(TAG, "co2=%d ppm  temp=%d °C  status=%d", values->co2, values->temp, values->status);
+        ESP_LOGI(TAG, "co2=%u ppm  temp=%u °C  st=%u", values->co2, values->temp, values->status);
     }
 }
