@@ -209,21 +209,38 @@ static int get_adxl345_values(char *buf, adxl345_values_t *values)
 
 static int get_qmc5883l_values(char *buf, qmc5883l_values_t *values)
 {
-    const char *fmt = opt_format ? "*%u,%u,%f,%f,%f,%f\n"
-                                 : "{id=%u,st=%u,x=%f,y=%f,z=%f,range=%f}\n";
+    const char *fmt = opt_format ? "*%u,%f,%f,%f,%f,%u\n"
+                                 : "{id=%u,x=%f,y=%f,z=%f,range=%f,st=%u}\n";
     return sprintf(buf, fmt, E_SENSOR_QMC5883L,
         values->status, values->mag_x, values->mag_y, values->mag_z, values->range);
+}
+
+static esp_err_t client_cmd_filecnt(int client_sock)
+{
+    DIR *dir = sd_open_data_dir();
+
+    if (dir == NULL) {
+        ESP_LOGE(TAG, "Failed to open data dir");
+        return ESP_FAIL;
+    }
+    int file_cnt = sd_dir_file_cnt(dir);
+    int len = sprintf(rx_buffer, "%d", file_cnt);
+    send_data_to_client(client_sock, (uint8_t *)rx_buffer,len);
+    sd_closedir(dir);
+    return ESP_OK;
 }
 
 static esp_err_t client_cmd_ls(int client_sock)
 {
     DIR *dir = sd_open_data_dir();
+
     if (dir == NULL) {
         ESP_LOGE(TAG, "Failed to open data dir");
         return ESP_FAIL;
     }
-    while (true) {
-        int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE, 0);
+    int file_cnt = sd_dir_file_cnt(dir);
+    while (file_cnt > 0) {
+        int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE, 0, 0);
         if (len == 0) break;
         send_data_to_client(client_sock, (uint8_t *)rx_buffer,len);
     }
@@ -239,7 +256,7 @@ static esp_err_t client_cmd_lsr(int client_sock)
         return ESP_FAIL;
     }
     while (true) {
-        int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE, 0);
+        int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE, 0, 0);
         if (len == 0) break;
         send_data_to_client(client_sock, (uint8_t *)rx_buffer,len);
     }
@@ -324,7 +341,7 @@ static esp_err_t send_all_data_files(int client_sock, bool remove_file)
         return ESP_FAIL;
     }
     while (true) {
-        int len = sd_read_dir(dir, path, 32, 1);
+        int len = sd_read_dir(dir, path, 32, 0, 1);
         if (len < 2) break;
         path[len - 1] = 0;
         ESP_LOGI(TAG, "Send file %s", path);
@@ -347,7 +364,7 @@ static esp_err_t remove_all_data_files()
         return ESP_FAIL;
     }
     while (true) {
-        int len = sd_read_dir(dir, path, 32, 1);
+        int len = sd_read_dir(dir, path, 32, 0, 1);
         if (len < 2) break;
         path[len - 1] = 0;
         if ((err = remove_data_file(path)) != ESP_OK) {
@@ -472,6 +489,11 @@ static void tcp_server_task(void *pvParameters)
                 } else if (strcmp(rx_buffer, "lsr") == 0) {
                     // Show root files on SD-Card
                     if ((err = client_cmd_lsr(client_sock)) != ESP_OK) {
+                        response = "ERR\n";
+                    }
+                } else if (strcmp(rx_buffer, "filecnt") == 0) {
+                    // Show file count in data folder
+                    if ((err = client_cmd_filecnt(client_sock)) != ESP_OK) {
                         response = "ERR\n";
                     }
                 } else if (strcmp(rx_buffer, "ls") == 0) {

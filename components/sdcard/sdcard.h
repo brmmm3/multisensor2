@@ -70,7 +70,9 @@ DIR *sd_open_dir(char *path);
 
 DIR *sd_open_data_dir();
 
-int sd_read_dir(DIR *dir, char *buf, int maxlen, int maxcnt);
+int sd_dir_file_cnt(DIR *dir);
+
+int sd_read_dir(DIR *dir, char *buf, int maxlen, int skip_cnt, int max_cnt);
 
 void sd_closedir(DIR *dir);
 
