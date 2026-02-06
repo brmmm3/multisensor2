@@ -533,6 +533,7 @@ static void sensors_recording()
         return;
     }
     bool log_values = (debug_main & 2) != 0;
+    bool force_all = status.record_pos == 0;
     uint16_t record_pos = status.record_pos;
     uint16_t year;
     uint8_t month;
@@ -562,7 +563,7 @@ static void sensors_recording()
     if (log_values) {
         ESP_LOGI(TAG, "TIME: %02d:%02d.%02d", hour, min, sec);
     }
-    if (gps_update) {
+    if (gps_update || force_all) {
         data_add(E_SENSOR_GPS, &last_values.gps, sizeof(sensors_data_gps_t));
         if (log_values || (debug_main & 4) != 0) {
             ESP_LOGI(TAG, "GPS: %s date=%lu time=%lu lat=%f %c lng=%f %c alt=%.1f spd=%.1f mode_3d=%c sats=%u pdop=%.1f hdop=%.1f vdop=%.1f st=%u dc=%u err=%u",
@@ -571,7 +572,7 @@ static void sensors_recording()
                     gps_values.pdop, gps_values.hdop, gps_values.vdop, gps_values.status, gps_values.data_cnt, gps_values.error_cnt);
         }
     }
-    if (bmx280lo_update) {
+    if (bmx280lo_update || force_all) {
         data_add(E_SENSOR_BMX280_LO, &last_values.bmx280lo, sizeof(sensors_data_bmx280_t));
         if (log_values || (debug_main & 8) != 0) {
             sensors_data_bmx280_t *values = &last_values.bmx280lo;
@@ -579,7 +580,7 @@ static void sensors_recording()
                     values->temperature, values->humidity, values->pressure, values->altitude);
         }
     }
-    if (bmx280hi_update) {
+    if (bmx280hi_update || force_all) {
         data_add(E_SENSOR_BMX280_HI, &last_values.bmx280hi, sizeof(sensors_data_bmx280_t));
         if (log_values || (debug_main & 8) != 0) {
             sensors_data_bmx280_t *values = &last_values.bmx280hi;
@@ -587,14 +588,14 @@ static void sensors_recording()
                     values->temperature, values->humidity, values->pressure, values->altitude);
         }
     }
-    if (mhz19_update) {
+    if (mhz19_update || force_all) {
         data_add(E_SENSOR_MHZ19, &last_values.mhz19, sizeof(sensors_data_mhz19_t));
         if (log_values || (debug_main & 16) != 0) {
             sensors_data_mhz19_t *values = &last_values.mhz19;
             ESP_LOGI(TAG, "MHZ19: co2=%u ppm  temp=%u °C  st=%u", values->co2, values->temp, values->status);
         }
     }
-    if (scd4x_calibrate) {
+    if (scd4x_calibrate || force_all) {
         scd4x_cal_values_t values = {
             .temperature_offset = scd4x->temperature_offset,
             .altitude = scd4x->altitude,
@@ -605,14 +606,14 @@ static void sensors_recording()
             ESP_LOGI(TAG, "SCD4XCAL: temp_offs=%f  alt=%u  press=%u", values.temperature_offset, values.altitude, values.pressure);
         }
     }
-    if (scd4x_update) {
+    if (scd4x_update || force_all) {
         data_add(E_SENSOR_SCD4X, &last_values.scd4x, sizeof(sensors_data_scd4x_t));
         if (log_values || (debug_main & 16) != 0) {
             sensors_data_scd4x_t *values = &last_values.scd4x;
             ESP_LOGI(TAG, "SCD4X: co2=%u ppm  temp=%.1f °C  hum=%.1f %%", values->co2, values->temperature, values->humidity);
         }
     }
-    if (yys_update) {
+    if (yys_update || force_all) {
         data_add(E_SENSOR_YYS, &last_values.yys, sizeof(sensors_data_yys_t));
         if (log_values || (debug_main & 32) != 0) {
             ESP_LOGI(TAG, "YYS: o2=%.1f %%  co=%.1f ppm  h2s=%.1f ppm  ch4=%.1f ppm",
@@ -620,7 +621,7 @@ static void sensors_recording()
                     yys_get_h2s(yys_sensor), yys_get_ch4(yys_sensor));
         }
     }
-    if (sps30_update) {
+    if (sps30_update || force_all) {
         data_add(E_SENSOR_SPS30, &last_values.sps30, sizeof(sensors_data_sps30_t));
         if (log_values || (debug_main & 64) != 0) {
             sensors_data_sps30_t *values = &last_values.sps30;
@@ -633,7 +634,7 @@ static void sensors_recording()
             ESP_LOGI(TAG, "TypPartSz=%.3f um", values->typical_particle_size);
         }
     }
-    if (adxl345_update) {
+    if (adxl345_update || force_all) {
         data_add(E_SENSOR_ADXL345, &last_values.adxl345, sizeof(sensors_data_adxl345_t));
         if (log_values || (debug_main & 128) != 0) {
             sensors_data_adxl345_t *values = &last_values.adxl345;
@@ -642,7 +643,7 @@ static void sensors_recording()
                     values->accel_offset_x, values->accel_offset_y, values->accel_offset_z);
         }
     }
-    if (qmc5883l_update) {
+    if (qmc5883l_update || force_all) {
         data_add(E_SENSOR_QMC5883L, &last_values.qmc5883l, sizeof(sensors_data_qmc5883l_t));
         if (log_values || (debug_main & 128) != 0) {
             sensors_data_qmc5883l_t *values = &last_values.qmc5883l;

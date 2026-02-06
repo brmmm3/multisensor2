@@ -13,8 +13,8 @@ static struct {
     struct arg_int *mhz;    // Debug MHZ19
     struct arg_int *yys;    // Debug YYS
     struct arg_int *sps;    // Debug SPS30
-    struct arg_int *qmc;    // Debug QMC5883L
     struct arg_int *adx;    // Debug ADXL345
+    struct arg_int *qmc;    // Debug QMC5883L
     struct arg_end *end;
 } debug_cmd_args;
 
@@ -89,8 +89,8 @@ void register_debug_cmd()
     debug_cmd_args.mhz = arg_int0("m", "mhz", "<0-15>", "Configure MHZ19 debugging");
     debug_cmd_args.yys = arg_int0("y", "yys", "<0-15>", "Configure YYS debugging");
     debug_cmd_args.sps = arg_int0("p", "sps", "<0-15>", "Configure SPS30 debugging");
-    debug_cmd_args.qmc = arg_int0("q", "qmc", "<0-15>", "Configure QMC5883L debugging");
     debug_cmd_args.adx = arg_int0("a", "adx", "<0-15>", "Configure ADXL345 debugging");
+    debug_cmd_args.qmc = arg_int0("q", "qmc", "<0-15>", "Configure QMC5883L debugging");
     debug_cmd_args.end = arg_end(8);
 
     const esp_console_cmd_t cmd = {
