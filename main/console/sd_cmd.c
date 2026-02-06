@@ -29,6 +29,10 @@ int process_sd_cmd(int argc, char **argv)
         }
         if (strcmp(cmd, "rec") == 0) {
             bool recording = sd_cmd_args.value->ival[0] != 0;
+            if (!recording) {
+                config->auto_record = false;
+                ui_set_switch_state(ui->sw_auto_record, false);
+            }
             ui_set_switch_state(ui->sw_record, recording);
             ui_sd_record_set_value(recording);
         } else if (strcmp(cmd, "auto") == 0) {
