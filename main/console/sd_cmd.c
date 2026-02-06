@@ -33,6 +33,7 @@ int process_sd_cmd(int argc, char **argv)
             ui_sd_record_set_value(recording);
         } else if (strcmp(cmd, "auto") == 0) {
             config->auto_record = sd_cmd_args.value->ival[0] != 0;
+            ui_set_switch_state(ui->sw_auto_record, config->auto_record);
         } else {
             ESP_LOGE(TAG, "no valid arguments");
             return 1;

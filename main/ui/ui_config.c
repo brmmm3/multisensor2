@@ -392,7 +392,8 @@ void ui_set_dop_value(lv_obj_t *obj, float dop)
     char buf[20];
     const char *quality = "POOR";
 
-    if (dop < 2) quality = "EXCELLENT";
+    if (dop == 0) quality = "-";
+    else if (dop < 2) quality = "EXCELLENT";
     else if (dop < 6) quality = "GOOD";
     else if (dop < 11) quality = "MODERATE";
     else if (dop < 21) quality = "FAIR";
