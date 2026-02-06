@@ -308,8 +308,6 @@ static void gps_sensor_task(void *arg)
 
     ESP_LOGI(TAG, "gps_sensor_task start");
     while (true) {
-        vTaskDelay(pdMS_TO_TICKS(100));
-        continue;
         const int rxBytes = uart_read_bytes(serial->uart_num, &buf[offset], UART_BUFFER_SIZE - offset, pdMS_TO_TICKS(100));
 
         if (rxBytes == 0) continue;
@@ -321,7 +319,6 @@ static void gps_sensor_task(void *arg)
         if (sensor->debug & 16) {
             ESP_LOG_BUFFER_CHAR(sensor->name, buf, rxBytes);
         }
-        continue;
         //ESP_LOG_BUFFER_HEXDUMP(sensor->name, buf, rxBytes, ESP_LOG_INFO);
 
         char *p = buf;
@@ -578,9 +575,9 @@ void gps_dump_values(gps_sensor_t *sensor, bool force)
     if (force || sensor->debug & 1) {
         gps_status_t *status = &sensor->status;
 
-        ESP_LOGI(TAG, "sat=%s date=%lu time=%lu lat=%f %c lng=%f %c altitude=%f speed=%f mode_3d=%c sats=%u status=0x%x errors=%u",
-                 get_gps_sat_type(status->sat), status->date, status->time, status->lat, status->ns, status->lng, status->ew, status->altitude,
-                 status->speed, status->mode_3d, status->sats, status->status, status->error_cnt);
+        ESP_LOGI(TAG, "cnt=%u sat=%s date=%lu time=%lu lat=%f %c lng=%f %c altitude=%f speed=%f mode_3d=%c sats=%u status=0x%x errors=%u",
+                 status->data_cnt, get_gps_sat_type(status->sat), status->date, status->time, status->lat, status->ns, status->lng, status->ew,
+                 status->altitude, status->speed, status->mode_3d, status->sats, status->status, status->error_cnt);
     }
     if (force || sensor->debug & 2) {
         gps_rmc_t *rmc = &sensor->rmc;
