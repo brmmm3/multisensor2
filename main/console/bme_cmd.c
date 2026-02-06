@@ -10,6 +10,7 @@ struct {
     struct arg_int *humidity;     // Humidity oversampling
     struct arg_int *filter;       // Filter coefficient
     struct arg_int *stdby;        // Standby time
+    struct arg_int *value;
     struct arg_end *end;
 } bme_cmd_args;
 
@@ -55,13 +56,21 @@ static int process_bme_cmd(int argc, char **argv)
     }
     if (bme_cmd_args.cmd->count == 1) {
         const char *cmd = bme_cmd_args.cmd->sval[0];
-        if (strcmp(cmd, "st") == 0) {
+        if (strcmp(cmd, "st") == 0 || strcmp(cmd, "status") == 0) {
             // Get sensor info and status
             show_bmx280_status(1, bmx280lo);
             show_bmx280_status(2, bmx280hi);
         } else if (strcmp(cmd, "cfg") == 0) {
             cmd_bmx280_configure(bmx280lo);
             cmd_bmx280_configure(bmx280hi);
+        } else if (strcmp(cmd, "debug") == 0) {
+            if (bme_cmd_args.value->count == 1) {
+                bmx280lo->debug = bme_cmd_args.value->ival[0];
+                bmx280hi->debug = bme_cmd_args.value->ival[0];
+            } else {
+                ESP_LOGE(TAG, "no valid arguments");
+                return 1;
+            }
         }
     } else {
         ESP_LOGE(TAG, "no valid arguments");
@@ -78,11 +87,12 @@ void register_bme_cmd()
     bme_cmd_args.humidity = arg_int0("h", NULL, "<0-5>", "Humidity oversampling");
     bme_cmd_args.filter = arg_int0("f", NULL, "<0-5>", "IIR filter");
     bme_cmd_args.stdby = arg_int0("s", NULL, "<0-9>", "Standby time");
-    bme_cmd_args.end = arg_end(6);
+    bme_cmd_args.value = arg_int0("v", NULL, "<int>", "Value");
+    bme_cmd_args.end = arg_end(7);
 
     const esp_console_cmd_t cmd = {
         .command = "bme",
-        .help = "BMX280. Command: st, cfg",
+        .help = "BMX280. Command: st[atus], cfg, debug",
         .hint = NULL,
         .func = &process_bme_cmd,
         .argtable = &bme_cmd_args

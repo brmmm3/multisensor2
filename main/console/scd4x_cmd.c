@@ -24,7 +24,7 @@ int process_scd4x_cmd(int argc, char **argv)
     }
     if (scd4x_cmd_args.cmd->count == 1) {
         const char *cmd = scd4x_cmd_args.cmd->sval[0];
-        if (strcmp(cmd, "status") == 0) {
+        if (strcmp(cmd, "st") == 0 || strcmp(cmd, "status") == 0) {
             scd4x_values_t *values = &scd4x->values;
             ESP_LOGI(TAG, "SCD4x (serial=0x%012llX ready=%d, enabled=%d):",
                 scd4x->serial_number, scd4x_get_data_ready_status(scd4x), scd4x->enabled);
@@ -97,6 +97,13 @@ int process_scd4x_cmd(int argc, char **argv)
             ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_stop_periodic_measurement(scd4x));
         } else if (strcmp(cmd, "reset") == 0) {
             ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_perfom_factory_reset(scd4x));
+        } else if (strcmp(cmd, "pwr") == 0) {
+            if (scd4x_cmd_args.value->count == 1) {
+                ESP_ERROR_CHECK_WITHOUT_ABORT(ui_scd4x_set_pwr_mode(scd4x_cmd_args.value->ival[0]));
+            } else {
+                ESP_LOGE(TAG, "no valid arguments");
+                return 1;
+            }
         } else if (strcmp(cmd, "test") == 0) {
             ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_perform_self_test(scd4x));
         } else if (strcmp(cmd, "save") == 0) {
@@ -118,6 +125,13 @@ int process_scd4x_cmd(int argc, char **argv)
             }
             ESP_LOGI(TAG, "co2=%d ppm  temp=%.1f °C  hum=%.1f %%  st=%d",
                 values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
+        } else if (strcmp(cmd, "debug") == 0) {
+            if (scd4x_cmd_args.value->count == 1) {
+                scd4x->debug = scd4x_cmd_args.value->ival[0];
+            } else {
+                ESP_LOGE(TAG, "no valid arguments");
+                return 1;
+            }
         } else {
             ESP_LOGE(TAG, "no valid arguments");
             return 1;
@@ -141,7 +155,7 @@ void register_scd4x_cmd()
 
     const esp_console_cmd_t cmd = {
         .command = "scd",
-        .help = "SCD4x. Command: st, cfg, cal, reset, save",
+        .help = "SCD4x. Command: st[atus], readcfg, cfg, cal, autocal, autoadj, start, startlp, stop, reset, pwr, test, save, wakeup, down, reinit, measure, read, debug",
         .hint = NULL,
         .func = &process_scd4x_cmd,
         .argtable = &scd4x_cmd_args

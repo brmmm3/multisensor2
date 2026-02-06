@@ -224,7 +224,7 @@ static esp_err_t client_cmd_filecnt(int client_sock)
         return ESP_FAIL;
     }
     int file_cnt = sd_dir_file_cnt(dir);
-    int len = sprintf(rx_buffer, "%d", file_cnt);
+    int len = sprintf(rx_buffer, "%d\n", file_cnt);
     send_data_to_client(client_sock, (uint8_t *)rx_buffer,len);
     sd_closedir(dir);
     return ESP_OK;
