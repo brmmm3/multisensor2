@@ -822,6 +822,7 @@ static void update_task(void *arg)
     ui_set_switch_state(ui->sw_ftp_server_auto, config->ftp_auto_start);
     ui_set_switch_state(ui->sw_auto_record, config->auto_record);
     show_sd_card_info(-1);
+    ui_set_tab_color(4, LV_PALETTE_YELLOW);
 
     while (true) {
         if (loop_cnt > 1) {
@@ -848,17 +849,21 @@ static void update_task(void *arg)
         }
         // Check if SD card is mounted. Try to mount if not mounted
         loop_cnt++;
-        if (loop_cnt % 10 == 0) {
-            ESP_ERROR_CHECK_WITHOUT_ABORT(ensure_sd_card_mounted());
-        } else if (loop_cnt > 0 && !status.recording && config->auto_record) {
-            if (ensure_sd_card_mounted() == ESP_OK) {
-                ui_sd_record_set_value(true);
+        if (loop_cnt > 60) {
+            if (loop_cnt % 10 == 0) {
+                ESP_ERROR_CHECK_WITHOUT_ABORT(ensure_sd_card_mounted());
+            } else if (loop_cnt > 0 && !status.recording && config->auto_record) {
+                if (ensure_sd_card_mounted() == ESP_OK) {
+                    ui_sd_record_set_value(true);
+                }
             }
         }
         if ((debug_main & 0x200) == 0) {
             sensors_update();
             scd4x_state_machine(scd4x);
-            if (status.recording) {
+            // Wait at least 1 min before start recording data to give sensors time for initialization and warmup
+            // 5 min would be more appropriate, but I do not want to wait that long ;-)
+            if (status.recording && loop_cnt > 60) {
                 sensors_recording();
             }
         }
