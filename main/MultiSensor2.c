@@ -812,6 +812,7 @@ static void update_task(void *arg)
     char buf[64];
     uint32_t loop_cnt = 0;
     bool old_wifi_connected = false;
+    uint8_t wifi_connect_failed = 0;
     esp_err_t err;
 
     ESP_LOGI(TAG, "Start update_task");
@@ -833,11 +834,15 @@ static void update_task(void *arg)
                 if (!ftp_server_running() && config->ftp_auto_start) {
                     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_ftp_server_enable(true));
                 }
+                wifi_connect_failed = 0;
             } else {
                 if (config->wifi_auto_connect) {
-                    if (config->wifi_auto_connect_idx < 4) {
+                    if (config->wifi_auto_connect_idx < 4 && wifi_connect_failed < 10) {
                         ensure_wifi_init(true);
+                        wifi_connect_failed++;
                     }
+                } else {
+                    wifi_connect_failed = 0;
                 }
                 if (tcp_server_running) {
                     ESP_ERROR_CHECK_WITHOUT_ABORT(ui_tcp_server_enable(false));
