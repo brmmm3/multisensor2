@@ -857,6 +857,9 @@ static void update_task(void *arg)
                     ui_sd_record_set_value(true);
                 }
             }
+        } else {
+            sprintf(buf, "Waiting %d s", (unsigned int)(60 - loop_cnt));
+            ui_set_label_text(ui->lbl_sd_fill, buf);
         }
         if ((debug_main & 0x200) == 0) {
             sensors_update();
@@ -945,8 +948,10 @@ static void update_task(void *arg)
         } else {
             if ((debug_main & 0x800) == 0) {
                 // Update SD-Card tab
-                float fill_level = 100.0 * (float) status.record_pos / (float)DATA_MAX_SIZE;
-                ui_sd_set_fill_level(fill_level);
+                if (loop_cnt > 60) {
+                    float fill_level = 100.0 * (float) status.record_pos / (float)DATA_MAX_SIZE;
+                    ui_sd_set_fill_level(fill_level);
+                }
                 // Update Cfg tab
                 ui_set_time_value(ui->lbl_time, &now);
                 ui_set_duration_value(ui->lbl_uptime, (uint32_t)(now - status.start_time));
