@@ -840,6 +840,9 @@ static void update_task(void *arg)
                     if (config->wifi_auto_connect_idx < 4 && wifi_connect_failed < 10) {
                         ensure_wifi_init(true);
                         wifi_connect_failed++;
+                    } else if (wifi_connect_failed == 10) {
+                        wifi_uninit();
+                        wifi_connect_failed++;
                     }
                 } else {
                     wifi_connect_failed = 0;
