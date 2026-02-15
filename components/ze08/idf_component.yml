@@ -1,0 +1,6 @@
+dependencies:
+  brmmm3/esp32_rmt_uart_v5: '>=1.0.0'
+  idf: '>=5.4'
+description: ZE08-CH2O Sensor Formaldehyde gas
+url: https://www.winsen-sensor.com/d/files/ze08-ch2o-manual-v1_7.pdf
+version: 1.0.0
