@@ -24,6 +24,13 @@
 
 static const char *TAG = "MS2";
 
+// UART0    USB     (TX=GPIO16, RX=GPIO17)
+// UART1    GPS     (TX=GPIO2, RX=GPIO10)
+// LP-UART0 MHZ19   (TX=GPIO5, RX=GPIO4)
+// SW-UART0 YYS     (TX=GPIO12, RX=GPIO13)
+// SW-UART1 ZE08    (TX=GPIO11, RX=GPIO3)
+
+// SPI      LCD + SD-Card
 // I2C Address assignment:
 //  (0x0D)  QMC5883L not used
 //  0x1F    TLV493D
@@ -32,7 +39,9 @@ static const char *TAG = "MS2";
 //  0x50    ?
 //  0x53    ADXL345
 //  (0x5E)  (TLV493D) not used
-//  0x62    SCD4x (SCD41)
+//  0x61    SCD30
+//  0x62    SCD41
+//  0x63    SenseAir S11 (EEPROM-Register 0xA7 (I²C address, default 0x68) auf einen anderen Wert zwischen 0x01 und 0x7F)
 //  0x68    RTC Tiny
 //  0x69    SPS30
 //  0x76    BMx280 (BME280 beside SPS30)
@@ -58,23 +67,26 @@ static const char *TAG = "MS2";
 #define LCD_PIN_NUM_RST     GPIO_NUM_21
 #define LCD_PIN_NUM_LED     GPIO_NUM_22
 #define LCD_PIN_NUM_T_CS    GPIO_NUM_15
-// GPS (HW-UART)
+// GPS (HW-UART1)
 #define GPS_UART_NUM        UART_NUM_1
 #define GPS_PIN_NUM_RX      GPIO_NUM_10
 #define GPS_PIN_NUM_TX      GPIO_NUM_2
-// MHZ19 (LP HW-UART)
+// MHZ19 (LP HW-UART0)
 #define MHZ19_UART_NUM      LP_UART_NUM_0
 #define MHZ19_PIN_NUM_RX    GPIO_NUM_4
 #define MHZ19_PIN_NUM_TX    GPIO_NUM_5
-// YYS (SW-UART)
-#define YYS_PIN_NUM_NC      GPIO_NUM_11
+// YYS (SW-UART0) (CO, O2, H2S=Hydrogen Sulfid=Schwefelwasserstoff, CH4=Methane)
 #define YYS_PIN_NUM_TX      GPIO_NUM_12
 #define YYS_PIN_NUM_RX      GPIO_NUM_13
+// ZE08-CH2O (SW-UART1) (Formaldehyde)
+#define ZE08_PIN_NUM_TX      GPIO_NUM_11
+#define ZE08_PIN_NUM_RX      GPIO_NUM_3
 
-// Unused GPIOs: 3, 9
+// Unused GPIOs: 9
 
 // Special GPIO functions:
 //  0 = Boot Mode (H = Normal Boot, internal Pull-Up)
+// 14 = N/A
 // 15 = JTAG Signal Source Control
 
 // UART
@@ -342,8 +354,12 @@ static bool update_mhz19()
 
 static bool update_scd4x()
 {
+    bmx280_t *bmx280;
+    uint16_t pressure_offset;
     esp_err_t err;
 
+    if (bmx280lo->values.temperature < bmx280hi->values.temperature) bmx280 = bmx280lo;
+    else bmx280 = bmx280hi;
     if (scd4x == NULL && (debug_main & 0x2000) == 0) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_init(&scd4x, bus_handle));
         if (scd4x == NULL) return false;
@@ -354,30 +370,14 @@ static bool update_scd4x()
         }
         return false;
     }
-    if (scd4x->auto_adjust > 0 && scd4x->auto_adjust-- == 1) {
-        bmx280_t *bmx280;
-        esp_err_t err;
+    if (bmx280->values.pressure > scd4x->pressure) pressure_offset = bmx280->values.pressure - scd4x->pressure;
+    else pressure_offset = scd4x->pressure - bmx280->values.pressure;
+    if (scd4x->auto_adjust > 0 && (scd4x->auto_adjust-- == 1 || pressure_offset > 50)) {
 
         scd4x->auto_adjust = 255;
-        if (bmx280lo->values.temperature < bmx280hi->values.temperature) bmx280 = bmx280lo;
-        else bmx280 = bmx280hi;
-
-        float temp_offset = scd4x->values.temperature - bmx280->values.temperature + scd4x->temperature_offset;
-
-        ESP_LOGI(TAG, "Temp_Offset for SCD4x set to %f", temp_offset);
-        if ((err = scd4x_stop_periodic_measurement(scd4x)) == ESP_OK) {
-            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_temperature_offset(scd4x, temp_offset));
-            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_sensor_altitude(scd4x, bmx280->values.altitude));
-            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_ambient_pressure(scd4x, bmx280->values.pressure));
-            if ((err = scd4x_start_periodic_measurement(scd4x)) != ESP_OK) {
-                ESP_LOGE(TAG, "Failed start periodic measurement: %u", err);
-            }
-        } else {
-            ESP_LOGE(TAG, "Failed to stop periodic measurement: %u", err);
-        }
+        ESP_LOGI(TAG, "SCD4X Adjust: Pressure=%f hPa", bmx280->values.pressure);
+        ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_ambient_pressure(scd4x, bmx280->values.pressure));
         scd4x_calibrate = true;
-        ESP_LOGI(TAG, "SCD4X Adjust: TempOffset=%f °C  Alt=%f m  Press=%f hPa",
-                    temp_offset, bmx280->values.altitude, bmx280->values.pressure);
     }
     if (!scd4x_get_data_ready_status(scd4x)) {
         return force_update_all;

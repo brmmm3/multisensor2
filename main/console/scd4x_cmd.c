@@ -89,6 +89,26 @@ int process_scd4x_cmd(int argc, char **argv)
                 ESP_LOGE(TAG, "no valid arguments");
                 return 1;
             }
+        } else if (strcmp(cmd, "toff") == 0) {
+            if (scd4x_cmd_args.value->count == 1) {
+                // Offset value e.g. 400 = 4.0°C
+                float offset = (float)scd4x_cmd_args.value->ival[0] * 0.01;
+
+                if (scd4x_st_machine_status == SCD4X_ST_IDLE) {
+                    ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_temperature_offset(scd4x, offset));
+                } else {
+                    esp_err_t err;
+
+                    if ((err = scd4x_stop_periodic_measurement(scd4x)) == ESP_OK) {
+                        ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_temperature_offset(scd4x, offset));
+                    } else {
+                        ESP_LOGE(TAG, "Failed to stop periodic measurement: %u", err);
+                    }
+                }
+            } else {
+                ESP_LOGE(TAG, "no valid arguments");
+                return 1;
+            }
         } else if (strcmp(cmd, "start") == 0) {
             ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_start_periodic_measurement(scd4x));
         } else if (strcmp(cmd, "startlp") == 0) {
@@ -155,7 +175,7 @@ void register_scd4x_cmd()
 
     const esp_console_cmd_t cmd = {
         .command = "scd",
-        .help = "SCD4x. Command: st[atus], readcfg, cfg, cal, autocal, autoadj, start, startlp, stop, reset, pwr, test, save, wakeup, down, reinit, measure, read, debug",
+        .help = "SCD4x. Command: st[atus], readcfg, toff, cfg, cal, autocal, autoadj, start, startlp, stop, reset, pwr, test, save, wakeup, down, reinit, measure, read, debug",
         .hint = NULL,
         .func = &process_scd4x_cmd,
         .argtable = &scd4x_cmd_args
