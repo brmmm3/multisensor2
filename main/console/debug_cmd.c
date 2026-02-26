@@ -38,9 +38,9 @@ int process_debug_cmd(int argc, char **argv)
         bmx280lo->debug = debug_cmd_args.bme->ival[0];
         bmx280hi->debug = debug_cmd_args.bme->ival[0];
     } else if (debug_cmd_args.scd->count == 1) {
-        scd4x->debug = debug_cmd_args.scd->ival[0];
+        scd41_sensor->debug = debug_cmd_args.scd->ival[0];
     } else if (debug_cmd_args.mhz->count == 1) {
-        mhz19->debug = debug_cmd_args.mhz->ival[0];
+        mhz19_sensor->debug = debug_cmd_args.mhz->ival[0];
     } else if (debug_cmd_args.yys->count == 1) {
         yys_sensor->debug = debug_cmd_args.yys->ival[0];
     } else if (debug_cmd_args.sps->count == 1) {

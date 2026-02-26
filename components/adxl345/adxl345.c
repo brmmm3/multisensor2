@@ -4,8 +4,8 @@
 #include "driver/i2c_master.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_err.h"
-#include "esp_log.h"
+#include <esp_err.h>
+#include <esp_log.h>
 
 #include "adxl345.h"
 
@@ -56,13 +56,13 @@ void adxl345_close(adxl345_t *sensor);
 
 esp_err_t adxl345_read(adxl345_t *sensor, uint8_t addr, uint8_t *dout, size_t size)
 {
-    return i2c_master_transmit_receive(sensor->i2c_dev, &addr, 1, dout, size, CONFIG_ADXL345_TIMEOUT);
+    return i2c_master_transmit_receive(sensor->dev_handle, &addr, 1, dout, size, CONFIG_ADXL345_TIMEOUT);
 }
 
 static esp_err_t adxl345_write(adxl345_t *sensor, uint8_t addr, uint8_t *din, size_t size)
 {
     if (din == NULL || size == 0) {
-        return i2c_master_transmit(sensor->i2c_dev, &addr, 1, CONFIG_ADXL345_TIMEOUT);
+        return i2c_master_transmit(sensor->dev_handle, &addr, 1, CONFIG_ADXL345_TIMEOUT);
     }
 
     i2c_master_transmit_multi_buffer_info_t buffer[2] = {
@@ -70,7 +70,7 @@ static esp_err_t adxl345_write(adxl345_t *sensor, uint8_t addr, uint8_t *din, si
         {.write_buffer = din, .buffer_size = size},
     };
 
-    return i2c_master_multi_buffer_transmit(sensor->i2c_dev, buffer, 2, CONFIG_ADXL345_TIMEOUT);
+    return i2c_master_multi_buffer_transmit(sensor->dev_handle, buffer, 2, CONFIG_ADXL345_TIMEOUT);
 }
 
 static esp_err_t adxl345_write_byte(adxl345_t *sensor, uint8_t addr, uint8_t data)
@@ -145,9 +145,9 @@ static esp_err_t adxl345_device_create(adxl345_t *sensor, const uint16_t dev_add
     esp_err_t err;
 
     ESP_LOGI(TAG, "device_create for ADXL345 sensors on ADDR %X", dev_addr);
-    sensor->dev_cfg.device_address = dev_addr;
+    sensor->dev_config.device_address = dev_addr;
     // Add device to the I2C bus
-    err = i2c_master_bus_add_device(sensor->bus_handle, &sensor->dev_cfg, &sensor->i2c_dev);
+    err = i2c_master_bus_add_device(sensor->bus_handle, &sensor->dev_config, &sensor->dev_handle);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "device_create success on 0x%x", dev_addr);
         return err;
@@ -165,10 +165,10 @@ adxl345_t *adxl345_create_master(i2c_master_bus_handle_t bus_handle)
         adxl345_values_t *values = &sensor->values;
         memset(sensor, 0, sizeof(adxl345_t));
         sensor->bus_handle = bus_handle;
-        sensor->dev_cfg.dev_addr_length = I2C_ADDR_BIT_LEN_7;
-        sensor->dev_cfg.device_address = ADXL345_I2C_ADDR;
-        sensor->dev_cfg.scl_speed_hz = CONFIG_ADXL345_I2C_CLK_SPEED_HZ;
-        sensor->i2c_dev = NULL;
+        sensor->dev_config.dev_addr_length = I2C_ADDR_BIT_LEN_7;
+        sensor->dev_config.device_address = ADXL345_I2C_ADDR;
+        sensor->dev_config.scl_speed_hz = CONFIG_ADXL345_I2C_CLK_SPEED_HZ;
+        sensor->dev_handle = NULL;
         values->accel_x = 0;
         values->accel_y = 0;
         values->accel_z = 0;
@@ -188,8 +188,8 @@ adxl345_t *adxl345_create_master(i2c_master_bus_handle_t bus_handle)
 
 void adxl345_close(adxl345_t *sensor)
 {
-    if (sensor != NULL && sensor->i2c_dev != NULL) {
-        i2c_master_bus_rm_device(sensor->i2c_dev);
+    if (sensor != NULL && sensor->dev_handle != NULL) {
+        i2c_master_bus_rm_device(sensor->dev_handle);
     }
     vPortFree(sensor);
 }

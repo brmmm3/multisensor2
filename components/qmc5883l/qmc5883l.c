@@ -4,8 +4,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 #include "freertos/task.h"
-#include "esp_err.h"
-#include "esp_log.h"
+#include <esp_err.h>
+#include <esp_log.h>
 
 #include "qmc5883l.h"
 
@@ -33,20 +33,14 @@ void qmc5883l_close(qmc5883l_t *sensor);
 
 esp_err_t qmc5883l_read(qmc5883l_t *sensor, uint8_t addr, uint8_t *dout, size_t size)
 {
-    //ESP_LOGI(TAG, "qmc5883l_read %02X dout=%u size=%u", addr, *dout, size);
-    //esp_err_t err = i2c_master_transmit(sensor->i2c_dev, &addr, 1, CONFIG_QMC5883L_TIMEOUT);
-
-    //ESP_LOGI(TAG, "qmc5883l_read err1=%u", err);
-    //if (err != ESP_OK) return err;
-    return i2c_master_transmit_receive(sensor->i2c_dev, &addr, 1, dout, size, CONFIG_QMC5883L_TIMEOUT);
-    //return i2c_master_receive(sensor->i2c_dev, dout, size, CONFIG_QMC5883L_TIMEOUT);
+    return i2c_master_transmit_receive(sensor->dev_handle, &addr, 1, dout, size, CONFIG_QMC5883L_TIMEOUT);
 }
 
 static esp_err_t qmc5883l_write(qmc5883l_t *sensor, uint8_t addr, uint8_t *din, size_t size)
 {
     ESP_LOGI(TAG, "qmc5883l_write %02X data=%p size=%u", addr, din, size);
     if (din == NULL || size == 0) {
-        return i2c_master_transmit(sensor->i2c_dev, &addr, 1, CONFIG_QMC5883L_TIMEOUT);
+        return i2c_master_transmit(sensor->dev_handle, &addr, 1, CONFIG_QMC5883L_TIMEOUT);
     }
 
     ESP_LOGI(TAG, "qmc5883l_write data=%u", *din);
@@ -55,7 +49,7 @@ static esp_err_t qmc5883l_write(qmc5883l_t *sensor, uint8_t addr, uint8_t *din, 
         {.write_buffer = din, .buffer_size = size},
     };
 
-    return i2c_master_multi_buffer_transmit(sensor->i2c_dev, buffer, 2, CONFIG_QMC5883L_TIMEOUT);
+    return i2c_master_multi_buffer_transmit(sensor->dev_handle, buffer, 2, CONFIG_QMC5883L_TIMEOUT);
 }
 
 static esp_err_t qmc5883l_write_byte(qmc5883l_t *sensor, uint8_t addr, uint8_t data)
@@ -143,9 +137,9 @@ static esp_err_t qmc5883l_device_create(qmc5883l_t *sensor, const uint16_t dev_a
     esp_err_t err;
 
     ESP_LOGI(TAG, "device_create for QMC5883L sensors on ADDR 0x%02X", dev_addr);
-    sensor->dev_cfg.device_address = dev_addr;
+    sensor->dev_config.device_address = dev_addr;
     // Add device to the I2C bus
-    err = i2c_master_bus_add_device(sensor->bus_handle, &sensor->dev_cfg, &sensor->i2c_dev);
+    err = i2c_master_bus_add_device(sensor->bus_handle, &sensor->dev_config, &sensor->dev_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "device_create error on 0x%02X", dev_addr);
         return err;
@@ -162,10 +156,10 @@ qmc5883l_t *qmc5883l_create_master(i2c_master_bus_handle_t bus_handle)
         qmc5883l_values_t *values = &sensor->values;
         memset(sensor, 0, sizeof(qmc5883l_t));
         sensor->bus_handle = bus_handle;
-        sensor->dev_cfg.dev_addr_length = I2C_ADDR_BIT_LEN_7;
-        sensor->dev_cfg.device_address = QMC5883L_I2C_ADDR;
-        sensor->dev_cfg.scl_speed_hz = CONFIG_QMC5883L_I2C_CLK_SPEED_HZ;
-        sensor->i2c_dev = NULL;
+        sensor->dev_config.dev_addr_length = I2C_ADDR_BIT_LEN_7;
+        sensor->dev_config.device_address = QMC5883L_I2C_ADDR;
+        sensor->dev_config.scl_speed_hz = CONFIG_QMC5883L_I2C_CLK_SPEED_HZ;
+        sensor->dev_handle = NULL;
         values->mag_x = 0.0;
         values->mag_y = 0.0;
         values->mag_z = 0.0;
@@ -182,9 +176,9 @@ qmc5883l_t *qmc5883l_create_master(i2c_master_bus_handle_t bus_handle)
 
 void qmc5883l_close(qmc5883l_t *sensor)
 {
-    if (sensor != NULL && sensor->i2c_dev != NULL) {
-        i2c_master_bus_rm_device(sensor->i2c_dev);
-        sensor->i2c_dev = NULL;
+    if (sensor != NULL && sensor->dev_handle != NULL) {
+        i2c_master_bus_rm_device(sensor->dev_handle);
+        sensor->dev_handle = NULL;
     }
     vPortFree(sensor);
 }

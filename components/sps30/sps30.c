@@ -33,8 +33,8 @@
 #include "esp_log_level.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_err.h"
-#include "esp_log.h"
+#include <esp_err.h>
+#include <esp_log.h>
 
 #include "sps30.h"
 #include "util.h"
@@ -78,9 +78,9 @@ sps30_t *sps30_create_master(i2c_master_bus_handle_t bus_handle)
         return NULL;
     }
     sensor->bus_handle = bus_handle;
-    sensor->dev_cfg.dev_addr_length = I2C_ADDR_BIT_LEN_7;
-    sensor->dev_cfg.device_address = SPS30_I2C_ADDRESS;
-    sensor->dev_cfg.scl_speed_hz = CONFIG_SPS30_I2C_CLK_SPEED_HZ;
+    sensor->dev_config.dev_addr_length = I2C_ADDR_BIT_LEN_7;
+    sensor->dev_config.device_address = SPS30_I2C_ADDRESS;
+    sensor->dev_config.scl_speed_hz = CONFIG_SPS30_I2C_CLK_SPEED_HZ;
     sensor->dev_handle = NULL;
     sensor->enabled = true;
     return sensor;
@@ -93,10 +93,10 @@ sps30_t *sps30_create_master(i2c_master_bus_handle_t bus_handle)
  */
 esp_err_t sps30_device_create(sps30_t *sensor)
 {
-    sensor->dev_cfg.device_address = SPS30_I2C_ADDRESS;
+    sensor->dev_config.device_address = SPS30_I2C_ADDRESS;
 
     // Add device to the I2C bus
-    esp_err_t err = i2c_master_bus_add_device(sensor->bus_handle, &sensor->dev_cfg, &sensor->dev_handle);
+    esp_err_t err = i2c_master_bus_add_device(sensor->bus_handle, &sensor->dev_config, &sensor->dev_handle);
 
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to create device on I2C address 0x%02x", SPS30_I2C_ADDRESS);

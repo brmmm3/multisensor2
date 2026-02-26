@@ -1,10 +1,10 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "esp_err.h"
+#include <esp_err.h>
 #include "hw_serial.h"
 #include "driver/uart.h"
-#include "esp_log.h"
+#include <esp_log.h>
 
 #include "mhz19.h"
 
@@ -115,7 +115,8 @@ static void rx_task_mhz19_sensor(void *arg)
                     ESP_LOGI(TAG, "MHZ19 SET ABC=%u", buf[2]);
                     break;
                     case MHZ19_GET_TEMP_INT:
-                    sensor->values.co2 = buf[2] * 256 + buf[3];
+                    sensor->values.co2_raw = buf[2] * 256 + buf[3];
+                    sensor->values.co2 = (uint16_t)((uint32_t)sensor->values.co2_raw * (uint32_t)sensor->pressure / 1013);
                     sensor->values.temp = buf[4] - 40;
                     sensor->values.status = buf[5];
                     sensor->data_cnt++;
@@ -256,6 +257,7 @@ esp_err_t mhz19_init(mhz19_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, uin
     sensor->error_cnt = 0;
     sensor->range = MHZ19_RANGE_INVALID;
     sensor->fw_version[0] = 0;
+    sensor->pressure = 1013; // Default is 1013 hPa
     sensor->debug = 0;
     *sensor_ptr = sensor;
 

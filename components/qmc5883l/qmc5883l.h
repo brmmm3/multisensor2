@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "esp_err.h"
+#include <esp_err.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -44,9 +44,9 @@ typedef struct __attribute__((packed)) {
 
 typedef struct qmc5883l_s {
     // I2C master handle via port with configuration
-    i2c_master_dev_handle_t i2c_dev;
+    i2c_master_dev_handle_t dev_handle;
     // I2C master configuration
-    i2c_device_config_t dev_cfg;
+    i2c_device_config_t dev_config;
     // I2C master handle via port
     i2c_master_bus_handle_t bus_handle;
     qmc5883l_values_t values;

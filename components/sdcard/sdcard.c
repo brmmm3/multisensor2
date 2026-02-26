@@ -4,8 +4,8 @@
 #include <dirent.h>
 #include <errno.h>
 #include "esp_vfs.h"
-#include "esp_err.h"
-#include "esp_log.h"
+#include <esp_err.h>
+#include <esp_log.h>
 
 #include "esp_vfs_fat.h"
 // Needed for LVGL locking to avoid race conditions when using shared SPI bus

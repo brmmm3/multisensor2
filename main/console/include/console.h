@@ -14,7 +14,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-#include "esp_err.h"
+#include <esp_err.h>
 
 esp_err_t console_init();
 

@@ -3,10 +3,9 @@ set(CMAKE_C_STANDARD 11)
 
 idf_component_register(
     SRCS
-        sps30.c
-        util.c
+        scd30.c
     INCLUDE_DIRS
-        "include"
+        .
     REQUIRES
         esp_driver_i2c
 )

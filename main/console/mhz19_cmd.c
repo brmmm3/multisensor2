@@ -19,10 +19,10 @@ int process_mhz19_cmd(int argc, char **argv)
     if (mhz19_cmd_args.cmd->count == 1) {
         const char *cmd = mhz19_cmd_args.cmd->sval[0];
         if (strcmp(cmd, "st") == 0) {
-            mhz19_values_t *values = &mhz19->values;
+            mhz19_values_t *values = &mhz19_sensor->values;
 
             // Get sensor info and status
-            ESP_LOGI(TAG, "MHZ19 (fw=%s status=%d  err=%d  range=%d):", mhz19->fw_version, values->status, mhz19->error_cnt, mhz19->range);
+            ESP_LOGI(TAG, "MHZ19 (fw=%s status=%d  err=%d  range=%d):", mhz19_sensor->fw_version, values->status, mhz19_sensor->error_cnt, mhz19_sensor->range);
             ESP_LOGI(TAG, "co2=%d ppm  temp=%d °C", values->co2, values->temp);
         } else {
             ESP_LOGE(TAG, "no valid arguments");

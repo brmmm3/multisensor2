@@ -1,5 +1,5 @@
 #include <nvs.h>
-#include "esp_log.h"
+#include <esp_log.h>
 #include "sdcard.h"
 #include "main.h"
 #include "config.h"
@@ -155,9 +155,9 @@ esp_err_t scd4x_set_pwr_mode(uint8_t mode)
     esp_err_t err;
 
     if (mode > 1) {
-        err = scd4x_power_down(scd4x);
+        err = scd4x_power_down(scd41_sensor);
     } else {
-        err = scd4x_init_do(scd4x, mode == 1);
+        err = scd4x_init_do(scd41_sensor, mode == 1);
     }
     if (err == ESP_OK) {
         config->scd4x_pwr = mode;

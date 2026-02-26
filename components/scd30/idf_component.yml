@@ -1,0 +1,4 @@
+description: Driver for SCD30 CO₂ sensor
+version: 1.0.13
+dependencies:
+  idf: '>=5.4'

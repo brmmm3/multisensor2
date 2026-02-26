@@ -2,7 +2,7 @@
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "esp_event.h"
-#include "esp_log.h"
+#include <esp_log.h>
 #include "main.h"
 
 #include "mqtt_client.h"
@@ -132,8 +132,8 @@ void mqtt_publish_values()
         mqtt_start();
     }
     if (!mqtt_connected) return;
-    if (!gps_update && !bmx280lo_update && !bmx280hi_update && !mhz19_update && !scd4x_calibrate &&
-        !scd4x_update && !yys_update && !sps30_update && !adxl345_update && !qmc5883l_update) {
+    if (!gps_update && !bmx280lo_update && !bmx280hi_update && !mhz19_update && !scd41_calibrate &&
+        !scd41_update && !yys_update && !sps30_update && !adxl345_update && !qmc5883l_update) {
         return;
     }
  

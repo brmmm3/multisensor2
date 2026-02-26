@@ -487,7 +487,7 @@ static void btn_calibrate_pressed(lv_event_t *e)
     /*if ((err = mhz19_calibrate_zero(mhz19)) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to calibrate MHZ19 with error %d", err);
     }*/
-    scd4x_state_machine_cmd(SCD4X_CMD_FRC, mhz19->values.co2);
+    scd4x_state_machine_cmd(SCD4X_CMD_FRC, mhz19_sensor->values.co2);
 }
 
 

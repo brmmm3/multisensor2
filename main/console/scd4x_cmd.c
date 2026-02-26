@@ -25,42 +25,42 @@ int process_scd4x_cmd(int argc, char **argv)
     if (scd4x_cmd_args.cmd->count == 1) {
         const char *cmd = scd4x_cmd_args.cmd->sval[0];
         if (strcmp(cmd, "st") == 0 || strcmp(cmd, "status") == 0) {
-            scd4x_values_t *values = &scd4x->values;
+            scd4x_values_t *values = &scd41_sensor->values;
             ESP_LOGI(TAG, "SCD4x (serial=0x%012llX ready=%d, enabled=%d):",
-                scd4x->serial_number, scd4x_get_data_ready_status(scd4x), scd4x->enabled);
+                scd41_sensor->serial_number, scd4x_get_data_ready_status(scd41_sensor), scd41_sensor->enabled);
             ESP_LOGI(TAG, "temp_offs=%f °C  altitude=%d m  pressure=%d hPa * co2=%d ppm  temp=%.1f °C  hum=%.1f %%  st=%d",
-                    scd4x->temperature_offset, scd4x->altitude, scd4x->pressure,
+                    scd41_sensor->temperature_offset, scd41_sensor->altitude, scd41_sensor->pressure,
                     values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
         } else if (strcmp(cmd, "readcfg") == 0) {
-            esp_err_t err = scd4x_stop_periodic_measurement(scd4x);
+            esp_err_t err = scd4x_stop_periodic_measurement(scd41_sensor);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to stop periodic measurement: %d", err);
                 return 1;
             }
             // Get sensor info and status
-            scd4x->temperature_offset = scd4x_get_temperature_offset(scd4x);
-            scd4x->altitude = scd4x_get_sensor_altitude(scd4x);
-            err = scd4x_start_periodic_measurement(scd4x);
+            scd41_sensor->temperature_offset = scd4x_get_temperature_offset(scd41_sensor);
+            scd41_sensor->altitude = scd4x_get_sensor_altitude(scd41_sensor);
+            err = scd4x_start_periodic_measurement(scd41_sensor);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "Failed start periodic measurement: %d", err);
                 return 1;
             }
         } else if (strcmp(cmd, "cfg") == 0) {
-            esp_err_t err = scd4x_stop_periodic_measurement(scd4x);
+            esp_err_t err = scd4x_stop_periodic_measurement(scd41_sensor);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to stop periodic measurement: %d", err);
                 return 1;
             }
             if (scd4x_cmd_args.temperature->count == 1) {
-                ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_temperature_offset(scd4x, (float)scd4x_cmd_args.temperature->ival[0]));
+                ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_temperature_offset(scd41_sensor, (float)scd4x_cmd_args.temperature->ival[0]));
             }
             if (scd4x_cmd_args.altitude->count == 1) {
-                ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_sensor_altitude(scd4x, scd4x_cmd_args.altitude->ival[0]));
+                ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_sensor_altitude(scd41_sensor, scd4x_cmd_args.altitude->ival[0]));
             }
             if (scd4x_cmd_args.pressure->count == 1) {
-                ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_ambient_pressure(scd4x, scd4x_cmd_args.pressure->ival[0]));
+                ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_ambient_pressure(scd41_sensor, scd4x_cmd_args.pressure->ival[0]));
             }
-            err = scd4x_start_periodic_measurement(scd4x);
+            err = scd4x_start_periodic_measurement(scd41_sensor);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "Failed start periodic measurement: %d", err);
                 return 1;
@@ -71,13 +71,13 @@ int process_scd4x_cmd(int argc, char **argv)
             if (scd4x_cmd_args.co2->count == 1) {
                 co2 = scd4x_cmd_args.co2->ival[0];
             } else {
-                co2 = mhz19->values.co2;
+                co2 = mhz19_sensor->values.co2;
             }
             ESP_LOGI(TAG, "Start SCD41 calibration with CO2 value %d", co2);
             scd4x_state_machine_cmd(SCD4X_CMD_FRC, co2);
         } else if (strcmp(cmd, "autocal") == 0) {
             if (scd4x_cmd_args.value->count == 1) {
-                ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_automatic_self_calibration_enabled(scd4x, scd4x_cmd_args.value->ival[0] != 0));
+                ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_automatic_self_calibration_enabled(scd41_sensor, scd4x_cmd_args.value->ival[0] != 0));
             } else {
                 ESP_LOGE(TAG, "no valid arguments");
                 return 1;
@@ -95,12 +95,12 @@ int process_scd4x_cmd(int argc, char **argv)
                 float offset = (float)scd4x_cmd_args.value->ival[0] * 0.01;
 
                 if (scd4x_st_machine_status == SCD4X_ST_IDLE) {
-                    ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_temperature_offset(scd4x, offset));
+                    ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_temperature_offset(scd41_sensor, offset));
                 } else {
                     esp_err_t err;
 
-                    if ((err = scd4x_stop_periodic_measurement(scd4x)) == ESP_OK) {
-                        ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_temperature_offset(scd4x, offset));
+                    if ((err = scd4x_stop_periodic_measurement(scd41_sensor)) == ESP_OK) {
+                        ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_temperature_offset(scd41_sensor, offset));
                     } else {
                         ESP_LOGE(TAG, "Failed to stop periodic measurement: %u", err);
                     }
@@ -110,13 +110,13 @@ int process_scd4x_cmd(int argc, char **argv)
                 return 1;
             }
         } else if (strcmp(cmd, "start") == 0) {
-            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_start_periodic_measurement(scd4x));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_start_periodic_measurement(scd41_sensor));
         } else if (strcmp(cmd, "startlp") == 0) {
-            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_start_low_power_periodic_measurement(scd4x));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_start_low_power_periodic_measurement(scd41_sensor));
         } else if (strcmp(cmd, "stop") == 0) {
-            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_stop_periodic_measurement(scd4x));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_stop_periodic_measurement(scd41_sensor));
         } else if (strcmp(cmd, "reset") == 0) {
-            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_perfom_factory_reset(scd4x));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_perfom_factory_reset(scd41_sensor));
         } else if (strcmp(cmd, "pwr") == 0) {
             if (scd4x_cmd_args.value->count == 1) {
                 ESP_ERROR_CHECK_WITHOUT_ABORT(ui_scd4x_set_pwr_mode(scd4x_cmd_args.value->ival[0]));
@@ -125,20 +125,20 @@ int process_scd4x_cmd(int argc, char **argv)
                 return 1;
             }
         } else if (strcmp(cmd, "test") == 0) {
-            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_perform_self_test(scd4x));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_perform_self_test(scd41_sensor));
         } else if (strcmp(cmd, "save") == 0) {
-            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_persist_settings(scd4x));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_persist_settings(scd41_sensor));
         } else if (strcmp(cmd, "wakeup") == 0) {
-            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_wake_up(scd4x));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_wake_up(scd41_sensor));
         } else if (strcmp(cmd, "down") == 0) {
-            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_power_down(scd4x));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_power_down(scd41_sensor));
         } else if (strcmp(cmd, "reinit") == 0) {
-            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_reinit(scd4x));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_reinit(scd41_sensor));
         } else if (strcmp(cmd, "measure") == 0) {
-            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_measure_single_shot(scd4x));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_measure_single_shot(scd41_sensor));
         } else if (strcmp(cmd, "read") == 0) {
-            scd4x_values_t *values = &scd4x->values;
-            esp_err_t err = scd4x_read_measurement(scd4x);
+            scd4x_values_t *values = &scd41_sensor->values;
+            esp_err_t err = scd4x_read_measurement(scd41_sensor);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to read measurement: %d", err);
                 return 1;
@@ -147,7 +147,7 @@ int process_scd4x_cmd(int argc, char **argv)
                 values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
         } else if (strcmp(cmd, "debug") == 0) {
             if (scd4x_cmd_args.value->count == 1) {
-                scd4x->debug = scd4x_cmd_args.value->ival[0];
+                scd41_sensor->debug = scd4x_cmd_args.value->ival[0];
             } else {
                 ESP_LOGE(TAG, "no valid arguments");
                 return 1;

@@ -9,13 +9,13 @@
 
 #pragma once
 
-#include "esp_err.h"
+#include <stdint.h>
+#include <esp_err.h>
+#include "driver/i2c_master.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <stdint.h>
-#include "driver/i2c_master.h"
 
 typedef struct __attribute__((packed)) {
     float accel_x;  // [g]
@@ -29,11 +29,12 @@ typedef struct __attribute__((packed)) {
 
 typedef struct adxl345_s {
     // I2C master handle via port with configuration
-    i2c_master_dev_handle_t i2c_dev;
+    i2c_master_dev_handle_t dev_handle;
     // I2C master configuration
-    i2c_device_config_t dev_cfg;
+    i2c_device_config_t dev_config;
     // I2C master handle via port
     i2c_master_bus_handle_t bus_handle;
+
     adxl345_values_t values;
     uint8_t moving_cnt;
     uint8_t accel_range;

@@ -5,7 +5,7 @@
 #include "config.h"
 #include "mbedtls/base64.h"
 #include "adxl345.h"
-#include "esp_log.h"
+#include <esp_log.h>
 #include "mhz19.h"
 #include "sdcard.h"
 #include "wifi/include/wifi.h"
@@ -55,7 +55,7 @@ static const char *help =
     "bme280hi\n"
     "mhz19\n"
     "scd4x {cal [co2]|autoadj int|status|val [0|1]|temp_offs|altitude|pressure]\n"
-    "yys\n"
+    "yys_sensor\n"
     "sps30\n"
     "auto con 0-4|rec 0-1|tcp 0-1|ftp 0-1\n"
     "save\n"
@@ -181,7 +181,7 @@ static int get_scd4x_values(char *buf, scd4x_values_t *values)
 {
     const char *fmt = opt_format ? "*%u,%u,%f,%f,%u\n"
                                  : "{id=%u,co2=%u,temp=%f,hum=%f,st=%u}\n";
-    return sprintf(buf, fmt, E_SENSOR_SCD4X,
+    return sprintf(buf, fmt, E_SENSOR_SCD41,
         values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
 }
 
@@ -647,12 +647,12 @@ static void tcp_server_task(void *pvParameters)
                     int len = get_bme280_values(rx_buffer, &bmx280hi->values);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                 } else if (strcmp(rx_buffer, "mhz19") == 0) {
-                    int len = get_mhz19_values(rx_buffer, &mhz19->values);
+                    int len = get_mhz19_values(rx_buffer, &mhz19_sensor->values);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                 } else if (strcmp(rx_buffer, "scd4x") == 0) {
-                    int len = get_scd4x_values(rx_buffer, &scd4x->values);
+                    int len = get_scd4x_values(rx_buffer, &scd41_sensor->values);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
-                } else if (strcmp(rx_buffer, "yys") == 0) {
+                } else if (strcmp(rx_buffer, "yys_sensor") == 0) {
                     int len = get_yys_values(rx_buffer);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                 } else if (strcmp(rx_buffer, "sps30") == 0) {
@@ -663,15 +663,15 @@ static void tcp_server_task(void *pvParameters)
                     if (strncmp(&rx_buffer[6], "cal ", 4) == 0) {
                         scd4x_state_machine_cmd(SCD4X_CMD_FRC, atoi(&rx_buffer[10]));
                     } else if (strcmp(&rx_buffer[6], "cal") == 0) {
-                        scd4x_state_machine_cmd(SCD4X_CMD_FRC, mhz19->values.co2);
+                        scd4x_state_machine_cmd(SCD4X_CMD_FRC, mhz19_sensor->values.co2);
                     } else if (strncmp(&rx_buffer[6], "autoadj ", 8) == 0) {
                         config->scd4x_auto_adjust = atoi(&rx_buffer[14]) != 0;
                     } else if (strcmp(&rx_buffer[6], "status") == 0) {
-                        esp_err_t err = scd4x_stop_periodic_measurement(scd4x);
+                        esp_err_t err = scd4x_stop_periodic_measurement(scd41_sensor);
                         if (err == ESP_OK) {
-                            scd4x->temperature_offset = scd4x_get_temperature_offset(scd4x);
-                            scd4x->altitude = scd4x_get_sensor_altitude(scd4x);
-                            err = scd4x_start_periodic_measurement(scd4x);
+                            scd41_sensor->temperature_offset = scd4x_get_temperature_offset(scd41_sensor);
+                            scd41_sensor->altitude = scd4x_get_sensor_altitude(scd41_sensor);
+                            err = scd4x_start_periodic_measurement(scd41_sensor);
                             if (err != ESP_OK) {
                                 ESP_LOGE(TAG, "Failed start periodic measurement: %u", err);
                                 response = "ERR\n";
@@ -682,26 +682,26 @@ static void tcp_server_task(void *pvParameters)
                         }
                         const char *fmt = opt_format ? "*%u,%f,%u,%u\n"
                                                      : "{id=%u,temp_offs=%f,altitude=%u,pressure=%u}\n";
-                        int len = sprintf(rx_buffer, fmt, E_SENSOR_SCD4XCAL,
-                            scd4x->temperature_offset, scd4x->altitude, scd4x->pressure);
+                        int len = sprintf(rx_buffer, fmt, E_SENSOR_SCD41CAL,
+                            scd41_sensor->temperature_offset, scd41_sensor->altitude, scd41_sensor->pressure);
                         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                     } else if (strcmp(&rx_buffer[4], "val 1") == 0) {
                         status.scd4x_auto_values = true;
                     } else if (strcmp(&rx_buffer[4], "val 0") == 0) {
                         status.scd4x_auto_values = false;
                     } else if (strcmp(&rx_buffer[4], "val") == 0) {
-                        scd4x_values_t *values = &scd4x->values;
+                        scd4x_values_t *values = &scd41_sensor->values;
                         const char *fmt = opt_format ? "*%u,%u,%f,%f,%u\n"
                                                      : "{id=%u,co2=%u,temp=%f,hum=%f,st=%u}\n";
-                        int len = sprintf(rx_buffer, fmt, E_SENSOR_SCD4X,
+                        int len = sprintf(rx_buffer, fmt, E_SENSOR_SCD41,
                             values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
                         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                     } else if (strncmp(&rx_buffer[4], "temp_offs ", 10) == 0) {
-                        scd4x_set_temperature_offset(scd4x, atof(&rx_buffer[14]));
+                        scd4x_set_temperature_offset(scd41_sensor, atof(&rx_buffer[14]));
                     } else if (strncmp(&rx_buffer[4], "altitude ", 9) == 0) {
-                        scd4x_set_sensor_altitude(scd4x, atof(&rx_buffer[13]));
+                        scd4x_set_sensor_altitude(scd41_sensor, atof(&rx_buffer[13]));
                     } else if (strncmp(&rx_buffer[4], "pressure ", 9) == 0) {
-                        scd4x_set_ambient_pressure(scd4x, atof(&rx_buffer[13]));
+                        scd4x_set_ambient_pressure(scd41_sensor, atof(&rx_buffer[13]));
                     } else {
                         ESP_LOGE(TAG, "Unknown command <%s>", rx_buffer);
                         response = "ERR\n";
@@ -819,11 +819,7 @@ void tcp_server_publish_values()
         return;
     }
     if (!tcp_send_values && !status.scd4x_auto_values) return;
-    if (!force_update_all && !gps_update && !bmx280lo_update && !bmx280hi_update && !mhz19_update
-        && !scd4x_calibrate && !scd4x_update && !yys_update && !sps30_update && !adxl345_update
-        && !qmc5883l_update && !status.scd4x_auto_values) {
-        return;
-    }
+    if (!force_update_all && !any_sensor_update && !scd41_calibrate && !status.scd4x_auto_values) return;
     if (update_all_cnt > 0) {
         if (--update_all_cnt == 0) {
             force_update_all = false;
@@ -849,11 +845,11 @@ void tcp_server_publish_values()
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && mhz19_update)) {
-        len = get_mhz19_values(buf, &mhz19->values);
+        len = get_mhz19_values(buf, &mhz19_sensor->values);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
-    if (force_update_all || (scd4x_update || status.scd4x_auto_values)) {
-        len = get_scd4x_values(buf, &scd4x->values);
+    if (force_update_all || (scd41_update || status.scd4x_auto_values)) {
+        len = get_scd4x_values(buf, &scd41_sensor->values);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && yys_update)) {

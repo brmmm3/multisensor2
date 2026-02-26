@@ -31,7 +31,8 @@ enum MHZ19_RANGE {
 };
 
 typedef struct __attribute__((packed)) {
-    uint16_t co2;
+    uint16_t co2;     // CO2 value from sensor with pressure compensation
+    uint16_t co2_raw; // CO2 value from sensor without pressure compensation
     uint8_t temp;
     uint8_t status;
 } mhz19_values_t;
@@ -47,6 +48,7 @@ typedef struct mhz19_s {
     uint8_t data_cnt;
     enum MHZ19_RANGE range;
     char fw_version[7];
+    uint16_t pressure;  // Current air pressure in hPa
     uint8_t debug;
     uint16_t error_cnt;
 } mhz19_t;

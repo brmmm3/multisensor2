@@ -65,7 +65,7 @@ typedef struct sps30_s {
     // I2C master handle via port with configuration
     i2c_master_dev_handle_t dev_handle;
     // I2C master configuration
-    i2c_device_config_t dev_cfg;
+    i2c_device_config_t dev_config;
     // I2C master handle via port
     i2c_master_bus_handle_t bus_handle;
     // Serial number

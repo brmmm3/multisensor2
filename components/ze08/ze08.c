@@ -1,7 +1,7 @@
 #include <string.h>
-#include "esp_err.h"
+#include <esp_err.h>
 #include "esp_timer.h"
-#include "esp_log.h"
+#include <esp_log.h>
 #include "rmt_uart.h"
 #include "ze08.h"
 
@@ -12,7 +12,7 @@ static const char *TAG = "ZE08";
 
 static esp_timer_handle_t ze08_message_end_timer;
 
-void ze08_check_and_save_data(ze08_sensor_t *sensor)
+void ze08_check_and_save_data(ze08_t *sensor)
 {
     uint8_t *buf = sensor->buffer;
     uint8_t cksum = 0x3c + 0x04 + buf[0] + buf[1] + buf[2] + buf[3] + buf[4] + buf[5] + buf[6] + buf[7] + buf[8];
@@ -33,12 +33,12 @@ void ze08_check_and_save_data(ze08_sensor_t *sensor)
 
 void ze08_message_end_timeout(void *args)
 {
-    ze08_check_and_save_data((ze08_sensor_t *)args);
+    ze08_check_and_save_data((ze08_t *)args);
 }
 
 static void rx_task_ze08_sensor(void *args)
 {
-    ze08_sensor_t *sensor = (ze08_sensor_t *)args;
+    ze08_t *sensor = (ze08_t *)args;
 
     uint8_t rx_pin = sensor->rx_pin;
     uint8_t *buf = sensor->buffer;
@@ -51,10 +51,10 @@ static void rx_task_ze08_sensor(void *args)
         .parity = RMT_UART_PARITY_DISABLE,
         .stop_bits = RMT_UART_STOP_BITS_1,
         .rx_io_num = rx_pin,                // Your RX GPIO pin
-        .buffer_size = 50                   // RX buffer size (bytes)
+        .buffer_size = 48                   // RX buffer size (bytes)
     };
 
-    ESP_ERROR_CHECK(rmt_uart_init(0, &uart_config));
+    ESP_ERROR_CHECK(rmt_uart_init(sensor->rx_channel, &uart_config));
 
     uint8_t rx_buf[32];
     size_t length = 0;
@@ -71,7 +71,7 @@ static void rx_task_ze08_sensor(void *args)
     ESP_ERROR_CHECK(esp_timer_create(&oneshot_timer_args, &ze08_message_end_timer));
 
     while (true) {
-        length = rmt_uart_read_bytes(0, rx_buf, sizeof(rx_buf), portMAX_DELAY);
+        length = rmt_uart_read(0, rx_buf, sizeof(rx_buf), portMAX_DELAY);
         uint8_t i = 0;
         while (length-- > 0) {
             uint8_t rx_byte = rx_buf[i++];
@@ -98,14 +98,14 @@ static void rx_task_ze08_sensor(void *args)
     }
 }
 
-esp_err_t ze08_init(ze08_sensor_t **sensor, uint8_t rx_pin, uint8_t tx_pin)
+esp_err_t ze08_init(ze08_t **sensor, uint8_t rx_channel, uint8_t rx_pin, uint8_t tx_pin)
 {
-    ze08_sensor_t *ze08_sensor = calloc(1, sizeof(ze08_sensor_t));
+    ze08_t *ze08_sensor = calloc(1, sizeof(ze08_t));
 
     ESP_LOGI(TAG, "Initialize ZE08-C2HO");
-    // YYS Multi Sensor
     ze08_sensor->name = "ZE08-C2HO";
     ze08_sensor->baudrate = 9600;
+    ze08_sensor->rx_channel = rx_channel;
     ze08_sensor->rx_pin = rx_pin;
     ze08_sensor->buffer = malloc(12);
     ze08_sensor->cnt = 0xff;
@@ -115,7 +115,7 @@ esp_err_t ze08_init(ze08_sensor_t **sensor, uint8_t rx_pin, uint8_t tx_pin)
     return ESP_OK;
 }
 
-bool ze08_data_ready(ze08_sensor_t *sensor)
+bool ze08_data_ready(ze08_t *sensor)
 {
     if (sensor == NULL) return false;
     if (sensor->data_ready) {
@@ -125,22 +125,22 @@ bool ze08_data_ready(ze08_sensor_t *sensor)
     return false;
 }
 
-uint16_t ze08_get_ch2o_raw(ze08_sensor_t *sensor)
+uint16_t ze08_get_ch2o_raw(ze08_t *sensor)
 {
     return sensor->values.ch2o;
 }
 
-float ze08_get_ch2o_ppm(ze08_sensor_t *sensor)
+float ze08_get_ch2o_ppm(ze08_t *sensor)
 {
     return (float)sensor->values.ch2o * 0.001;  // e.g. 6 ppb = 0.006 ppm
 }
 
-float ze08_get_ch2o_mg(ze08_sensor_t *sensor)
+float ze08_get_ch2o_mg(ze08_t *sensor)
 {
     return (float)sensor->values.ch2o * 0.00125;  // e.g. 6 ppb = 0.0075 mg/m³
 }
 
-void ze08_dump_values(ze08_sensor_t *sensor, bool force)
+void ze08_dump_values(ze08_t *sensor, bool force)
 {
     if (force || sensor->debug & 1) {
         ESP_LOGI(TAG, "CH2O=%u ppb = %f ppm  DCNT=%d  ERR=%d",
