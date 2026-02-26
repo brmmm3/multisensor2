@@ -23,9 +23,12 @@ typedef struct ui_s {
     lv_obj_t *titles_bg;
     lv_obj_t *lbl_bmx280lo;
     lv_obj_t *lbl_bmx280hi;
+    lv_obj_t *lbl_s11;
+    lv_obj_t *lbl_scd30;
+    lv_obj_t *lbl_scd41;
     lv_obj_t *lbl_mhz19;
-    lv_obj_t *lbl_scd4x;
     lv_obj_t *lbl_yys;
+    lv_obj_t *lbl_ze08;
     // Tab Dust
     lv_obj_t *tab_dust;
     lv_obj_t *lbl_sps30_1;

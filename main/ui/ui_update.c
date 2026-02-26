@@ -29,21 +29,25 @@ void update_air_tab(bool force_update)
                 bmx280hi->values.pressure, bmx280hi->values.altitude, bmx280hi->values.temperature, bmx280hi->values.humidity);
         lv_label_set_text(ui->lbl_bmx280hi, buf);
     }
-    if (scd4x_update || force_update) {
-        scd4x_values_t *scd4x_values = &scd4x->values;
+    if (scd41_update || force_update) {
+        scd4x_values_t *scd4x_values = &scd41_sensor->values;
 
         sprintf(buf, "CO2=%d ppm    ST=%d\nT=%.1f °C  H=%.1f %%", scd4x_values->co2, scd4x_st_machine_status, scd4x_values->temperature, scd4x_values->humidity);
-        lv_label_set_text(ui->lbl_scd4x, buf);
+        lv_label_set_text(ui->lbl_scd41, buf);
     }
     if (mhz19_update || force_update) {
-        sprintf(buf, "CO2=%d ppm\nT=%d °C ", mhz19->values.co2, mhz19->values.temp);
+        sprintf(buf, "CO2=%d ppm  T=%d °C", mhz19_sensor->values.co2, mhz19_sensor->values.temp);
         lv_label_set_text(ui->lbl_mhz19, buf);
     }
     if (yys_update || force_update) {
-        sprintf(buf, "O2=%.1f %%  CO=%d ppm\nH2S=%.1f ppm  CH4=%d ppm",
+        sprintf(buf, "O2=%.1f %%    CO=%d ppm\nH2S=%.1f ppm  CH4=%d ppm",
             yys_get_o2(yys_sensor), yys_get_co_raw(yys_sensor),
             yys_get_h2s(yys_sensor), yys_get_ch4_raw(yys_sensor));
         lv_label_set_text(ui->lbl_yys, buf);
+    }
+    if (ze08_update || force_update) {
+        sprintf(buf, "CH2O=%.2f ppm", 0.0);
+        lv_label_set_text(ui->lbl_ze08, buf);
     }
 }
 

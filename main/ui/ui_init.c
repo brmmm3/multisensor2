@@ -7,7 +7,7 @@
 // This demo UI is adapted from LVGL official example: https://docs.lvgl.io/master/examples.html#loader-with-arc
 
 #include "core/lv_obj_style.h"
-#include "esp_log.h"
+#include <esp_log.h>
 
 #include "misc/lv_area.h"
 #include "misc/lv_color.h"
@@ -273,9 +273,12 @@ lv_obj_t *add_page_air(ui_t *ui)
     lv_obj_t *tab = add_tab(ui->tbv_main, "Air");
     ui->lbl_bmx280lo = add_section_label(tab, 0, 42, 72, "BME280L");
     ui->lbl_bmx280hi = add_section_label(tab, 40, 42, 72, "BME280H");
-    ui->lbl_scd4x = add_section_label(tab, 80, 42, 72, "SCD41");
-    ui->lbl_mhz19 = add_section_label(tab, 120, 42, 72, "MHZ19");
-    ui->lbl_yys = add_section_label(tab, 160, 42, 72, "YYS");
+    ui->lbl_s11 = add_section_label(tab, 80, 42, 72, "S11");
+    ui->lbl_scd30 = add_section_label(tab, 120, 22, 72, "SCD30");
+    ui->lbl_scd41 = add_section_label(tab, 140, 42, 72, "SCD41");
+    ui->lbl_mhz19 = add_section_label(tab, 180, 22, 72, "MHZ19");
+    ui->lbl_yys = add_section_label(tab, 200, 42, 72, "YYS");
+    ui->lbl_ze08 = add_section_label(tab, 240, 22, 72, "ZE08");
     return tab;
 }
 
