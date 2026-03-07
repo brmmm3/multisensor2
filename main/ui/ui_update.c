@@ -29,6 +29,18 @@ void update_air_tab(bool force_update)
                 bmx280hi->values.pressure, bmx280hi->values.altitude, bmx280hi->values.temperature, bmx280hi->values.humidity);
         lv_label_set_text(ui->lbl_bmx280hi, buf);
     }
+    if (s11_update || force_update) {
+        s11_values_t *s11_values = &s11_sensor->values;
+
+        sprintf(buf, "CO2FP=%d ppm   T=%.1f °C\nCO2P=%d ppm", s11_values->co2_fp, (float)s11_values->temp * 0.01, s11_values->co2_p);
+        lv_label_set_text(ui->lbl_s11, buf);
+    }
+    if (scd30_update || force_update) {
+        scd30_values_t *scd30_values = &scd30_sensor->values;
+
+        sprintf(buf, "CO2=%d ppm\nT=%.1f °C  H=%.1f %%", (int)scd30_values->co2, scd30_values->temperature, scd30_values->humidity);
+        lv_label_set_text(ui->lbl_scd30, buf);
+    }
     if (scd41_update || force_update) {
         scd4x_values_t *scd4x_values = &scd41_sensor->values;
 

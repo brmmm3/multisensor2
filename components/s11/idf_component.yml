@@ -1,0 +1,4 @@
+description: Senseair S11 CO2 Sensor
+version: 1.0.0
+dependencies:
+  idf: '>=5.4'

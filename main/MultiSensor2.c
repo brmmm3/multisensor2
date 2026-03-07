@@ -1,26 +1,41 @@
-#include "esp_err.h"
-#include "esp_rom_crc.h"
-#include "bmx280.h"
+/* MIT License
+*
+* Copyright (c) 2026 Martin Bammer
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy
+* of this software and associated documentation files (the "Software"), to deal
+* in the Software without restriction, including without limitation the rights
+* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+* copies of the Software, and to permit persons to whom the Software is
+* furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in all
+* copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+* SOFTWARE.
+*/
+
 #include "config.h"
-#include "freertos/portable.h"
-#include "ftp.h"
-#include "gps.h"
-#include "lcd.h"
+#include <esp_task_wdt.h>
+#include <esp_err.h>
+#include "esp_rom_crc.h"
+#include <sys/time.h>
+#include "nvs_flash.h"
 #include "main.h"
 #include "misc/lv_palette.h"
 //#include "mqtt.h"
-#include "nvs_flash.h"
-#include "rtc_tiny.h"
-#include "scd4x.h"
-#include "sdcard.h"
+#include "s11.h"
 #include "tcp_server.h"
 #include "ui/include/ui_config.h"
 #include "ui/include/ui_update.h"
 #include "wifi/include/wifi.h"
-
-#include "esp_task_wdt.h"
 #include "console/include/console.h"
-#include <sys/time.h>
 
 static const char *TAG = "MS2";
 
@@ -76,13 +91,15 @@ static const char *TAG = "MS2";
 #define MHZ19_PIN_NUM_RX    GPIO_NUM_4
 #define MHZ19_PIN_NUM_TX    GPIO_NUM_5
 // YYS (SW-UART0) (CO, O2, H2S=Hydrogen Sulfid=Schwefelwasserstoff, CH4=Methane)
-#define YYS_PIN_NUM_TX      GPIO_NUM_12
+#define YYS_RX_CHANNEL      0
+#define YYS_PIN_NUM_TX      0  /* 0=DISABLED  GPIO_NUM_12 */
 #define YYS_PIN_NUM_RX      GPIO_NUM_13
 // ZE08-CH2O (SW-UART1) (Formaldehyde)
-#define ZE08_PIN_NUM_TX      GPIO_NUM_11
-#define ZE08_PIN_NUM_RX      GPIO_NUM_3
+#define ZE08_RX_CHANNEL     1
+#define ZE08_PIN_NUM_TX     0  /* 0=DISABLED  GPIO_NUM_3 */
+#define ZE08_PIN_NUM_RX     GPIO_NUM_11
 
-// Unused GPIOs: 9
+// Unused GPIOs: 9 (do not use -> Boot mode)
 
 // Special GPIO functions:
 //  0 = Boot Mode (H = Normal Boot, internal Pull-Up)
@@ -90,7 +107,7 @@ static const char *TAG = "MS2";
 // 15 = JTAG Signal Source Control
 
 // UART
-#define UART_BUFFER_SIZE 256
+#define UART_BUFFER_SIZE    256
 
 #define CONFIG_NTP_SERVER   "pool.ntp.org"
 
@@ -122,8 +139,11 @@ gps_values_t gps_values = {0};
 gps_status_t *gps_status = NULL;
 bmx280_t *bmx280lo = NULL;
 bmx280_t *bmx280hi = NULL;
-mhz19_t *mhz19 = NULL;
-scd4x_t *scd4x = NULL;
+s11_t *s11_sensor = NULL;
+scd30_t *scd30_sensor = NULL;
+scd4x_t *scd41_sensor = NULL;
+mhz19_t *mhz19_sensor = NULL;
+ze08_t *ze08_sensor = NULL;
 sps30_t *sps30 = NULL;
 yys_sensor_t *yys_sensor = NULL;
 adxl345_t *adxl345 = NULL;
@@ -135,16 +155,22 @@ ui_t *ui;
 
 status_t status = {0};
 
+uint16_t current_pressure = 1013;
+
 bool gps_update = false;
 bool bmx280lo_update = false;
 bool bmx280hi_update = false;
 bool mhz19_update = false;
-bool scd4x_calibrate = false;
-bool scd4x_update = false;
+bool s11_update = false;
+bool scd30_update = false;
+bool scd41_calibrate = false;
+bool scd41_update = false;
 bool yys_update = false;
+bool ze08_update = false;
 bool sps30_update = false;
 bool adxl345_update = false;
 bool qmc5883l_update = false;
+bool any_sensor_update = false;
 
 uint32_t debug_main = 0;
 
@@ -270,6 +296,33 @@ i2c_master_bus_handle_t i2c_bus_init(uint8_t sda_io, uint8_t scl_io)
     return bus_handle;
 }
 
+void s11_setup()
+{
+    // Ensure continuous measurement mode
+    ESP_ERROR_CHECK_WITHOUT_ABORT(s11_get_measurement_mode(s11_sensor));
+    ESP_LOGI(TAG, "S11: meas_mode=%02X", s11_sensor->dev_settings.meas_mode);
+    if (s11_sensor->dev_settings.meas_mode != 0) {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(s11_set_measurement_mode(s11_sensor, 0));
+        vTaskDelay(pdMS_TO_TICKS(10));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(s11_reset(s11_sensor));
+        vTaskDelay(pdMS_TO_TICKS(10));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(s11_get_measurement_mode(s11_sensor));
+        ESP_LOGI(TAG, "S11: meas_mode=%02X", s11_sensor->dev_settings.meas_mode);
+    }
+    // Ensure dev meter control
+    ESP_ERROR_CHECK_WITHOUT_ABORT(s11_get_dev_meter_ctl(s11_sensor));
+    ESP_LOGI(TAG, "S11: dev_meter_ctl=%02X", s11_sensor->dev_settings.dev_meter_ctl);
+    if (s11_sensor->dev_settings.dev_meter_ctl != 0xf2) {
+        // Disable pressure compensation because rev 14 seems not to support this.
+        ESP_ERROR_CHECK_WITHOUT_ABORT(s11_set_dev_meter_ctl(s11_sensor, 0xf2));
+        vTaskDelay(pdMS_TO_TICKS(10));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(s11_reset(s11_sensor));
+        vTaskDelay(pdMS_TO_TICKS(10));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(s11_get_dev_meter_ctl(s11_sensor));
+        ESP_LOGI(TAG, "S11: dev_meter_ctl=%02X", s11_sensor->dev_settings.dev_meter_ctl);
+    }
+}
+
 void sensors_init()
 {
     ESP_LOGI(TAG, "Initialize Sensors");
@@ -278,14 +331,24 @@ void sensors_init()
     gps_status = &gps->status;
     ESP_ERROR_CHECK_WITHOUT_ABORT(bmx280_init(&bmx280lo, bus_handle, false));
     ESP_ERROR_CHECK_WITHOUT_ABORT(bmx280_init(&bmx280hi, bus_handle, true));
+    // S11
+    ESP_ERROR_CHECK_WITHOUT_ABORT(s11_init(&s11_sensor, bus_handle));
+    s11_dump_dev_info(s11_sensor);
+    s11_setup();
+    ESP_ERROR_CHECK_WITHOUT_ABORT(scd30_init(&scd30_sensor, bus_handle));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_init(&scd41_sensor, bus_handle));
     // This will never fail here
-    mhz19_init(&mhz19, MHZ19_UART_NUM, MHZ19_PIN_NUM_RX, MHZ19_PIN_NUM_TX);
-    ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_init(&scd4x, bus_handle));
+    mhz19_init(&mhz19_sensor, MHZ19_UART_NUM, MHZ19_PIN_NUM_RX, MHZ19_PIN_NUM_TX);
     // This will never fail here
-    yys_init(&yys_sensor, YYS_PIN_NUM_RX, YYS_PIN_NUM_TX);
+    yys_init(&yys_sensor, YYS_RX_CHANNEL, YYS_PIN_NUM_RX, YYS_PIN_NUM_TX);
+    // This will never fail here
+    ze08_init(&ze08_sensor, ZE08_RX_CHANNEL, ZE08_PIN_NUM_RX, ZE08_PIN_NUM_TX);
     ESP_ERROR_CHECK_WITHOUT_ABORT(sps30_init(&sps30, bus_handle));
     ESP_ERROR_CHECK_WITHOUT_ABORT(adxl345_init(&adxl345, bus_handle));
     ESP_ERROR_CHECK_WITHOUT_ABORT(qmc5883l_init(&qmc5883l, bus_handle));
+    s11_sensor->debug = 1;
+    scd30_sensor->debug = 1;
+    ze08_sensor->debug = 1;
 }
 
 static bool update_gps()
@@ -339,30 +402,51 @@ static bool update_bmx280(int num, bmx280_t **sensor, sensors_data_bmx280_t *las
     return false;
 }
 
-static bool update_mhz19()
+static bool update_s11()
 {
     bool force_update = force_update_all || (debug_main & 1) != 0;
 
-    if (mhz19_data_ready(mhz19)) {
-        if (force_update || memcmp(&last_values.mhz19, &mhz19->values, sizeof(sensors_data_mhz19_t)) != 0) {
-            memcpy(&last_values.mhz19, &mhz19->values, sizeof(sensors_data_mhz19_t));
-            return true;
-        }
+    ESP_ERROR_CHECK_WITHOUT_ABORT(s11_get_measurement_count(s11_sensor));
+    if (s11_sensor->dev_status.measurement_count == s11_sensor->dev_status.old_measurement_count) return false;
+    s11_sensor->dev_status.old_measurement_count = s11_sensor->dev_status.measurement_count;
+    ESP_ERROR_CHECK_WITHOUT_ABORT(s11_read_measurement(s11_sensor));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(s11_get_error_status(s11_sensor));
+    if (force_update || memcmp(&last_values.s11, &s11_sensor->values, sizeof(sensors_data_s11_t)) != 0) {
+        memcpy(&last_values.s11, &s11_sensor->values, sizeof(sensors_data_s11_t));
+        return true;
+    }
+    return true;
+}
+
+static bool update_scd30()
+{
+    esp_err_t err;
+
+    if (!scd30_get_data_ready_status(scd30_sensor)) {
+        return force_update_all;
+    }
+    if ((err = scd30_read_measurement(scd30_sensor)) != ESP_OK) {
+        ESP_LOGE(TAG, "SCD30 read error %u", err);
+        return false;
+    }
+
+    bool force_update = force_update_all || (debug_main & 1) != 0;
+
+    if (force_update || memcmp(&last_values.scd30, &scd30_sensor->values, sizeof(sensors_data_scd30_t)) != 0) {
+        memcpy(&last_values.scd30, &scd30_sensor->values, sizeof(sensors_data_scd30_t));
+        return true;
     }
     return false;
 }
 
-static bool update_scd4x()
+static bool update_scd41()
 {
-    bmx280_t *bmx280;
     uint16_t pressure_offset;
     esp_err_t err;
 
-    if (bmx280lo->values.temperature < bmx280hi->values.temperature) bmx280 = bmx280lo;
-    else bmx280 = bmx280hi;
-    if (scd4x == NULL && (debug_main & 0x2000) == 0) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_init(&scd4x, bus_handle));
-        if (scd4x == NULL) return false;
+    if (scd41_sensor == NULL && (debug_main & 0x2000) == 0) {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_init(&scd41_sensor, bus_handle));
+        if (scd41_sensor == NULL) return false;
     }
     if (scd4x_st_machine_status == SCD4X_ST_IDLE || scd4x_st_machine_status > SCD4X_ST_MEASURE_3MIN) {
         if (scd4x_st_machine_status > SCD4X_ST_MEASURE_3MIN) {
@@ -370,27 +454,43 @@ static bool update_scd4x()
         }
         return false;
     }
-    if (bmx280->values.pressure > scd4x->pressure) pressure_offset = bmx280->values.pressure - scd4x->pressure;
-    else pressure_offset = scd4x->pressure - bmx280->values.pressure;
-    if (scd4x->auto_adjust > 0 && (scd4x->auto_adjust-- == 1 || pressure_offset > 50)) {
+    if (current_pressure > scd41_sensor->pressure) pressure_offset = current_pressure - scd41_sensor->pressure;
+    else pressure_offset = scd41_sensor->pressure - current_pressure;
+    if (scd41_sensor->auto_adjust > 0 && (scd41_sensor->auto_adjust-- == 1 || pressure_offset > 50)) {
 
-        scd4x->auto_adjust = 255;
-        ESP_LOGI(TAG, "SCD4X Adjust: Pressure=%f hPa", bmx280->values.pressure);
-        ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_ambient_pressure(scd4x, bmx280->values.pressure));
-        scd4x_calibrate = true;
+        scd41_sensor->auto_adjust = 255;
+        ESP_LOGI(TAG, "SCD41 Adjust: Pressure=%f hPa", current_pressure);
+        ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_ambient_pressure(scd41_sensor, current_pressure));
+        scd41_calibrate = true;
     }
-    if (!scd4x_get_data_ready_status(scd4x)) {
+    if (!scd4x_get_data_ready_status(scd41_sensor)) {
         return force_update_all;
     }
-    if ((err = scd4x_read_measurement(scd4x)) != ESP_OK) {
-        ESP_LOGE(TAG, "SCD4X read error %u", err);
+    if ((err = scd4x_read_measurement(scd41_sensor)) != ESP_OK) {
+        ESP_LOGE(TAG, "SCD41 read error %u", err);
         return false;
     }
 
     bool force_update = force_update_all || (debug_main & 1) != 0;
 
-    if (force_update || memcmp(&last_values.scd4x, &scd4x->values, sizeof(sensors_data_scd4x_t)) != 0) {
-        memcpy(&last_values.scd4x, &scd4x->values, sizeof(sensors_data_scd4x_t));
+    if (force_update || memcmp(&last_values.scd41, &scd41_sensor->values, sizeof(sensors_data_scd41_t)) != 0) {
+        memcpy(&last_values.scd41, &scd41_sensor->values, sizeof(sensors_data_scd41_t));
+        return true;
+    }
+    return false;
+}
+
+static bool update_mhz19()
+{
+    if (!mhz19_data_ready(mhz19_sensor)) {
+        return force_update_all;
+    }
+
+    bool force_update = force_update_all || (debug_main & 1) != 0;
+
+    mhz19_sensor->pressure = current_pressure;
+    if (force_update || memcmp(&last_values.mhz19, &mhz19_sensor->values, sizeof(sensors_data_mhz19_t)) != 0) {
+        memcpy(&last_values.mhz19, &mhz19_sensor->values, sizeof(sensors_data_mhz19_t));
         return true;
     }
     return false;
@@ -398,13 +498,30 @@ static bool update_scd4x()
 
 static bool update_yys()
 {
+    if (!yys_data_ready(yys_sensor)) {
+        return force_update_all;
+    }
+
     bool force_update = force_update_all || (debug_main & 1) != 0;
 
-    if (yys_data_ready(yys_sensor)) {
-        if (force_update || memcmp(&last_values.yys, &yys_sensor->values, sizeof(sensors_data_yys_t)) != 0) {
-            memcpy(&last_values.yys, &yys_sensor->values, sizeof(sensors_data_yys_t));
-            return true;
-        }
+    if (force_update || memcmp(&last_values.yys, &yys_sensor->values, sizeof(sensors_data_yys_t)) != 0) {
+        memcpy(&last_values.yys, &yys_sensor->values, sizeof(sensors_data_yys_t));
+        return true;
+    }
+    return false;
+}
+
+static bool update_ze08()
+{
+    if (!ze08_data_ready(ze08_sensor)) {
+        return force_update_all;
+    }
+
+    bool force_update = force_update_all || (debug_main & 1) != 0;
+
+    if (force_update || memcmp(&last_values.ze08, &ze08_sensor->values, sizeof(sensors_data_ze08_t)) != 0) {
+        memcpy(&last_values.ze08, &ze08_sensor->values, sizeof(sensors_data_ze08_t));
+        return true;
     }
     return false;
 }
@@ -513,25 +630,38 @@ static void update_gps_status()
 
 static void sensors_update()
 {
+    bmx280_t *bmx280;
+
     // Update/Read data
     gps_update |= update_gps();
+
     bmx280lo_update |= update_bmx280(0, &bmx280lo, &last_values.bmx280lo);
     bmx280hi_update |= update_bmx280(1, &bmx280hi, &last_values.bmx280hi);
+
+    // Get current pressure. Use BME280 sensor with lower temperature value, if pressure is in range.
+    if (bmx280lo->values.temperature < bmx280hi->values.temperature) bmx280 = bmx280lo;
+    else bmx280 = bmx280hi;
+    if (bmx280->values.pressure > 200 && bmx280->values.pressure < 2026) current_pressure = bmx280->values.pressure;
+
+    s11_update |= update_s11();
+    scd30_update |= update_scd30();
+    scd41_update |= update_scd41();
     mhz19_update |= update_mhz19();
-    scd4x_update |= update_scd4x();
     yys_update |= update_yys();
+    ze08_update |= update_ze08();
     sps30_update |= update_sps30();
     adxl345_update |= update_adxl345();
     qmc5883l_update |= update_qmc5883l();
+
+    any_sensor_update = gps_update || bmx280lo_update || bmx280hi_update || mhz19_update || s11_update
+                        || scd30_update || scd41_update || yys_update || ze08_update || sps30_update
+                        || adxl345_update || qmc5883l_update;
 }
 
 
 static void sensors_recording()
 {
-    if (!gps_update && !bmx280lo_update && !bmx280hi_update && !mhz19_update && !scd4x_calibrate &&
-        !scd4x_update && !yys_update && !sps30_update && !adxl345_update && !qmc5883l_update) {
-        return;
-    }
+    if (!any_sensor_update)  return;
     bool log_values = (debug_main & 2) != 0;
     bool force_all = status.record_pos == 0;
     uint16_t record_pos = status.record_pos;
@@ -565,91 +695,62 @@ static void sensors_recording()
     }
     if (gps_update || force_all) {
         data_add(E_SENSOR_GPS, &last_values.gps, sizeof(sensors_data_gps_t));
-        if (log_values || (debug_main & 4) != 0) {
-            ESP_LOGI(TAG, "GPS: %s date=%lu time=%lu lat=%f %c lng=%f %c alt=%.1f spd=%.1f mode_3d=%c sats=%u pdop=%.1f hdop=%.1f vdop=%.1f st=%u dc=%u err=%u",
-                    gps_values.sat, gps_values.date, gps_values.time, gps_values.lat, gps_values.ns, gps_values.lng,
-                    gps_values.ew, gps_values.altitude, gps_values.speed, gps_values.mode_3d, gps_values.sats,
-                    gps_values.pdop, gps_values.hdop, gps_values.vdop, gps_values.status, gps_values.data_cnt, gps_values.error_cnt);
-        }
+        if (log_values || (debug_main & 4) != 0) gps_dump_values(gps, true);
     }
     if (bmx280lo_update || force_all) {
         data_add(E_SENSOR_BMX280_LO, &last_values.bmx280lo, sizeof(sensors_data_bmx280_t));
-        if (log_values || (debug_main & 8) != 0) {
-            sensors_data_bmx280_t *values = &last_values.bmx280lo;
-            ESP_LOGI(TAG, "BMX280LO: temp=%.1f °C  hum=%.1f  press=%.1f hPa  alt=%.1f m",
-                    values->temperature, values->humidity, values->pressure, values->altitude);
-        }
+        if (log_values || (debug_main & 8) != 0) bmx280_dump_values(bmx280lo, true);
     }
     if (bmx280hi_update || force_all) {
         data_add(E_SENSOR_BMX280_HI, &last_values.bmx280hi, sizeof(sensors_data_bmx280_t));
-        if (log_values || (debug_main & 8) != 0) {
-            sensors_data_bmx280_t *values = &last_values.bmx280hi;
-            ESP_LOGI(TAG, "BMX280HI: temp=%.1f °C  hum=%.1f  press=%.1f hPa  alt=%.1f m",
-                    values->temperature, values->humidity, values->pressure, values->altitude);
+        if (log_values || (debug_main & 8) != 0) bmx280_dump_values(bmx280hi, true);
+    }
+    if (scd41_calibrate || force_all) {
+        scd41_cal_values_t values = {
+            .temperature_offset = scd41_sensor->temperature_offset,
+            .altitude = scd41_sensor->altitude,
+            .pressure =scd41_sensor->pressure
+        };
+        data_add(E_SENSOR_SCD41CAL, &values, sizeof(scd41_cal_values_t));
+        if (log_values || (debug_main & 16) != 0) {
+            ESP_LOGI(TAG, "SCD41CAL: temp_offs=%f  alt=%u  press=%u", values.temperature_offset, values.altitude, values.pressure);
         }
+    }
+    if (s11_update || force_all) {
+        data_add(E_SENSOR_S11, &last_values.s11, sizeof(sensors_data_s11_t));
+        if (log_values || (debug_main & 32) != 0) s11_dump_values(s11_sensor, true);
+    }
+    if (scd30_update || force_all) {
+        data_add(E_SENSOR_SCD30, &last_values.scd30, sizeof(sensors_data_scd30_t));
+        if (log_values || (debug_main & 64) != 0) scd30_dump_values(scd30_sensor, true);
+    }
+    if (scd41_update || force_all) {
+        data_add(E_SENSOR_SCD41, &last_values.scd41, sizeof(sensors_data_scd41_t));
+        if (log_values || (debug_main & 128) != 0) scd4x_dump_values(scd41_sensor, true);
     }
     if (mhz19_update || force_all) {
         data_add(E_SENSOR_MHZ19, &last_values.mhz19, sizeof(sensors_data_mhz19_t));
-        if (log_values || (debug_main & 16) != 0) {
-            sensors_data_mhz19_t *values = &last_values.mhz19;
-            ESP_LOGI(TAG, "MHZ19: co2=%u ppm  temp=%u °C  st=%u", values->co2, values->temp, values->status);
-        }
-    }
-    if (scd4x_calibrate || force_all) {
-        scd4x_cal_values_t values = {
-            .temperature_offset = scd4x->temperature_offset,
-            .altitude = scd4x->altitude,
-            .pressure =scd4x->pressure
-        };
-        data_add(E_SENSOR_SCD4XCAL, &values, sizeof(scd4x_cal_values_t));
-        if (log_values || (debug_main & 16) != 0) {
-            ESP_LOGI(TAG, "SCD4XCAL: temp_offs=%f  alt=%u  press=%u", values.temperature_offset, values.altitude, values.pressure);
-        }
-    }
-    if (scd4x_update || force_all) {
-        data_add(E_SENSOR_SCD4X, &last_values.scd4x, sizeof(sensors_data_scd4x_t));
-        if (log_values || (debug_main & 16) != 0) {
-            sensors_data_scd4x_t *values = &last_values.scd4x;
-            ESP_LOGI(TAG, "SCD4X: co2=%u ppm  temp=%.1f °C  hum=%.1f %%", values->co2, values->temperature, values->humidity);
-        }
+        if (log_values || (debug_main & 256) != 0) mhz19_dump_values(mhz19_sensor, true);
     }
     if (yys_update || force_all) {
         data_add(E_SENSOR_YYS, &last_values.yys, sizeof(sensors_data_yys_t));
-        if (log_values || (debug_main & 32) != 0) {
-            ESP_LOGI(TAG, "YYS: o2=%.1f %%  co=%.1f ppm  h2s=%.1f ppm  ch4=%.1f ppm",
-                    yys_get_o2(yys_sensor), yys_get_co(yys_sensor),
-                    yys_get_h2s(yys_sensor), yys_get_ch4(yys_sensor));
-        }
+        if (log_values || (debug_main & 512) != 0) yys_dump_values(yys_sensor, true);
+    }
+    if (ze08_update || force_all) {
+        data_add(E_SENSOR_ZE08, &last_values.ze08, sizeof(sensors_data_ze08_t));
+        if (log_values || (debug_main & 1024) != 0) ze08_dump_values(ze08_sensor, true);
     }
     if (sps30_update || force_all) {
         data_add(E_SENSOR_SPS30, &last_values.sps30, sizeof(sensors_data_sps30_t));
-        if (log_values || (debug_main & 64) != 0) {
-            sensors_data_sps30_t *values = &last_values.sps30;
-            ESP_LOGI(TAG, "SPS30: STATUS=%08X", (unsigned int)values->status);
-            ESP_LOGI(TAG, "PM0.5 =%.1f #/cm3", values->nc_0p5);
-            ESP_LOGI(TAG, "PM1.0 =%.1f ug/cm3 P1.0 =%.1f #/cm3", values->mc_1p0, values->nc_1p0);
-            ESP_LOGI(TAG, "PM2.5 =%.1f ug/cm3 P2.5 =%.1f #/cm3", values->mc_2p5, values->nc_2p5);
-            ESP_LOGI(TAG, "PM4.0 =%.1f ug/cm3 P4.0 =%.1f #/cm3", values->mc_4p0, values->nc_4p0);
-            ESP_LOGI(TAG, "PM10.0=%.1f ug/cm3 P10.0=%.1f #/cm3", values->mc_10p0, values->nc_10p0);
-            ESP_LOGI(TAG, "TypPartSz=%.3f um", values->typical_particle_size);
-        }
+        if (log_values || (debug_main & 2048) != 0) sps30_dump_values(sps30, true);
     }
     if (adxl345_update || force_all) {
         data_add(E_SENSOR_ADXL345, &last_values.adxl345, sizeof(sensors_data_adxl345_t));
-        if (log_values || (debug_main & 128) != 0) {
-            sensors_data_adxl345_t *values = &last_values.adxl345;
-            ESP_LOGI(TAG, "ADXL345: x=%f g  y=%f g  z=%f g  abs=%f g  offs=%f %f %f",
-                    values->accel_x, values->accel_y, values->accel_z, values->accel_abs,
-                    values->accel_offset_x, values->accel_offset_y, values->accel_offset_z);
-        }
+        if (log_values || (debug_main & 4096) != 0) adxl345_dump_values(adxl345, true);
     }
     if (qmc5883l_update || force_all) {
         data_add(E_SENSOR_QMC5883L, &last_values.qmc5883l, sizeof(sensors_data_qmc5883l_t));
-        if (log_values || (debug_main & 128) != 0) {
-            sensors_data_qmc5883l_t *values = &last_values.qmc5883l;
-            ESP_LOGI(TAG, "QMC5883L: x=%f gauss  y=%f gauss  z=%f gauss  range=%f  st=%" PRIu8,
-                values->mag_x, values->mag_y, values->mag_z, values->range, values->status);
-        }
+        if (log_values || (debug_main & 8192) != 0) qmc5883l_dump_values(qmc5883l, true);
     }
     if (log_values) {
         ESP_LOGI(TAG, "WRITTEN: %u bytes", status.record_pos - record_pos);
@@ -871,7 +972,7 @@ static void update_task(void *arg)
         }
         if ((debug_main & 0x200) == 0) {
             sensors_update();
-            scd4x_state_machine(scd4x);
+            scd4x_state_machine(scd41_sensor);
             // Wait at least 1 min before start recording data to give sensors time for initialization and warmup
             // 5 min would be more appropriate, but I do not want to wait that long ;-)
             if (status.recording && loop_cnt > 60) {
@@ -968,7 +1069,7 @@ static void update_task(void *arg)
             size_t total_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
             size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
             int frag = 100 - (largest_block * 100 / (total_free + 1));
-            if (total_free < 10000 || frag > 50 || (debug_main & 0x100) != 0) {
+            if (total_free < 10000 || frag > 60 || (debug_main & 0x100) != 0) {
                 ESP_LOGW(TAG, "Heap: free=%u largest_block=%u frag=%d%%",
                     total_free, largest_block, frag);
             }
@@ -987,9 +1088,12 @@ static void update_task(void *arg)
         bmx280lo_update = false;
         bmx280hi_update = false;
         mhz19_update = false;
-        scd4x_calibrate = false;
-        scd4x_update = false;
+        s11_update = false;
+        scd30_update = false;
+        scd41_calibrate = false;
+        scd41_update = false;
         yys_update = false;
+        ze08_update = false;
         sps30_update = false;
         adxl345_update = false;
         qmc5883l_update = false;
@@ -1002,8 +1106,8 @@ void dump_values(bool force)
     if (gps != NULL) gps_dump_values(gps, force);
     if (bmx280lo != NULL) bmx280_dump_values(bmx280lo, force);
     if (bmx280hi != NULL) bmx280_dump_values(bmx280hi, force);
-    if (scd4x != NULL) scd4x_dump_values(scd4x, force);
-    if (mhz19 != NULL) mhz19_dump_values(mhz19, force);
+    if (scd41_sensor != NULL) scd4x_dump_values(scd41_sensor, force);
+    if (mhz19_sensor != NULL) mhz19_dump_values(mhz19_sensor, force);
     if (yys_sensor != NULL) yys_dump_values(yys_sensor, force);
     if (sps30 != NULL) sps30_dump_values(sps30, force);
     if (qmc5883l != NULL) qmc5883l_dump_values(qmc5883l, force);
