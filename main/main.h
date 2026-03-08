@@ -68,6 +68,10 @@ extern "C" {
 //#include "mqtt.h"
 #include "tcp_server.h"
 
+// MultiSensor Version 2.0
+#define MULTISENSOR_ID           20
+#define MULTISENSOR_NAME_VERSION "MultiSensor V2.0"
+
 typedef enum {
     E_SENSOR_INFO = 0,
     E_SENSOR_CONFIG,
@@ -82,10 +86,14 @@ typedef enum {
     E_SENSOR_BMX280_HI,
     E_SENSOR_SCD41CAL = 0x40,
     E_SENSOR_S11_DEV_INFO,
+    E_SENSOR_SCD30_DEV_INFO,
+    E_SENSOR_MHZ19_DEV_INFO,
+    E_SENSOR_SPS30_DEV_INFO,
     E_SENSOR_S11 = 0x50,
     E_SENSOR_SCD30,
     E_SENSOR_SCD41,
     E_SENSOR_MHZ19,
+    E_SENSOR_S11_OLD_FW,
     E_SENSOR_YYS = 0x60,
     E_SENSOR_ZE08,
     E_SENSOR_SPS30 = 0x70,
@@ -123,7 +131,8 @@ typedef gps_values_t sensors_data_gps_t;
 
 typedef bmx280_values_t sensors_data_bmx280_t;
 
-typedef s11_values_t sensors_data_s11_t;
+// Unfortunately the S11 sensor has a rather old Firmware. So we have to use s11_values_old_fw_t.
+typedef s11_values_old_fw_t sensors_data_s11_t;
 
 typedef scd30_values_t sensors_data_scd30_t;
 
@@ -164,7 +173,6 @@ typedef struct {
     bool force_update;
     bool recording;
     bool auto_status;
-    bool scd4x_auto_values;
     uint16_t record_pos;
     uint16_t file_cnt;
     char filename[32];
@@ -184,7 +192,7 @@ extern scd4x_t *scd41_sensor;
 extern mhz19_t *mhz19_sensor;
 extern yys_sensor_t *yys_sensor;
 extern ze08_t *ze08_sensor;
-extern sps30_t *sps30;
+extern sps30_t *sps30_sensor;
 extern adxl345_t *adxl345;
 extern qmc5883l_t *qmc5883l;
 
@@ -229,6 +237,9 @@ extern bool any_sensor_update;
 extern uint32_t debug_main;
 
 extern bool force_update_all;
+
+// Last sensor values
+extern sensors_data_t last_values;
 
 esp_err_t set_sys_time(struct tm *timeinfo, bool set_rtc_time);
 

@@ -18,7 +18,7 @@ extern "C" {
 #include "driver/i2c_master.h"
 
 typedef struct __attribute__((packed)) {
-    float co2;
+    uint16_t co2;
     float temperature;
     float humidity;
 } scd30_values_t;
@@ -34,7 +34,7 @@ typedef struct scd30_s {
     #endif
 
     scd30_values_t values;
-    uint16_t firmware_version;
+    uint16_t fw_version;
     esp_err_t last_error;
     uint8_t debug;
 } scd30_t;

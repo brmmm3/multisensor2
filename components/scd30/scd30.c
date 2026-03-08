@@ -178,8 +178,8 @@ esp_err_t scd30_init(scd30_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(scd30_probe(sensor));
     ESP_ERROR_CHECK_WITHOUT_ABORT(scd30_soft_reset(sensor));
-    sensor->firmware_version = scd30_get_firmware_version(sensor);
-    ESP_LOGI(TAG, "Firmware version=%d", sensor->firmware_version);
+    sensor->fw_version = scd30_get_firmware_version(sensor);
+    ESP_LOGI(TAG, "Firmware version=%d", sensor->fw_version);
     ESP_LOGI(TAG, "AutoCal=%d", scd30_get_automatic_self_calibration(sensor));
     ESP_ERROR_CHECK_WITHOUT_ABORT(scd30_set_automatic_self_calibration(sensor, false));
     ESP_ERROR_CHECK_WITHOUT_ABORT(scd30_start_continuous_measurement(sensor, 0));
@@ -250,7 +250,7 @@ esp_err_t scd30_read_measurement(scd30_t *sensor)
     sensor->last_error = execute_cmd(sensor, read_measurement, CONFIG_SCD30_TIMEOUT, 0, 0, buf, 6);
     if (sensor->last_error != ESP_OK) return sensor->last_error;
     tmp.u32 = ((uint32_t)buf[0] << 16) | (uint32_t)buf[1];
-    sensor->values.co2 = tmp.f;
+    sensor->values.co2 = (uint16_t)tmp.f;
     tmp.u32 = ((uint32_t)buf[2] << 16) | (uint32_t)buf[3];
     sensor->values.temperature = tmp.f;
     tmp.u32 = ((uint32_t)buf[4] << 16) | (uint32_t)buf[5];

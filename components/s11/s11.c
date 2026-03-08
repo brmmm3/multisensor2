@@ -195,19 +195,22 @@ esp_err_t s11_reset(s11_t *sensor)
 
 esp_err_t s11_get_error_status(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_ERRSTAT_MSB, &sensor->values.error_status);
+    uint16_t value;
+
+    sensor->last_error = s11_read_u16(sensor, S11_ADDR_ERRSTAT_MSB, &value);
+    sensor->values.error_status = value;
     return sensor->last_error;
 }
 
 esp_err_t s11_get_firmware_rev(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_FW_REV_MSB, &sensor->dev_info.firmware_rev);
+    sensor->last_error = s11_read_u16(sensor, S11_ADDR_FW_REV_MSB, &sensor->dev_info.fw_version);
     return sensor->last_error;
 }
 
 esp_err_t s11_get_firmware_type(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u8(sensor, S11_ADDR_FW_TYPE, &sensor->dev_info.firmware_type);
+    sensor->last_error = s11_read_u8(sensor, S11_ADDR_FW_TYPE, &sensor->dev_info.fw_type);
     return sensor->last_error;
 }
 
@@ -457,7 +460,9 @@ esp_err_t s11_set_abc_pressure_value(s11_t *sensor, uint16_t abc_pressure_value)
 
 esp_err_t s11_get_sensor_temperature(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_TEMPERATURE, (uint16_t *)&sensor->values.temp);
+    uint16_t value;
+    sensor->last_error = s11_read_u16(sensor, S11_ADDR_TEMPERATURE, &value);
+    sensor->values.temperature = (int16_t)value;
     return sensor->last_error;
 }
 
@@ -475,28 +480,59 @@ esp_err_t s11_get_measurement_cycle(s11_t *sensor)
 
 esp_err_t s11_get_co2(s11_t *sensor)
 {
-    if ((sensor->last_error = s11_read_u16(sensor, S11_ADDR_CO2_FP, &sensor->values.co2_fp)) != ESP_OK) return sensor->last_error;
-    if ((sensor->last_error = s11_read_u16(sensor, S11_ADDR_CO2_P, &sensor->values.co2_p)) != ESP_OK) return sensor->last_error;
-    if ((sensor->last_error = s11_read_u16(sensor, S11_ADDR_CO2_F, &sensor->values.co2_f)) != ESP_OK) return sensor->last_error;
-    if ((sensor->last_error = s11_read_u16(sensor, S11_ADDR_CO2, &sensor->values.co2)) != ESP_OK) return sensor->last_error;
+    uint16_t value;
+
+    if (sensor->dev_info.fw_version <= 14) {
+        if ((sensor->last_error = s11_read_u16(sensor, S11_ADDR_CO2_FP, &value)) != ESP_OK) return sensor->last_error;
+        sensor->values.co2_f = value;
+        if ((sensor->last_error = s11_read_u16(sensor, S11_ADDR_CO2_P, &value)) != ESP_OK) return sensor->last_error;
+        sensor->values.co2 = value;
+    } else {
+        if ((sensor->last_error = s11_read_u16(sensor, S11_ADDR_CO2_FP, &value)) != ESP_OK) return sensor->last_error;
+        sensor->values.co2_fp = value;
+        if ((sensor->last_error = s11_read_u16(sensor, S11_ADDR_CO2_P, &value)) != ESP_OK) return sensor->last_error;
+        sensor->values.co2_p = value;
+        if ((sensor->last_error = s11_read_u16(sensor, S11_ADDR_CO2_F, &value)) != ESP_OK) return sensor->last_error;
+        sensor->values.co2_f = value;
+        if ((sensor->last_error = s11_read_u16(sensor, S11_ADDR_CO2, &value)) != ESP_OK) return sensor->last_error;
+        sensor->values.co2 = value;
+    }
     return sensor->last_error;
 }
 
 esp_err_t s11_read_measurement(s11_t *sensor)
 {
-    uint8_t buf[S11_ADDR_MD_BUF_LEN];
+    uint8_t len;
+
+    if (sensor->dev_info.fw_version <= 14) len = S11_ADDR_MD_BUF_OLD_FW_LEN;
+    else len = S11_ADDR_MD_BUF_LEN;
+
+    uint8_t buf[len];
 
     sensor->last_error = execute_cmd(sensor, S11_ADDR_MD_BUF, NULL, 0, buf, S11_ADDR_MD_BUF_LEN);
     //ESP_LOG_BUFFER_HEX_LEVEL(TAG, buf, sizeof(buf), ESP_LOG_INFO);
     if (sensor->last_error != ESP_OK) return sensor->last_error;
     sensor->dev_status.measurement_count = buf[S11_ADDR_MD_COUNT];
     sensor->dev_status.measurement_cycle_time = get_u16(&buf[S11_ADDR_MD_CYCLE_TIME_MSB]);
-    sensor->values.co2_fp = get_u16(&buf[S11_ADDR_MD_CO2_FP_MSB]);
-    sensor->values.temp = get_u16(&buf[S11_ADDR_MD_TEMP_MSB]);
-    sensor->values.co2_p = get_u16(&buf[S11_ADDR_MD_CO2_P_MSB]);
-    sensor->values.co2_f = get_u16(&buf[S11_ADDR_MD_CO2_F_MSB]);
-    sensor->values.co2 = get_u16(&buf[S11_ADDR_MD_CO2_MSB]);
+    sensor->values.temperature = get_u16(&buf[S11_ADDR_MD_TEMP_MSB]);
+    if (sensor->dev_info.fw_version <= 14) {
+        // Old firmware <= 14 only deliver co2_f and co2. Pressure compensation is not available.
+        sensor->values.co2_f = get_u16(&buf[S11_ADDR_MD_CO2_FP_MSB]);
+        sensor->values.co2 = get_u16(&buf[S11_ADDR_MD_CO2_P_MSB]);
+    } else {
+        sensor->values.co2_fp = get_u16(&buf[S11_ADDR_MD_CO2_FP_MSB]);
+        sensor->values.co2_p = get_u16(&buf[S11_ADDR_MD_CO2_P_MSB]);
+        sensor->values.co2_f = get_u16(&buf[S11_ADDR_MD_CO2_F_MSB]);
+        sensor->values.co2 = get_u16(&buf[S11_ADDR_MD_CO2_MSB]);
+    }
     return ESP_OK;
+}
+
+void s11_get_measurement_old_fw(s11_values_t *values, s11_values_old_fw_t *values_old_fw)
+{
+    values_old_fw->temp = values->temperature;
+    values_old_fw->co2_f = values->co2_f;
+    values_old_fw->co2 = values->co2;
 }
 
 esp_err_t s11_get_cal_data(s11_t *sensor)
@@ -522,8 +558,8 @@ esp_err_t s11_start_single_measurement(s11_t *sensor)
 
 void s11_dump_dev_info(s11_t *sensor)
 {
-    ESP_LOGI(TAG, "Firmware rev=%04X", sensor->dev_info.firmware_rev);
-    ESP_LOGI(TAG, "Firmware type=%02X", sensor->dev_info.firmware_type);
+    ESP_LOGI(TAG, "Firmware rev=%04X", sensor->dev_info.fw_version);
+    ESP_LOGI(TAG, "Firmware type=%02X", sensor->dev_info.fw_type);
     ESP_LOGI(TAG, "Sensor ID=%08X", sensor->dev_info.sensor_id);
     ESP_LOGI(TAG, "Meter Control=%02X", sensor->dev_settings.dev_meter_ctl);
     ESP_LOGI(TAG, "IIR Filter Par=%d", sensor->dev_settings.iir_filter_par);
@@ -557,7 +593,7 @@ void s11_dump_values(s11_t *sensor, bool force)
         s11_values_t *values = &sensor->values;
 
         ESP_LOGI(TAG, "co2_fp=%u ppm  co2_p=%u ppm  co2_f=%u ppm  co2=%u ppm  temp=%.1f °C",
-                 values->co2_fp, values->co2_p, values->co2_f, values->co2, (float)values->temp * 0.01);
+                 values->co2_fp, values->co2_p, values->co2_f, values->co2, (float)values->temperature * 0.01);
         s11_dump_error_status(sensor);
     }
 }

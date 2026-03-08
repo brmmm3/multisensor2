@@ -37,7 +37,18 @@ extern "C" {
 #include "s11_defs.h"
 
 
-typedef struct {
+typedef struct  __attribute__((__packed__)) {
+	/// 06-07: CO2 value filtered and pressure compensated [ppm] (R)
+	uint16_t co2_f;
+	/// 10-11: CO2 value unfiltered & pressure compensated [ppm] (R)
+	uint16_t co2;
+	/// 08-09: Chip temperature [0.01 deg C] (R)
+  	int16_t temp;
+	/// 00-01: Error status (R)
+	uint16_t error_status;
+} s11_values_old_fw_t;
+
+typedef struct  __attribute__((__packed__)) {
 	/// 06-07: CO2 value filtered and pressure compensated [ppm] (R)
 	uint16_t co2_fp;
 	/// 10-11: CO2 value unfiltered & pressure compensated [ppm] (R)
@@ -47,7 +58,7 @@ typedef struct {
 	/// 14-15: CO2 value unfiltered [ppm] (R)
 	uint16_t co2;
 	/// 08-09: Chip temperature [0.01 deg C] (R)
-  	int16_t temp;
+  	int16_t temperature;
 	/// 00-01: Error status (R)
 	uint16_t error_status;
 } s11_values_t;
@@ -56,9 +67,9 @@ typedef struct {
 	/// 3A-3D: Sensor ID (R)
 	uint32_t sensor_id;
 	/// 38-39: Firmware revision, MSB=main, LSB=sub (R)
-	uint16_t firmware_rev;
+	uint16_t fw_version;
 	/// 2F: Firmware type (R)
-	uint8_t firmware_type;
+	uint8_t fw_type;
 	/// 70-7F: Product code (R)
 	uint8_t product_code[8];
 } s11_dev_info_t;
@@ -247,6 +258,8 @@ esp_err_t s11_get_cal_data(s11_t *sensor);
 esp_err_t s11_clear_error_status(s11_t *sensor);
 
 esp_err_t s11_start_single_measurement(s11_t *sensor);
+
+void s11_get_measurement_old_fw(s11_values_t *values, s11_values_old_fw_t *values_old_fw);
 
 void s11_dump_dev_info(s11_t *sensor);
 

@@ -324,7 +324,7 @@ lv_obj_t *add_page_wifi(ui_t *ui)
     ui->lbl_wifi_rssi = add_section_label_xw(tab, 170, 124, 150, 26, 64, "RSSI");
     ui->lbl_ftp_status = add_section_label(tab, 148, 26, 64, "FTP");
     ui->lbl_mqtt_status = add_section_label(tab, 172, 26, 64, "MQTT");
-    ui->btn_wifi_scan = add_button(tab, 0, 196, 200, 0, "WiFi Scan");
+    ui->btn_wifi_scan = add_button(tab, 0, 200, 200, 0, "WiFi Scan");
     ui->lst_wifi = lv_list_create(tab);
     lv_obj_set_pos(ui->lst_wifi, 0, 240);
     lv_obj_set_size(ui->lst_wifi, 320, 120);

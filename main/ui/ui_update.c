@@ -32,7 +32,7 @@ void update_air_tab(bool force_update)
     if (s11_update || force_update) {
         s11_values_t *s11_values = &s11_sensor->values;
 
-        sprintf(buf, "CO2FP=%d ppm   T=%.1f °C\nCO2P=%d ppm", s11_values->co2_fp, (float)s11_values->temp * 0.01, s11_values->co2_p);
+        sprintf(buf, "CO2F=%d ppm   T=%.1f °C\nCO2=%d ppm", s11_values->co2_f, (float)s11_values->temperature * 0.01, s11_values->co2);
         lv_label_set_text(ui->lbl_s11, buf);
     }
     if (scd30_update || force_update) {
@@ -67,7 +67,7 @@ void update_dust_tab(bool force_update)
 {
     if (sps30_update || force_update) {
         char buf[100];
-        sps30_values_t *sps30_values = &sps30->values;
+        sps30_values_t *sps30_values = &sps30_sensor->values;
 
         sprintf(buf, "%.1f #/cm3", sps30_values->nc_0p5);
         lv_label_set_text(ui->lbl_sps30_1, buf);

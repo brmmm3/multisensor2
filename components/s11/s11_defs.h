@@ -28,6 +28,7 @@ extern "C" {
 // Reg addr - measurement data array (R)
 #define S11_ADDR_MD_BUF             (0x06) ///< First register address
 #define S11_ADDR_MD_BUF_LEN         (16)   ///< Length [bytes]
+#define S11_ADDR_MD_BUF_OLD_FW_LEN  (12)   ///< Length [bytes] for old firmware (<=14), because last 2 values are always 0 ad are co2_f, co2
 // Offsets
 #define S11_ADDR_MD_CO2_FP_MSB      (0)  ///< Offset - CO2 value filtered & pressure compensated MSB
 #define S11_ADDR_MD_CO2_FP_LSB      (1)  ///< Offset - CO2 value filtered & pressure compensated LSB

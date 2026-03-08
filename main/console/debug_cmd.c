@@ -44,7 +44,7 @@ int process_debug_cmd(int argc, char **argv)
     } else if (debug_cmd_args.yys->count == 1) {
         yys_sensor->debug = debug_cmd_args.yys->ival[0];
     } else if (debug_cmd_args.sps->count == 1) {
-        sps30->debug = debug_cmd_args.sps->ival[0];
+        sps30_sensor->debug = debug_cmd_args.sps->ival[0];
     } else if (debug_cmd_args.qmc->count == 1) {
         qmc5883l->debug = debug_cmd_args.qmc->ival[0];
     } else if (debug_cmd_args.adx->count == 1) {

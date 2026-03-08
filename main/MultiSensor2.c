@@ -144,7 +144,7 @@ scd30_t *scd30_sensor = NULL;
 scd4x_t *scd41_sensor = NULL;
 mhz19_t *mhz19_sensor = NULL;
 ze08_t *ze08_sensor = NULL;
-sps30_t *sps30 = NULL;
+sps30_t *sps30_sensor = NULL;
 yys_sensor_t *yys_sensor = NULL;
 adxl345_t *adxl345 = NULL;
 qmc5883l_t *qmc5883l = NULL;
@@ -343,7 +343,7 @@ void sensors_init()
     yys_init(&yys_sensor, YYS_RX_CHANNEL, YYS_PIN_NUM_RX, YYS_PIN_NUM_TX);
     // This will never fail here
     ze08_init(&ze08_sensor, ZE08_RX_CHANNEL, ZE08_PIN_NUM_RX, ZE08_PIN_NUM_TX);
-    ESP_ERROR_CHECK_WITHOUT_ABORT(sps30_init(&sps30, bus_handle));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(sps30_init(&sps30_sensor, bus_handle));
     ESP_ERROR_CHECK_WITHOUT_ABORT(adxl345_init(&adxl345, bus_handle));
     ESP_ERROR_CHECK_WITHOUT_ABORT(qmc5883l_init(&qmc5883l, bus_handle));
     s11_sensor->debug = 1;
@@ -411,8 +411,11 @@ static bool update_s11()
     s11_sensor->dev_status.old_measurement_count = s11_sensor->dev_status.measurement_count;
     ESP_ERROR_CHECK_WITHOUT_ABORT(s11_read_measurement(s11_sensor));
     ESP_ERROR_CHECK_WITHOUT_ABORT(s11_get_error_status(s11_sensor));
-    if (force_update || memcmp(&last_values.s11, &s11_sensor->values, sizeof(sensors_data_s11_t)) != 0) {
-        memcpy(&last_values.s11, &s11_sensor->values, sizeof(sensors_data_s11_t));
+    if (force_update || last_values.s11.temp != s11_sensor->values.temperature || last_values.s11.co2_f != s11_sensor->values.co2_f
+        || last_values.s11.co2 != s11_sensor->values.co2) {
+        last_values.s11.temp = s11_sensor->values.temperature;
+        last_values.s11.co2_f = s11_sensor->values.co2_f;
+        last_values.s11.co2 = s11_sensor->values.co2;
         return true;
     }
     return true;
@@ -528,39 +531,39 @@ static bool update_ze08()
 
 static bool update_sps30()
 {
-    if (sps30 == NULL && (debug_main & 0x2000) == 0) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(sps30_init(&sps30, bus_handle));
-        if (sps30 == NULL) return false;
+    if (sps30_sensor == NULL && (debug_main & 0x2000) == 0) {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(sps30_init(&sps30_sensor, bus_handle));
+        if (sps30_sensor == NULL) return false;
     }
-    if (!sps30->enabled) {
+    if (!sps30_sensor->enabled) {
         return false;
     }
 
     esp_err_t err;
 
-    if ((err = sps30_read_device_status_register(sps30)) == ESP_OK) {
-        if (sps30->values.status != 0) {
-            ESP_LOGW("SPS30", "STATUS=%08X", (unsigned int)sps30->values.status);
+    if ((err = sps30_read_device_status_register(sps30_sensor)) == ESP_OK) {
+        if (sps30_sensor->values.status != 0) {
+            ESP_LOGW("SPS30", "STATUS=%08X", (unsigned int)sps30_sensor->values.status);
         }
     } else {
         ESP_LOGE("SPS30", "Failed to read status");
     }
-    if (!sps30_read_data_ready(sps30)) {
+    if (!sps30_read_data_ready(sps30_sensor)) {
         if (sps30_not_ready_cnt++ > 5) {
             ESP_LOGE(TAG, "SPS30: not ready");
         }
         return false;
     }
     sps30_not_ready_cnt = 0;
-    if ((err = sps30_read_measurement(sps30)) != ESP_OK) {
+    if ((err = sps30_read_measurement(sps30_sensor)) != ESP_OK) {
         ESP_LOGE(TAG, "SPS30: Failed to read measurement values err=%u", err);
         return false;
     }
 
     bool force_update = force_update_all || (debug_main & 1) != 0;
 
-    if (force_update || memcmp(&last_values.sps30, &sps30->values, sizeof(sensors_data_sps30_t)) != 0) {
-        memcpy(&last_values.sps30, &sps30->values, sizeof(sensors_data_sps30_t));
+    if (force_update || memcmp(&last_values.sps30, &sps30_sensor->values, sizeof(sensors_data_sps30_t)) != 0) {
+        memcpy(&last_values.sps30, &sps30_sensor->values, sizeof(sensors_data_sps30_t));
         return true;
     }
     return true;
@@ -676,6 +679,7 @@ static void sensors_recording()
         data[status.record_pos++] = DATA_HEADER_ID0;
         data[status.record_pos++] = DATA_HEADER_ID1;
         data[status.record_pos++] = DATA_HEADER_VERSION;
+        data[status.record_pos++] = MULTISENSOR_ID;
         // Add current date
         data[status.record_pos++] = E_SENSOR_DATE;
         data[status.record_pos++] = year;
@@ -717,7 +721,7 @@ static void sensors_recording()
         }
     }
     if (s11_update || force_all) {
-        data_add(E_SENSOR_S11, &last_values.s11, sizeof(sensors_data_s11_t));
+        data_add(E_SENSOR_S11_OLD_FW, &last_values.s11, sizeof(sensors_data_s11_t));
         if (log_values || (debug_main & 32) != 0) s11_dump_values(s11_sensor, true);
     }
     if (scd30_update || force_all) {
@@ -742,7 +746,7 @@ static void sensors_recording()
     }
     if (sps30_update || force_all) {
         data_add(E_SENSOR_SPS30, &last_values.sps30, sizeof(sensors_data_sps30_t));
-        if (log_values || (debug_main & 2048) != 0) sps30_dump_values(sps30, true);
+        if (log_values || (debug_main & 2048) != 0) sps30_dump_values(sps30_sensor, true);
     }
     if (adxl345_update || force_all) {
         data_add(E_SENSOR_ADXL345, &last_values.adxl345, sizeof(sensors_data_adxl345_t));
@@ -1109,7 +1113,7 @@ void dump_values(bool force)
     if (scd41_sensor != NULL) scd4x_dump_values(scd41_sensor, force);
     if (mhz19_sensor != NULL) mhz19_dump_values(mhz19_sensor, force);
     if (yys_sensor != NULL) yys_dump_values(yys_sensor, force);
-    if (sps30 != NULL) sps30_dump_values(sps30, force);
+    if (sps30_sensor != NULL) sps30_dump_values(sps30_sensor, force);
     if (qmc5883l != NULL) qmc5883l_dump_values(qmc5883l, force);
     if (adxl345 != NULL) adxl345_dump_values(adxl345, force);
 }
@@ -1142,6 +1146,7 @@ void app_main(void)
 
     // LCD (SPI Mode)
     lcd = lcd_init(spi_host_id, LCD_PIN_NUM_CS, LCD_PIN_NUM_DC, LCD_PIN_NUM_RST, LCD_PIN_NUM_LED, LCD_PIN_NUM_T_CS);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(lcd_set_pwr_mode(2));
     ui = ui_init(lcd);
     ui_register_callbacks(ui);
 

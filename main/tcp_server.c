@@ -10,6 +10,7 @@
 #include "sdcard.h"
 #include "wifi/include/wifi.h"
 #include "main.h"
+#include "yys.h"
 
 static const char *TAG = "TCP";
 
@@ -53,9 +54,12 @@ static const char *help =
     "gps\n"
     "bme280lo\n"
     "bme280hi\n"
+    "s11\n"
+    "scd30\n"
+    "scd41 {cal [co2]|autoadj int|status|temp_offs|altitude|pressure]\n"
     "mhz19\n"
-    "scd4x {cal [co2]|autoadj int|status|val [0|1]|temp_offs|altitude|pressure]\n"
-    "yys_sensor\n"
+    "yys\n"
+    "ze08\n"
     "sps30\n"
     "auto con 0-4|rec 0-1|tcp 0-1|ftp 0-1\n"
     "save\n"
@@ -149,7 +153,7 @@ static int get_status(char *buf)
 static int get_gps_values(char *buf)
 {
     const char *fmt = opt_format ? "*%u,%u,%lu,%lu,%f,%c,%f,%c,%f,%f,%c,%u,%f,%f,%f,%x,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n"
-                                 : "{id=%u,sat=%u,date=%lu,time=%lu,lat=%f,lat_unit=\"%c\",lng=%f,lng_unit=\"%c\",alt=%f,spd=%f,"
+                                 : "{id=%u,sat=%u,date=%lu,time=%lu,lat=%f,ns=\"%c\",lng=%f,ew=\"%c\",alt=%f,spd=%f,"
                                    "mode_3d=\"%c\",sats=%u,pdop=%f,hdop=%f,vdop=%f,status=0x%x,data_cnt=%u,error_cnt=%u,"
                                    "txt_cnt=%u,rmc_cnt=%u,gll_cnt=%u,gsa_cnt=%u,gsv_cnt=%u,gga_cnt=%u,vtg_cnt=%u,zda_cnt=%u,unk_cnt=%u}\n";
     gps_status_t *status = &gps->status;
@@ -161,41 +165,76 @@ static int get_gps_values(char *buf)
             status->gga_cnt, status->vtg_cnt, status->zda_cnt, status->unk_cnt);
 }
 
-static int get_bme280_values(char *buf, bmx280_values_t *values)
+static int get_bme280_values(char *buf, int id, bmx280_values_t *values)
 {
     const char *fmt = opt_format ? "*%u,%f,%f,%f,%f\n"
                                  : "{id=%u,temp=%f,hum=%f,press=%f,alt=%f}\n";
-    return sprintf(buf, fmt, E_SENSOR_BMX280_LO,
+    return sprintf(buf, fmt, id,
         values->temperature, values->humidity, values->pressure, values->altitude);
 }
 
-static int get_mhz19_values(char *buf, mhz19_values_t *values)
+static int get_s11_values(char *buf)
 {
-    const char *fmt = opt_format ? "*%u,%u,%u,%u\n"
-                                 : "{id=%u,co2=%u,temp=%u,st=%u}\n";
-    return sprintf(buf, fmt, E_SENSOR_MHZ19,
-        values->co2, values->temp, values->status);
+    s11_values_old_fw_t *values = &last_values.s11;
+
+    const char *fmt = opt_format ? "*%u,%u,%u\n"
+                                 : "{id=%u,co2_f=%u,co2=%u}\n";
+    return sprintf(buf, fmt, E_SENSOR_S11_OLD_FW, values->co2_f, values->co2);
 }
 
-static int get_scd4x_values(char *buf, scd4x_values_t *values)
+static int get_scd30_values(char *buf)
 {
+    scd30_values_t *values = &last_values.scd30;
+
+    const char *fmt = opt_format ? "*%u,%u,%f,%f\n"
+                                 : "{id=%u,co2=%u,temp=%f,hum=%f}\n";
+    return sprintf(buf, fmt, E_SENSOR_SCD30,
+        values->co2, values->temperature, values->humidity);
+}
+
+static int get_scd41_values(char *buf)
+{
+    scd4x_values_t *values = &last_values.scd41;
+
     const char *fmt = opt_format ? "*%u,%u,%f,%f,%u\n"
                                  : "{id=%u,co2=%u,temp=%f,hum=%f,st=%u}\n";
     return sprintf(buf, fmt, E_SENSOR_SCD41,
         values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
 }
 
+static int get_mhz19_values(char *buf)
+{
+    mhz19_values_t *values = &last_values.mhz19;
+
+    const char *fmt = opt_format ? "*%u,%u,%u,%u\n"
+                                 : "{id=%u,co2=%u,temp=%u,st=%u}\n";
+    return sprintf(buf, fmt, E_SENSOR_MHZ19,
+        values->co2, values->temp, values->status);
+}
+
 static int get_yys_values(char *buf)
 {
+    yys_values_t *values = &last_values.yys;
+
     const char *fmt = opt_format ? "*%u,%f,%f,%f,%f\n"
                                  : "{id=%u,o2=%f,co=%f,h2s=%f,ch4=%f}\n";
     return sprintf(buf, fmt, E_SENSOR_YYS,
-        yys_get_o2(yys_sensor), yys_get_co(yys_sensor),
-        yys_get_h2s(yys_sensor), yys_get_ch4(yys_sensor));
+        values->o2, values->co, values->h2s, values->ch4);
 }
 
-static int get_sps30_values(char *buf, sps30_values_t *values)
+static int get_ze08_values(char *buf)
 {
+    ze08_values_t *values = &last_values.ze08;
+
+    const char *fmt = opt_format ? "*%u,%u\n"
+                                 : "{id=%u,ch2o=%u}\n";
+    return sprintf(buf, fmt, E_SENSOR_ZE08, values->ch2o);
+}
+
+static int get_sps30_values(char *buf)
+{
+    sps30_values_t *values = &last_values.sps30;
+
     const char *fmt = opt_format ? "*%u,%lu,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n"
                                  : "{id=%u,status=%lu,pm0_5=%f,pm1_0=%f,p1_0=%f,pm2_5=%f,p2_5=%f,pm4_0=%f,p4_0=%f,pm10_0=%f,p10_0=%f,typ_part_sz=%f}\n";
     return sprintf(buf, fmt, E_SENSOR_SPS30,
@@ -203,8 +242,10 @@ static int get_sps30_values(char *buf, sps30_values_t *values)
         values->mc_4p0, values->nc_4p0, values->mc_10p0, values->nc_10p0, values->typical_particle_size);
 }
 
-static int get_adxl345_values(char *buf, adxl345_values_t *values)
+static int get_adxl345_values(char *buf)
 {
+    adxl345_values_t *values = &last_values.adxl345;
+
     const char *fmt = opt_format ? "*%u,%f,%f,%f,%f,%f,%f,%f\n"
                                  : "{id=%u,x=%f,y=%f,z=%f,abs=%f,offs=%f %f %f}\n";
     return sprintf(buf, fmt, E_SENSOR_ADXL345,
@@ -212,8 +253,10 @@ static int get_adxl345_values(char *buf, adxl345_values_t *values)
         values->accel_offset_x, values->accel_offset_y, values->accel_offset_z);
 }
 
-static int get_qmc5883l_values(char *buf, qmc5883l_values_t *values)
+static int get_qmc5883l_values(char *buf)
 {
+    qmc5883l_values_t *values = &last_values.qmc5883l;
+
     const char *fmt = opt_format ? "*%u,%f,%f,%f,%f,%u\n"
                                  : "{id=%u,x=%f,y=%f,z=%f,range=%f,st=%u}\n";
     return sprintf(buf, fmt, E_SENSOR_QMC5883L,
@@ -443,7 +486,7 @@ static void tcp_server_task(void *pvParameters)
         int flags = fcntl(client_sock, F_GETFL, 0);
         fcntl(client_sock, F_SETFL, flags | O_NONBLOCK);
 
-        int len = sprintf(rx_buffer, "{id=%u,name=\"MultiSensor V2.0\"}\n", E_SENSOR_INFO);
+        int len = sprintf(rx_buffer, "{id=%u,ms=%u,name=\"%s\"}\n", E_SENSOR_INFO, MULTISENSOR_ID, MULTISENSOR_NAME_VERSION);
         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
 
         len = sprintf(rx_buffer, "{id=%u,lat=\"%c\",lng=\"%c\",co2=\"ppm\",temp=\"°C\",hum=\"%%\",o2=\"%%\",co=\"ppm\",h2s=\"ppm\",ch4=\"ppm\",",
@@ -452,6 +495,18 @@ static void tcp_server_task(void *pvParameters)
         len += sprintf(&rx_buffer[len], "pm0_5=\"#/cm3\",typ_part_sz=\"um\",pm1_0=\"ug/cm3\",p1_0=\"#/cm3\",");
         len += sprintf(&rx_buffer[len], "pm2_5=\"ug/cm3\",p2_5=\"#/cm3\",pm4_0=\"ug/cm3\",p4_0=\"#/cm3\",pm10_0=\"ug/cm3\",p10_0=\"#/cm3\",");
         len += sprintf(&rx_buffer[len], "adxl345=\"g\",qmc5883l=\"gauss\"}\n");
+        len = sprintf(rx_buffer, "{id=%u,sid=%08lX,fw_ver=%u,fw_typ=%u}",
+            E_SENSOR_S11_DEV_INFO,
+            s11_sensor->dev_info.sensor_id, s11_sensor->dev_info.fw_version, s11_sensor->dev_info.fw_type);
+        len = sprintf(rx_buffer, "{id=%u,fw_ver=%u}",
+            E_SENSOR_SCD30_DEV_INFO,
+            scd30_sensor->fw_version);
+        len = sprintf(rx_buffer, "{id=%u,fw_ver=%s}",
+            E_SENSOR_MHZ19_DEV_INFO,
+            mhz19_sensor->fw_version);
+        len = sprintf(rx_buffer, "{id=%u,dev_info=%s,fw_ver=%u}",
+            E_SENSOR_SPS30_DEV_INFO,
+            sps30_sensor->device_info, sps30_sensor->fw_version);
         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
 
         // Echo loop for this client
@@ -641,24 +696,30 @@ static void tcp_server_task(void *pvParameters)
                     int len = get_gps_values(rx_buffer);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                 } else if (strcmp(rx_buffer, "bme280lo") == 0) {
-                    int len = get_bme280_values(rx_buffer, &bmx280lo->values);
+                    int len = get_bme280_values(rx_buffer, E_SENSOR_BMX280_LO, &bmx280lo->values);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                 } else if (strcmp(rx_buffer, "bme280hi") == 0) {
-                    int len = get_bme280_values(rx_buffer, &bmx280hi->values);
+                    int len = get_bme280_values(rx_buffer, E_SENSOR_BMX280_HI, &bmx280hi->values);
+                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                } else if (strcmp(rx_buffer, "s11") == 0) {
+                    int len = get_s11_values(rx_buffer);
+                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                } else if (strcmp(rx_buffer, "scd30") == 0) {
+                    int len = get_scd30_values(rx_buffer);
+                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
+                } else if (strcmp(rx_buffer, "scd41") == 0) {
+                    int len = get_scd41_values(rx_buffer);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                 } else if (strcmp(rx_buffer, "mhz19") == 0) {
-                    int len = get_mhz19_values(rx_buffer, &mhz19_sensor->values);
+                    int len = get_mhz19_values(rx_buffer);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
-                } else if (strcmp(rx_buffer, "scd4x") == 0) {
-                    int len = get_scd4x_values(rx_buffer, &scd41_sensor->values);
-                    send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
-                } else if (strcmp(rx_buffer, "yys_sensor") == 0) {
+                } else if (strcmp(rx_buffer, "yys") == 0) {
                     int len = get_yys_values(rx_buffer);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                 } else if (strcmp(rx_buffer, "sps30") == 0) {
-                    int len = get_sps30_values(rx_buffer, &sps30->values);
+                    int len = get_sps30_values(rx_buffer);
                     send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
-                } else if (strncmp(rx_buffer, "scd4x ", 6) == 0) {
+                } else if (strncmp(rx_buffer, "scd41 ", 6) == 0) {
                     // Set power status
                     if (strncmp(&rx_buffer[6], "cal ", 4) == 0) {
                         scd4x_state_machine_cmd(SCD4X_CMD_FRC, atoi(&rx_buffer[10]));
@@ -685,10 +746,6 @@ static void tcp_server_task(void *pvParameters)
                         int len = sprintf(rx_buffer, fmt, E_SENSOR_SCD41CAL,
                             scd41_sensor->temperature_offset, scd41_sensor->altitude, scd41_sensor->pressure);
                         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
-                    } else if (strcmp(&rx_buffer[4], "val 1") == 0) {
-                        status.scd4x_auto_values = true;
-                    } else if (strcmp(&rx_buffer[4], "val 0") == 0) {
-                        status.scd4x_auto_values = false;
                     } else if (strcmp(&rx_buffer[4], "val") == 0) {
                         scd4x_values_t *values = &scd41_sensor->values;
                         const char *fmt = opt_format ? "*%u,%u,%f,%f,%u\n"
@@ -818,8 +875,8 @@ void tcp_server_publish_values()
         ESP_LOGW(TAG, "TX queue full");
         return;
     }
-    if (!tcp_send_values && !status.scd4x_auto_values) return;
-    if (!force_update_all && !any_sensor_update && !scd41_calibrate && !status.scd4x_auto_values) return;
+    if (!tcp_send_values) return;
+    if (!any_sensor_update && !force_update_all) return;
     if (update_all_cnt > 0) {
         if (--update_all_cnt == 0) {
             force_update_all = false;
@@ -837,35 +894,47 @@ void tcp_server_publish_values()
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && bmx280lo_update)) {
-        len = get_bme280_values(buf, &bmx280lo->values);
+        len = get_bme280_values(buf, E_SENSOR_BMX280_LO, &last_values.bmx280lo);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && bmx280hi_update)) {
-        len = get_bme280_values(buf, &bmx280hi->values);
+        len = get_bme280_values(buf, E_SENSOR_BMX280_HI, &last_values.bmx280hi);
+        ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
+    }
+    if (force_update_all || (tcp_send_values && s11_update)) {
+        len = get_s11_values(buf);
+        ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
+    }
+    if (force_update_all || (tcp_send_values && scd30_update)) {
+        len = get_scd30_values(buf);
+        ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
+    }
+    if (force_update_all || (tcp_send_values && scd41_update)) {
+        len = get_scd41_values(buf);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && mhz19_update)) {
-        len = get_mhz19_values(buf, &mhz19_sensor->values);
-        ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
-    }
-    if (force_update_all || (scd41_update || status.scd4x_auto_values)) {
-        len = get_scd4x_values(buf, &scd41_sensor->values);
+        len = get_mhz19_values(buf);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && yys_update)) {
         len = get_yys_values(buf);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
+    if (force_update_all || (tcp_send_values && ze08_update)) {
+        len = get_ze08_values(buf);
+        ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
+    }
     if (force_update_all || (tcp_send_values && sps30_update)) {
-        len = get_sps30_values(buf, &sps30->values);
+        len = get_sps30_values(buf);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && adxl345_update)) {
-        len = get_adxl345_values(buf, &adxl345->values);
+        len = get_adxl345_values(buf);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
     if (force_update_all || (tcp_send_values && qmc5883l_update)) {
-        len = get_qmc5883l_values(buf, &qmc5883l->values);
+        len = get_qmc5883l_values(buf);
         ESP_ERROR_CHECK_WITHOUT_ABORT(send_message(buf, len));
     }
 }

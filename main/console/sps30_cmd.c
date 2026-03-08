@@ -20,8 +20,8 @@ int process_sps30_cmd(int argc, char **argv)
         const char *cmd = sps30_cmd_args.cmd->sval[0];
         if (strcmp(cmd, "st") == 0) {
             // Get sensor info and status
-            sps30_dump_info(sps30);
-            sps30_dump_values(sps30, true);
+            sps30_dump_info(sps30_sensor);
+            sps30_dump_values(sps30_sensor, true);
         } else {
             ESP_LOGE(TAG, "no valid arguments");
             return 1;
