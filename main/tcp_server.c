@@ -495,16 +495,16 @@ static void tcp_server_task(void *pvParameters)
         len += sprintf(&rx_buffer[len], "pm0_5=\"#/cm3\",typ_part_sz=\"um\",pm1_0=\"ug/cm3\",p1_0=\"#/cm3\",");
         len += sprintf(&rx_buffer[len], "pm2_5=\"ug/cm3\",p2_5=\"#/cm3\",pm4_0=\"ug/cm3\",p4_0=\"#/cm3\",pm10_0=\"ug/cm3\",p10_0=\"#/cm3\",");
         len += sprintf(&rx_buffer[len], "adxl345=\"g\",qmc5883l=\"gauss\"}\n");
-        len = sprintf(rx_buffer, "{id=%u,sid=%08lX,fw_ver=%u,fw_typ=%u}",
+        len += sprintf(&rx_buffer[len], "{id=%u,sid=%08lX,fw_ver=%u,fw_typ=%u}\n",
             E_SENSOR_S11_DEV_INFO,
             s11_sensor->dev_info.sensor_id, s11_sensor->dev_info.fw_version, s11_sensor->dev_info.fw_type);
-        len = sprintf(rx_buffer, "{id=%u,fw_ver=%u}",
+        len += sprintf(&rx_buffer[len], "{id=%u,fw_ver=%u}\n",
             E_SENSOR_SCD30_DEV_INFO,
             scd30_sensor->fw_version);
-        len = sprintf(rx_buffer, "{id=%u,fw_ver=%s}",
+        len += sprintf(&rx_buffer[len], "{id=%u,fw_ver=%s}\n",
             E_SENSOR_MHZ19_DEV_INFO,
             mhz19_sensor->fw_version);
-        len = sprintf(rx_buffer, "{id=%u,dev_info=%s,fw_ver=%u}",
+        len += sprintf(&rx_buffer[len], "{id=%u,dev_info=%s,fw_ver=%u}\n",
             E_SENSOR_SPS30_DEV_INFO,
             sps30_sensor->device_info, sps30_sensor->fw_version);
         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
