@@ -152,9 +152,9 @@ static int get_status(char *buf)
 
 static int get_gps_values(char *buf)
 {
-    const char *fmt = opt_format ? "*%u,%u,%lu,%lu,%f,%c,%f,%c,%f,%f,%c,%u,%f,%f,%f,%x,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n"
-                                 : "{id=%u,sat=%u,date=%lu,time=%lu,lat=%f,ns=\"%c\",lng=%f,ew=\"%c\",alt=%f,spd=%f,"
-                                   "mode_3d=\"%c\",sats=%u,pdop=%f,hdop=%f,vdop=%f,status=0x%x,data_cnt=%u,error_cnt=%u,"
+    const char *fmt = opt_format ? "*%u,%u,%lu,%lu,%f,%c,%f,%c,%.1f,%.1f,%c,%u,%.1f,%.1f,%.1f,%x,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n"
+                                 : "{id=%u,sat=%u,date=%lu,time=%lu,lat=%f,ns=\"%c\",lng=%f,ew=\"%c\",alt=%.1f,spd=%.1f,"
+                                   "mode_3d=\"%c\",sats=%u,pdop=%.1f,hdop=%.1f,vdop=%.1f,status=0x%x,data_cnt=%u,error_cnt=%u,"
                                    "txt_cnt=%u,rmc_cnt=%u,gll_cnt=%u,gsa_cnt=%u,gsv_cnt=%u,gga_cnt=%u,vtg_cnt=%u,zda_cnt=%u,unk_cnt=%u}\n";
     gps_status_t *status = &gps->status;
     return sprintf(buf, fmt, E_SENSOR_GPS,
@@ -167,8 +167,8 @@ static int get_gps_values(char *buf)
 
 static int get_bme280_values(char *buf, int id, bmx280_values_t *values)
 {
-    const char *fmt = opt_format ? "*%u,%f,%f,%f,%f\n"
-                                 : "{id=%u,temp=%f,hum=%f,press=%f,alt=%f}\n";
+    const char *fmt = opt_format ? "*%u,%.1f,%u,%u,%u\n"
+                                 : "{id=%u,temp=%.1f,hum=%u,press=%u,alt=%u}\n";
     return sprintf(buf, fmt, id,
         values->temperature, values->humidity, values->pressure, values->altitude);
 }
@@ -177,29 +177,29 @@ static int get_s11_values(char *buf)
 {
     s11_values_old_fw_t *values = &last_values.s11;
 
-    const char *fmt = opt_format ? "*%u,%u,%u\n"
-                                 : "{id=%u,co2_f=%u,co2=%u}\n";
-    return sprintf(buf, fmt, E_SENSOR_S11_OLD_FW, values->co2_f, values->co2);
+    const char *fmt = opt_format ? "*%u,%u,%u,%.1f\n"
+                                 : "{id=%u,co2_f=%u,co2=%u,temp=%.1f}\n";
+    return sprintf(buf, fmt, E_SENSOR_S11_OLD_FW, values->co2_f, values->co2, 0.1 * (float)values->temperature);
 }
 
 static int get_scd30_values(char *buf)
 {
     scd30_values_t *values = &last_values.scd30;
 
-    const char *fmt = opt_format ? "*%u,%u,%f,%f\n"
-                                 : "{id=%u,co2=%u,temp=%f,hum=%f}\n";
+    const char *fmt = opt_format ? "*%u,%u,%.1f,%u\n"
+                                 : "{id=%u,co2=%u,temp=%.1f,hum=%u}\n";
     return sprintf(buf, fmt, E_SENSOR_SCD30,
-        values->co2, values->temperature, values->humidity);
+        values->co2, 0.1 * (float)values->temperature, values->humidity);
 }
 
 static int get_scd41_values(char *buf)
 {
     scd4x_values_t *values = &last_values.scd41;
 
-    const char *fmt = opt_format ? "*%u,%u,%f,%f,%u\n"
-                                 : "{id=%u,co2=%u,temp=%f,hum=%f,st=%u}\n";
+    const char *fmt = opt_format ? "*%u,%u,%.1f,%u,%u\n"
+                                 : "{id=%u,co2=%u,temp=%.1f,hum=%u,st=%u}\n";
     return sprintf(buf, fmt, E_SENSOR_SCD41,
-        values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
+        values->co2, 0.1 * (float)values->temperature, values->humidity, scd41_st_machine_status);
 }
 
 static int get_mhz19_values(char *buf)
@@ -216,8 +216,8 @@ static int get_yys_values(char *buf)
 {
     yys_values_t *values = &last_values.yys;
 
-    const char *fmt = opt_format ? "*%u,%f,%f,%f,%f\n"
-                                 : "{id=%u,o2=%f,co=%f,h2s=%f,ch4=%f}\n";
+    const char *fmt = opt_format ? "*%u,%u,%u,%u,%u\n"
+                                 : "{id=%u,o2=%u,co=%u,h2s=%u,ch4=%u}\n";
     return sprintf(buf, fmt, E_SENSOR_YYS,
         values->o2, values->co, values->h2s, values->ch4);
 }
@@ -235,8 +235,8 @@ static int get_sps30_values(char *buf)
 {
     sps30_values_t *values = &last_values.sps30;
 
-    const char *fmt = opt_format ? "*%u,%lu,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n"
-                                 : "{id=%u,status=%lu,pm0_5=%f,pm1_0=%f,p1_0=%f,pm2_5=%f,p2_5=%f,pm4_0=%f,p4_0=%f,pm10_0=%f,p10_0=%f,typ_part_sz=%f}\n";
+    const char *fmt = opt_format ? "*%u,%lu,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f\n"
+                                 : "{id=%u,status=%lu,pm0_5=%.1f,pm1_0=%.1f,p1_0=%.1f,pm2_5=%.1f,p2_5=%.1f,pm4_0=%.1f,p4_0=%.1f,pm10_0=%.1f,p10_0=%.1f,typ_part_sz=%.1f}\n";
     return sprintf(buf, fmt, E_SENSOR_SPS30,
         (unsigned long)values->status, values->nc_0p5, values->mc_1p0, values->nc_1p0, values->mc_2p5, values->nc_2p5,
         values->mc_4p0, values->nc_4p0, values->mc_10p0, values->nc_10p0, values->typical_particle_size);
@@ -751,7 +751,7 @@ static void tcp_server_task(void *pvParameters)
                         const char *fmt = opt_format ? "*%u,%u,%f,%f,%u\n"
                                                      : "{id=%u,co2=%u,temp=%f,hum=%f,st=%u}\n";
                         int len = sprintf(rx_buffer, fmt, E_SENSOR_SCD41,
-                            values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
+                            values->co2, values->temperature, values->humidity, scd41_st_machine_status);
                         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
                     } else if (strncmp(&rx_buffer[4], "temp_offs ", 10) == 0) {
                         scd4x_set_temperature_offset(scd41_sensor, atof(&rx_buffer[14]));

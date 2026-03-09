@@ -20,31 +20,31 @@ void update_air_tab(bool force_update)
 {
     char buf[100];
     if (bmx280lo_update || force_update) {
-        sprintf(buf, "P=%.1f hPa  A=%.1f m\nT=%.1f °C  H=%.1f %%",
-                bmx280lo->values.pressure, bmx280lo->values.altitude, bmx280lo->values.temperature, bmx280lo->values.humidity);
+        sprintf(buf, "P=%d hPa  A=%d m\nT=%.1f °C  H=%d %%",
+                bmx280lo->values.pressure, bmx280lo->values.altitude, 0.1 * (float)bmx280lo->values.temperature, bmx280lo->values.humidity);
         lv_label_set_text(ui->lbl_bmx280lo, buf);
     }
     if (bmx280hi_update || force_update) {
-        sprintf(buf, "P=%.1f hPa  A=%.1f m\nT=%.1f °C  H=%.1f %%",
-                bmx280hi->values.pressure, bmx280hi->values.altitude, bmx280hi->values.temperature, bmx280hi->values.humidity);
+        sprintf(buf, "P=%d hPa  A=%d m\nT=%.1f °C  H=%d %%",
+                bmx280hi->values.pressure, bmx280hi->values.altitude, 0.1 * (float)bmx280hi->values.temperature, bmx280hi->values.humidity);
         lv_label_set_text(ui->lbl_bmx280hi, buf);
     }
     if (s11_update || force_update) {
-        s11_values_t *s11_values = &s11_sensor->values;
+        s11_values_t *values = &s11_sensor->values;
 
-        sprintf(buf, "CO2F=%d ppm   T=%.1f °C\nCO2=%d ppm", s11_values->co2_f, (float)s11_values->temperature * 0.01, s11_values->co2);
+        sprintf(buf, "CO2F=%d ppm   T=%.1f °C\nCO2=%d ppm", values->co2_f, 0.1 * (float)values->temperature, values->co2);
         lv_label_set_text(ui->lbl_s11, buf);
     }
     if (scd30_update || force_update) {
-        scd30_values_t *scd30_values = &scd30_sensor->values;
+        scd30_values_t *values = &scd30_sensor->values;
 
-        sprintf(buf, "CO2=%d ppm\nT=%.1f °C  H=%.1f %%", (int)scd30_values->co2, scd30_values->temperature, scd30_values->humidity);
+        sprintf(buf, "CO2=%d ppm\nT=%.1f °C  H=%d %%", (int)values->co2, 0.1 * (float)values->temperature, values->humidity);
         lv_label_set_text(ui->lbl_scd30, buf);
     }
     if (scd41_update || force_update) {
-        scd4x_values_t *scd4x_values = &scd41_sensor->values;
+        scd4x_values_t *values = &scd41_sensor->values;
 
-        sprintf(buf, "CO2=%d ppm    ST=%d\nT=%.1f °C  H=%.1f %%", scd4x_values->co2, scd4x_st_machine_status, scd4x_values->temperature, scd4x_values->humidity);
+        sprintf(buf, "CO2=%d ppm    ST=%d\nT=%.1f °C  H=%d %%", values->co2, scd41_st_machine_status, 0.1 * (float)values->temperature, values->humidity);
         lv_label_set_text(ui->lbl_scd41, buf);
     }
     if (mhz19_update || force_update) {
@@ -58,7 +58,7 @@ void update_air_tab(bool force_update)
         lv_label_set_text(ui->lbl_yys, buf);
     }
     if (ze08_update || force_update) {
-        sprintf(buf, "CH2O=%.2f ppm", 0.0);
+        sprintf(buf, "CH2O=%.3f ppm", 0.001 * (float)ze08_sensor->values.ch2o);
         lv_label_set_text(ui->lbl_ze08, buf);
     }
 }

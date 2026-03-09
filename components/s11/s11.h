@@ -43,7 +43,7 @@ typedef struct  __attribute__((__packed__)) {
 	/// 10-11: CO2 value unfiltered & pressure compensated [ppm] (R)
 	uint16_t co2;
 	/// 08-09: Chip temperature [0.01 deg C] (R)
-  	int16_t temp;
+  	int16_t temperature;
 	/// 00-01: Error status (R)
 	uint16_t error_status;
 } s11_values_old_fw_t;
@@ -57,7 +57,7 @@ typedef struct  __attribute__((__packed__)) {
 	uint16_t co2_f;
 	/// 14-15: CO2 value unfiltered [ppm] (R)
 	uint16_t co2;
-	/// 08-09: Chip temperature [0.01 deg C] (R)
+	/// 08-09: Chip temperature [0.1 deg C] (R)
   	int16_t temperature;
 	/// 00-01: Error status (R)
 	uint16_t error_status;

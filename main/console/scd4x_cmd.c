@@ -30,7 +30,7 @@ int process_scd4x_cmd(int argc, char **argv)
                 scd41_sensor->serial_number, scd4x_get_data_ready_status(scd41_sensor), scd41_sensor->enabled);
             ESP_LOGI(TAG, "temp_offs=%f °C  altitude=%d m  pressure=%d hPa * co2=%d ppm  temp=%.1f °C  hum=%.1f %%  st=%d",
                     scd41_sensor->temperature_offset, scd41_sensor->altitude, scd41_sensor->pressure,
-                    values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
+                    values->co2, values->temperature, values->humidity, scd41_st_machine_status);
         } else if (strcmp(cmd, "readcfg") == 0) {
             esp_err_t err = scd4x_stop_periodic_measurement(scd41_sensor);
             if (err != ESP_OK) {
@@ -94,7 +94,7 @@ int process_scd4x_cmd(int argc, char **argv)
                 // Offset value e.g. 400 = 4.0°C
                 float offset = (float)scd4x_cmd_args.value->ival[0] * 0.01;
 
-                if (scd4x_st_machine_status == SCD4X_ST_IDLE) {
+                if (scd41_st_machine_status == SCD4X_ST_IDLE) {
                     ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_set_temperature_offset(scd41_sensor, offset));
                 } else {
                     esp_err_t err;
@@ -144,7 +144,7 @@ int process_scd4x_cmd(int argc, char **argv)
                 return 1;
             }
             ESP_LOGI(TAG, "co2=%d ppm  temp=%.1f °C  hum=%.1f %%  st=%d",
-                values->co2, values->temperature, values->humidity, scd4x_st_machine_status);
+                values->co2, values->temperature, values->humidity, scd41_st_machine_status);
         } else if (strcmp(cmd, "debug") == 0) {
             if (scd4x_cmd_args.value->count == 1) {
                 scd41_sensor->debug = scd4x_cmd_args.value->ival[0];

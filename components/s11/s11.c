@@ -462,7 +462,7 @@ esp_err_t s11_get_sensor_temperature(s11_t *sensor)
 {
     uint16_t value;
     sensor->last_error = s11_read_u16(sensor, S11_ADDR_TEMPERATURE, &value);
-    sensor->values.temperature = (int16_t)value;
+    sensor->values.temperature = (int16_t)value / 10;
     return sensor->last_error;
 }
 
@@ -514,7 +514,7 @@ esp_err_t s11_read_measurement(s11_t *sensor)
     if (sensor->last_error != ESP_OK) return sensor->last_error;
     sensor->dev_status.measurement_count = buf[S11_ADDR_MD_COUNT];
     sensor->dev_status.measurement_cycle_time = get_u16(&buf[S11_ADDR_MD_CYCLE_TIME_MSB]);
-    sensor->values.temperature = get_u16(&buf[S11_ADDR_MD_TEMP_MSB]);
+    sensor->values.temperature = (int16_t)get_u16(&buf[S11_ADDR_MD_TEMP_MSB]) / 10;
     if (sensor->dev_info.fw_version <= 14) {
         // Old firmware <= 14 only deliver co2_f and co2. Pressure compensation is not available.
         sensor->values.co2_f = get_u16(&buf[S11_ADDR_MD_CO2_FP_MSB]);
@@ -530,7 +530,7 @@ esp_err_t s11_read_measurement(s11_t *sensor)
 
 void s11_get_measurement_old_fw(s11_values_t *values, s11_values_old_fw_t *values_old_fw)
 {
-    values_old_fw->temp = values->temperature;
+    values_old_fw->temperature = values->temperature;
     values_old_fw->co2_f = values->co2_f;
     values_old_fw->co2 = values->co2;
 }
@@ -593,7 +593,7 @@ void s11_dump_values(s11_t *sensor, bool force)
         s11_values_t *values = &sensor->values;
 
         ESP_LOGI(TAG, "co2_fp=%u ppm  co2_p=%u ppm  co2_f=%u ppm  co2=%u ppm  temp=%.1f °C",
-                 values->co2_fp, values->co2_p, values->co2_f, values->co2, (float)values->temperature * 0.01);
+                 values->co2_fp, values->co2_p, values->co2_f, values->co2, 0.1 * (float)values->temperature);
         s11_dump_error_status(sensor);
     }
 }

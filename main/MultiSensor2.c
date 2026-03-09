@@ -346,9 +346,9 @@ void sensors_init()
     ESP_ERROR_CHECK_WITHOUT_ABORT(sps30_init(&sps30_sensor, bus_handle));
     ESP_ERROR_CHECK_WITHOUT_ABORT(adxl345_init(&adxl345, bus_handle));
     ESP_ERROR_CHECK_WITHOUT_ABORT(qmc5883l_init(&qmc5883l, bus_handle));
-    s11_sensor->debug = 1;
-    scd30_sensor->debug = 1;
-    ze08_sensor->debug = 1;
+    //s11_sensor->debug = 1;
+    //scd30_sensor->debug = 1;
+    //ze08_sensor->debug = 1;
 }
 
 static bool update_gps()
@@ -411,9 +411,9 @@ static bool update_s11()
     s11_sensor->dev_status.old_measurement_count = s11_sensor->dev_status.measurement_count;
     ESP_ERROR_CHECK_WITHOUT_ABORT(s11_read_measurement(s11_sensor));
     ESP_ERROR_CHECK_WITHOUT_ABORT(s11_get_error_status(s11_sensor));
-    if (force_update || last_values.s11.temp != s11_sensor->values.temperature || last_values.s11.co2_f != s11_sensor->values.co2_f
+    if (force_update || last_values.s11.temperature != s11_sensor->values.temperature || last_values.s11.co2_f != s11_sensor->values.co2_f
         || last_values.s11.co2 != s11_sensor->values.co2) {
-        last_values.s11.temp = s11_sensor->values.temperature;
+        last_values.s11.temperature = s11_sensor->values.temperature;
         last_values.s11.co2_f = s11_sensor->values.co2_f;
         last_values.s11.co2 = s11_sensor->values.co2;
         return true;
@@ -451,9 +451,9 @@ static bool update_scd41()
         ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_init(&scd41_sensor, bus_handle));
         if (scd41_sensor == NULL) return false;
     }
-    if (scd4x_st_machine_status == SCD4X_ST_IDLE || scd4x_st_machine_status > SCD4X_ST_MEASURE_3MIN) {
-        if (scd4x_st_machine_status > SCD4X_ST_MEASURE_3MIN) {
-            ESP_LOGW(TAG, "SCD4x is busy with status %u. Unable to read values.", scd4x_st_machine_status);
+    if (scd41_st_machine_status == SCD4X_ST_IDLE || scd41_st_machine_status > SCD4X_ST_MEASURE_3MIN) {
+        if (scd41_st_machine_status > SCD4X_ST_MEASURE_3MIN) {
+            ESP_LOGW(TAG, "SCD4x is busy with status %u. Unable to read values.", scd41_st_machine_status);
         }
         return false;
     }

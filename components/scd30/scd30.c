@@ -252,9 +252,9 @@ esp_err_t scd30_read_measurement(scd30_t *sensor)
     tmp.u32 = ((uint32_t)buf[0] << 16) | (uint32_t)buf[1];
     sensor->values.co2 = (uint16_t)tmp.f;
     tmp.u32 = ((uint32_t)buf[2] << 16) | (uint32_t)buf[3];
-    sensor->values.temperature = tmp.f;
+    sensor->values.temperature = (uint16_t)(10.0 * tmp.f);
     tmp.u32 = ((uint32_t)buf[4] << 16) | (uint32_t)buf[5];
-    sensor->values.humidity = tmp.f;
+    sensor->values.humidity = (uint16_t)tmp.f;
     return ESP_OK;
 }
 
@@ -348,7 +348,7 @@ void scd30_dump_values(scd30_t *sensor, bool force)
     if (force || sensor->debug & 1) {
         scd30_values_t *values = &sensor->values;
 
-        ESP_LOGI(TAG, "co2=%.1f ppm  temp=%.1f °C  hum=%.1f %%",
-                 values->co2, values->temperature, values->humidity);
+        ESP_LOGI(TAG, "co2=%d ppm  temp=%.1f °C  hum=%d %%",
+                 values->co2, 0.1 * (float)values->temperature, values->humidity);
     }
 }
