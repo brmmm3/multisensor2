@@ -48,7 +48,7 @@ esp_err_t write_bin_file(const char *path, void *data, uint32_t size);
 
 uint32_t read_bin_file(const char *path, void *buf, uint32_t size);
 
-FILE *open_bin_file(const char *path);
+FILE *open_bin_file(const char *path, const char *mode);
 
 uint32_t read_bin_file_part(FILE *f, void *buf, uint32_t size);
 
@@ -59,6 +59,8 @@ char *get_data_file_path(const char *path);
 FILE *open_data_file(const char *path);
 
 uint32_t read_data_file_part(FILE *f, void *buf, uint32_t size);
+
+uint32_t write_bin_file_part(FILE *f, void *buf, uint32_t size);
 
 int close_data_file(FILE *f);
 

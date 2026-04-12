@@ -428,8 +428,7 @@ static void sw_sd_auto_record_cb(lv_event_t *e)
 
 esp_err_t ui_lcd_set_tmp_lcd_pwr(uint8_t mode)
 {
-    status.lcd_pwr = mode;
-    return lcd_set_bk_pwr(mode);
+    return lcd_set_pwr_mode(mode);
 }
 
 

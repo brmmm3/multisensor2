@@ -31,6 +31,7 @@
 #include "misc/lv_palette.h"
 //#include "mqtt.h"
 #include "s11.h"
+#include "sdcard.h"
 #include "tcp_server.h"
 #include "ui/include/ui_config.h"
 #include "ui/include/ui_update.h"
@@ -1118,6 +1119,78 @@ void dump_values(bool force)
     if (adxl345 != NULL) adxl345_dump_values(adxl345, force);
 }
 
+uint32_t save_reset_reason(uint8_t reason)
+{
+    FILE *f = open_bin_file("resets.bin", "ab");
+    if (f == NULL) return 0;
+    uint32_t len = write_bin_file_part(f, &reason, 1);
+    close_bin_file(f);
+    return len;
+}
+
+void check_and_log_reset_reason()
+{
+    esp_reset_reason_t reason = esp_reset_reason();
+
+    switch (reason) {
+        case ESP_RST_POWERON:
+            ESP_LOGI(TAG, "Reset reason: Power on");
+            break;
+        case ESP_RST_SW:
+            ESP_LOGI(TAG, "Reset reason: Software reset");
+            break;
+        case ESP_RST_PANIC:
+            ESP_LOGI(TAG, "Reset reason: Panic/Exception");
+            break;
+        case ESP_RST_TASK_WDT:
+            ESP_LOGI(TAG, "Reset reason: Task Watchdog");
+            break;
+        case ESP_RST_BROWNOUT:
+            ESP_LOGI(TAG, "Reset reason: Brownout");
+            break;
+        case ESP_RST_DEEPSLEEP:
+            ESP_LOGI(TAG, "Reset reason: Deep sleep wake");
+            break;
+        default:
+            ESP_LOGI(TAG, "Reset reason: %d (other)", reason);
+            break;
+    }
+    if (save_reset_reason((uint8_t)reason) == 0) {
+        ESP_LOGE(TAG, "Failed to write reset reason to SD-Card");
+    }
+}
+
+void show_reset_reason()
+{
+    char buf[10];
+    esp_reset_reason_t reason = esp_reset_reason();
+
+    switch (reason) {
+        case ESP_RST_POWERON:
+            lv_label_set_text(ui->lbl_reason, "Power On");
+            break;
+        case ESP_RST_SW:
+            lv_label_set_text(ui->lbl_reason, "SW Reset");
+            break;
+        case ESP_RST_PANIC:
+            lv_label_set_text(ui->lbl_reason, "Panic");
+            break;
+        case ESP_RST_TASK_WDT:
+            lv_label_set_text(ui->lbl_reason, "Watchdog");
+            break;
+        case ESP_RST_BROWNOUT:
+            lv_label_set_text(ui->lbl_reason, "Brownout");
+            break;
+        case ESP_RST_DEEPSLEEP:
+            lv_label_set_text(ui->lbl_reason, "Deep SlpWk");
+            break;
+        default:
+            sprintf(buf, "Other %d", reason);
+            lv_label_set_text(ui->lbl_reason, buf);
+            break;
+    }
+}
+
 void app_main(void)
 {
     // Wait 100ms to give sensors time to power up.
@@ -1143,6 +1216,7 @@ void app_main(void)
 
     config_read();
     config_show();
+    check_and_log_reset_reason();
 
     // LCD (SPI Mode)
     lcd = lcd_init(spi_host_id, LCD_PIN_NUM_CS, LCD_PIN_NUM_DC, LCD_PIN_NUM_RST, LCD_PIN_NUM_LED, LCD_PIN_NUM_T_CS);
@@ -1152,6 +1226,7 @@ void app_main(void)
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(update_startup_cnt(1, 0));
     show_startup_uptime_cnt();
+    show_reset_reason();
 
     led_init();
     sensors_init();

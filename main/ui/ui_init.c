@@ -352,20 +352,21 @@ lv_obj_t *add_page_cfg(ui_t *ui)
     ui->lbl_savetime = add_section_label(tab, 24, 26, 72, "Save Time");
     ui->lbl_uptime = add_section_label(tab, 48, 26, 72, "Up Time");
     ui->lbl_counter = add_section_label(tab, 72, 26, 72, "Counter");
-    ui->lbl_heap = add_section_label(tab, 96, 26, 72, "Heap");
-    ui->lbl_qmc5883L = add_section_label(tab, 120, 26, 72, "QMC5883L");
-    ui->lbl_adxl345 = add_section_label(tab, 144, 26, 72, "ADXL345");
+    ui->lbl_reason = add_section_label(tab, 96, 26, 72, "Reason"); // Reset reason
+    ui->lbl_heap = add_section_label(tab, 120, 26, 72, "Heap");
+    ui->lbl_qmc5883L = add_section_label(tab, 144, 26, 72, "QMC5883L");
+    ui->lbl_adxl345 = add_section_label(tab, 168, 26, 72, "ADXL345");
 
-    add_label_text(tab, 0, 174, "Power Mode", lv_color_black());
-    ui->sl_lcd_pwr = add_slider_label(tab, 204, 2, "LCD");
-    ui->sl_gps_pwr = add_slider_label(tab, 244, 3, "GPS");
-    ui->sl_scd4x_pwr = add_slider_label(tab, 284, 3, "SCD4x");
-    ui->sl_wifi_pwr = add_slider_label(tab, 324, 2, "WiFi");
-    ui->sl_mode_pwr = add_slider_label(tab, 364, 4, "Mode");
+    add_label_text(tab, 0, 198, "Power Mode", lv_color_black());
+    ui->sl_lcd_pwr = add_slider_label(tab, 228, 2, "LCD");
+    ui->sl_gps_pwr = add_slider_label(tab, 268, 3, "GPS");
+    ui->sl_scd4x_pwr = add_slider_label(tab, 308, 3, "SCD4x");
+    ui->sl_wifi_pwr = add_slider_label(tab, 348, 2, "WiFi");
+    ui->sl_mode_pwr = add_slider_label(tab, 388, 4, "Mode");
 
-    ui->btn_calibrate = add_button(tab, 0, 404, 200, 0, "Calibrate Sensors");
-    ui->btn_save_config = add_button(tab, 0, 454, 200, 0, "Save Config");
-    ui->sw_cfg_lock = add_switch_label(tab, 504, "Lock Config");
+    ui->btn_calibrate = add_button(tab, 0, 428, 200, 0, "Calibrate Sensors");
+    ui->btn_save_config = add_button(tab, 0, 478, 200, 0, "Save Config");
+    ui->sw_cfg_lock = add_switch_label(tab, 528, "Lock Config");
     return tab;
 }
 

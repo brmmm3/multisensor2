@@ -95,7 +95,7 @@ esp_err_t lcd_set_bk_pwr(uint8_t mode)
     bk_gpio_config.pull_up_en = mode == 1 || mode == 2 ? GPIO_PULLUP_ENABLE : GPIO_PULLUP_DISABLE;
     bk_gpio_config.pull_down_en = mode == 2 ? GPIO_PULLDOWN_ENABLE : GPIO_PULLDOWN_DISABLE;
 
-    ESP_LOGI(TAG, "lcd_set_bg_pwr %d mode=%d pull_up_en=%d pull_down_en=%d", mode,
+    ESP_LOGI(TAG, "lcd_set_bk_pwr %d mode=%d pull_up_en=%d pull_down_en=%d", mode,
         bk_gpio_config.mode, bk_gpio_config.pull_up_en, bk_gpio_config.pull_down_en);
     if ((err = gpio_config(&bk_gpio_config)) != ESP_OK) return err;
     return gpio_set_level(bk_led_pin, mode == 0);

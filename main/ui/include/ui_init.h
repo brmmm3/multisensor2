@@ -83,6 +83,7 @@ typedef struct ui_s {
     lv_obj_t *lbl_uptime;
     lv_obj_t *lbl_savetime;
     lv_obj_t *lbl_counter;
+    lv_obj_t *lbl_reason; // Reset reason
     lv_obj_t *lbl_heap;
     lv_obj_t *lbl_adxl345;
     lv_obj_t *lbl_qmc5883L;

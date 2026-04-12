@@ -91,10 +91,10 @@ uint32_t read_bin_file(const char *path, void *buf, uint32_t size)
     return len;
 }
 
-FILE *open_bin_file(const char *path)
+FILE *open_bin_file(const char *path, const char *mode)
 {
     if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return NULL;
-    FILE *fd = fopen(path, "rb");
+    FILE *fd = fopen(path, mode);
     lvgl_port_unlock();
     return fd;
 }
@@ -105,7 +105,16 @@ uint32_t read_bin_file_part(FILE *f, void *buf, uint32_t size)
     if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return 0;
     uint32_t len = fread(buf, 1, size, f);
     lvgl_port_unlock();
-   return len;
+    return len;
+}
+
+uint32_t write_bin_file_part(FILE *f, void *buf, uint32_t size)
+{
+    if (buf == NULL) return 0;
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return 0;
+    uint32_t len = fwrite(buf, size, 1, f);
+    lvgl_port_unlock();
+    return len;
 }
 
 int close_bin_file(FILE *f)

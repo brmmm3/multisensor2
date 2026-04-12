@@ -1,6 +1,6 @@
 idf_component_register(
     SRCS
-        MultiSensor2.c
+        main.c
         config.c
         tcp_server.c
         console/console.c

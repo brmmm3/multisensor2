@@ -287,6 +287,7 @@ static esp_err_t client_cmd_ls(int client_sock)
         return ESP_FAIL;
     }
     int file_cnt = sd_dir_file_cnt(dir);
+    ESP_LOGI(TAG, "%d files", file_cnt);
     while (file_cnt > 0) {
         int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE, 0, 0);
         if (len == 0) break;
@@ -423,6 +424,19 @@ static esp_err_t remove_all_data_files()
     return ESP_OK;
 }
 
+static char *reset_reason_str(esp_reset_reason_t reason)
+{
+    switch (reason) {
+        case ESP_RST_POWERON: return "Power on";
+        case ESP_RST_SW: return "Software reset";
+        case ESP_RST_PANIC: return "Panic/Exception";
+        case ESP_RST_TASK_WDT: return "Task Watchdog";
+        case ESP_RST_BROWNOUT: return "Brownout";
+        case ESP_RST_DEEPSLEEP: return "Deep sleep wake";
+        default: return "Other";
+    }
+}
+
 static void tcp_server_task(void *pvParameters)
 {
     char addr_str[128];
@@ -430,6 +444,7 @@ static void tcp_server_task(void *pvParameters)
     struct sockaddr_in server_addr;
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
+    esp_reset_reason_t reset_reason = esp_reset_reason();
 
     // Create TCP socket
     listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
@@ -486,7 +501,9 @@ static void tcp_server_task(void *pvParameters)
         int flags = fcntl(client_sock, F_GETFL, 0);
         fcntl(client_sock, F_SETFL, flags | O_NONBLOCK);
 
-        int len = sprintf(rx_buffer, "{id=%u,ms=%u,name=\"%s\"}\n", E_SENSOR_INFO, MULTISENSOR_ID, MULTISENSOR_NAME_VERSION);
+        // Send initial data
+        int len = sprintf(rx_buffer, "{id=%u,ms=%u,name=\"%s\",reset=%d,reason=\"%s\"}\n",
+            E_SENSOR_INFO, MULTISENSOR_ID, MULTISENSOR_NAME_VERSION, reset_reason, reset_reason_str(reset_reason));
         send_data_to_client(client_sock, (uint8_t *)rx_buffer, len);
 
         len = sprintf(rx_buffer, "{id=%u,lat=\"%c\",lng=\"%c\",co2=\"ppm\",temp=\"°C\",hum=\"%%\",o2=\"%%\",co=\"ppm\",h2s=\"ppm\",ch4=\"ppm\",",
@@ -495,7 +512,7 @@ static void tcp_server_task(void *pvParameters)
         len += sprintf(&rx_buffer[len], "pm0_5=\"#/cm3\",typ_part_sz=\"um\",pm1_0=\"ug/cm3\",p1_0=\"#/cm3\",");
         len += sprintf(&rx_buffer[len], "pm2_5=\"ug/cm3\",p2_5=\"#/cm3\",pm4_0=\"ug/cm3\",p4_0=\"#/cm3\",pm10_0=\"ug/cm3\",p10_0=\"#/cm3\",");
         len += sprintf(&rx_buffer[len], "adxl345=\"g\",qmc5883l=\"gauss\"}\n");
-        len += sprintf(&rx_buffer[len], "{id=%u,sid=%08lX,fw_ver=%u,fw_typ=%u}\n",
+        len += sprintf(&rx_buffer[len], "{id=%u,sid=0x%08lX,fw_ver=%u,fw_typ=%u}\n",
             E_SENSOR_S11_DEV_INFO,
             s11_sensor->dev_info.sensor_id, s11_sensor->dev_info.fw_version, s11_sensor->dev_info.fw_type);
         len += sprintf(&rx_buffer[len], "{id=%u,fw_ver=%u}\n",
