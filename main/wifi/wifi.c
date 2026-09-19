@@ -154,6 +154,10 @@ void wifi_deinit_sta(void)
     netif = NULL;
     esp_event_loop_delete_default();
     esp_netif_deinit();
+    if (wifi_event_group != NULL) {
+        vEventGroupDelete(wifi_event_group);
+        wifi_event_group = NULL;
+    }
     ESP_LOGI(TAG,"wifi_deinit_sta DONE");
 }
 
@@ -236,6 +240,7 @@ static void wifi_connect_task(void *arg)
     wifi_network_t *network = arg;
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(wifi_connect(network->ssid, network->password));
+    vPortFree(network);
     connect_task_handle = NULL;
     vTaskDelete(NULL);
 }

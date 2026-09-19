@@ -527,9 +527,15 @@ void gps_stop_sensor(gps_sensor_t **sensor_ptr)
     if (gps_sensor_task_handle == NULL) return;
     vTaskDelete(gps_sensor_task_handle);
     gps_sensor_task_handle = NULL;
+    if ((*sensor_ptr)->messages != NULL) vPortFree((*sensor_ptr)->messages);
     vPortFree((*sensor_ptr)->buffer);
     vPortFree(*sensor_ptr);
     *sensor_ptr = NULL;
+    if (gps_serial != NULL) {
+        vQueueDelete(gps_serial->queue);
+        vPortFree(gps_serial);
+        gps_serial = NULL;
+    }
 }
 
 int gps_set_power_mode(gps_sensor_t *sensor, uint8_t mode)

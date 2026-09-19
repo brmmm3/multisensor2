@@ -78,13 +78,16 @@ uint32_t read_bin_file(const char *path, void *buf, uint32_t size)
 {
     ESP_LOGI(TAG, "Read bin file %s", path);
     if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
+    if (buf == NULL) {
+        lvgl_port_unlock();
+        return 0;
+    }
     FILE *f = fopen(path, "rb");
     if (f == NULL) {
         lvgl_port_unlock();
         ESP_LOGE(TAG, "Failed to open file for reading: %s (errno=%u)", strerror(errno), errno);
         return 0;
     }
-    if (buf == NULL) return 0;
     uint32_t len = fread(buf, size, 1, f);
     fclose(f);
     lvgl_port_unlock();

@@ -136,23 +136,43 @@ static esp_err_t s11_device_create(s11_t *sensor)
 
 esp_err_t s11_init(s11_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
 {
-    s11_t *sensor = NULL;
     esp_err_t err;
 
     ESP_LOGI(TAG, "Initialize S11");
-    sensor = s11_create_master(bus_handle);
-    if (sensor == NULL) { 
+    s11_t *sensor = s11_create_master(bus_handle);
+    if (sensor == NULL) {
         ESP_LOGE(TAG, "Could not create S11 driver.");
         return ESP_FAIL;
     }
+    if ((err = s11_device_create(sensor)) != ESP_OK) {
+        s11_close(sensor);
+        return err;
+    }
+    if ((err = s11_probe(sensor)) != ESP_OK) {
+        s11_close(sensor);
+        return err;
+    }
+    if ((err = s11_get_dev_info(sensor)) != ESP_OK) {
+        s11_close(sensor);
+        return err;
+    }
+    if ((err = s11_get_cal_data(sensor)) != ESP_OK) {
+        s11_close(sensor);
+        return err;
+    }
+    if ((err = s11_get_dev_meter_ctl(sensor)) != ESP_OK) {
+        s11_close(sensor);
+        return err;
+    }
+    if ((err = s11_get_iir_filter_par(sensor)) != ESP_OK) {
+        s11_close(sensor);
+        return err;
+    }
     *sensor_ptr = sensor;
-    if ((err = s11_device_create(sensor)) != ESP_OK) return err;
-    if ((err = s11_probe(sensor)) != ESP_OK) return err;
-    if ((err = s11_get_dev_info(sensor)) != ESP_OK) return err;
-    if ((err = s11_get_cal_data(sensor)) != ESP_OK) return err;
-    if ((err = s11_get_dev_meter_ctl(sensor)) != ESP_OK) return err;
-    if ((err = s11_get_iir_filter_par(sensor)) != ESP_OK) return err;
-    return ESP_OK;
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "S11 initialized");
+    }
+    return err;
 }
 
 void s11_close(s11_t *sensor)

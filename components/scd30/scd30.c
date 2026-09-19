@@ -174,7 +174,10 @@ esp_err_t scd30_init(scd30_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
         return ESP_FAIL;
     }
     *sensor_ptr = sensor;
-    if ((err = scd30_device_create(sensor)) != ESP_OK) return err;
+    if ((err = scd30_device_create(sensor)) != ESP_OK) {
+        vPortFree(sensor);
+        return err;
+    }
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(scd30_probe(sensor));
     ESP_ERROR_CHECK_WITHOUT_ABORT(scd30_soft_reset(sensor));
@@ -183,7 +186,7 @@ esp_err_t scd30_init(scd30_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
     ESP_LOGI(TAG, "AutoCal=%d", scd30_get_automatic_self_calibration(sensor));
     ESP_ERROR_CHECK_WITHOUT_ABORT(scd30_set_automatic_self_calibration(sensor, false));
     ESP_ERROR_CHECK_WITHOUT_ABORT(scd30_start_continuous_measurement(sensor, 0));
-    return err;
+    return ESP_OK;
 }
 
 esp_err_t scd30_soft_reset(scd30_t *sensor)

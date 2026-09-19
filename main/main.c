@@ -651,13 +651,15 @@ static void sensors_update()
     // Update/Read data
     gps_update |= update_gps();
 
-    bmx280lo_update |= update_bmx280(0, &bmx280lo, &last_values.bmx280lo);
-    bmx280hi_update |= update_bmx280(1, &bmx280hi, &last_values.bmx280hi);
+    if (bmx280lo != NULL && bmx280hi != NULL) {
+        bmx280lo_update |= update_bmx280(0, &bmx280lo, &last_values.bmx280lo);
+        bmx280hi_update |= update_bmx280(1, &bmx280hi, &last_values.bmx280hi);
 
-    // Get current pressure. Use BME280 sensor with lower temperature value, if pressure is in range.
-    if (bmx280lo->values.temperature < bmx280hi->values.temperature) bmx280 = bmx280lo;
-    else bmx280 = bmx280hi;
-    if (bmx280->values.pressure > 200 && bmx280->values.pressure < 2026) current_pressure = bmx280->values.pressure;
+        // Get current pressure. Use BME280 sensor with lower temperature value, if pressure is in range.
+        if (bmx280lo->values.temperature < bmx280hi->values.temperature) bmx280 = bmx280lo;
+        else bmx280 = bmx280hi;
+        if (bmx280->values.pressure > 200 && bmx280->values.pressure < 2026) current_pressure = bmx280->values.pressure;
+    }
 
     s11_update |= update_s11();
     scd30_update |= update_scd30();
@@ -1260,7 +1262,7 @@ void app_main(void)
     char buf[32];
     esp_err_t err;
 
-    if ((err = (rtc_get_datetime(rtc->rtc, &timeinfo))) == ESP_OK) {
+    if (rtc != NULL && (err = (rtc_get_datetime(rtc->rtc, &timeinfo))) == ESP_OK) {
         uint16_t year = 1900 + timeinfo.tm_year;
         uint8_t mon = timeinfo.tm_mon + 1;
 

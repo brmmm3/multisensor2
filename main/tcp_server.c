@@ -30,6 +30,7 @@ static TaskHandle_t tcp_server_task_handle = NULL;
 static QueueHandle_t tx_queue = NULL;
 static char rx_buffer[BUFFER_SIZE];
 static uint8_t update_all_cnt = 0;
+static int listen_sock = -1;
 
 bool tcp_server_running = false;
 bool tcp_send_values = false;
@@ -75,7 +76,12 @@ static bool send_message(const char *buf, int len)
     msg->data = pvPortMalloc(len);
     memcpy(msg->data, buf, len);
     msg->len = len;
-    return xQueueSend(tx_queue, msg, pdMS_TO_TICKS(100)) != pdPASS;
+    if (xQueueSend(tx_queue, msg, pdMS_TO_TICKS(100)) != pdPASS) {
+        vPortFree(msg->data);
+        ESP_LOGE(TAG, "Failed to send message to queue");
+        return false;
+    }
+    return true;
 }
 
 static bool send_data_to_client(int client_sock, uint8_t *data, int to_write)
@@ -425,7 +431,6 @@ static char *reset_reason_str(esp_reset_reason_t reason)
 static void tcp_server_task(void *pvParameters)
 {
     char addr_str[128];
-    int listen_sock;
     struct sockaddr_in server_addr;
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
@@ -857,6 +862,14 @@ esp_err_t tcp_server_stop()
     if (tcp_server_task_handle != NULL) {
         vTaskDelete(tcp_server_task_handle);
         tcp_server_task_handle = NULL;
+    }
+    if (listen_sock >= 0) {
+        close(listen_sock);
+        listen_sock = -1;
+    }
+    msg_t tx_data;
+    while (xQueueReceive(tx_queue, &tx_data, pdMS_TO_TICKS(10))) {
+        vPortFree(tx_data.data);
     }
     if (tx_queue != NULL) {
         vQueueDelete(tx_queue);

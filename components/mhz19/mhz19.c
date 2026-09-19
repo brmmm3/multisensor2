@@ -102,7 +102,7 @@ static void rx_task_mhz19_sensor(void *arg)
             buf[0] = 0xff;
             buf[1] = 0x01;
             buf[CMD_SIZE + 2] = 0;
-            if (xQueueReceive(sensor->queue, &cmd, 100)) {
+            if (xQueueReceive(sensor->queue, &cmd, pdMS_TO_TICKS(100))) {
                 memcpy(&buf[2], cmd, CMD_SIZE);
             } else {
                 memcpy(&buf[2], &cmd_get_values, CMD_SIZE);

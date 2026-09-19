@@ -49,10 +49,12 @@ esp_err_t rtc_init(rtc_t **rtc_ptr, i2c_master_bus_handle_t *bus_handle)
 
     rtc->rtc = rtci2c_init(RTCI2C_DEVICE_DS1307, DS1307_ADDRESS, &config);
     if (rtc->rtc == NULL) {
+        vPortFree(rtc);
         ESP_LOGE(TAG, "RTC Initialization failed");
         return ESP_FAIL;
     }
     if (!rtci2c_get_datetime(rtc->rtc, &t)) {
+        vPortFree(rtc);
         ESP_LOGE(TAG, "Date/tate query failed");
         return ESP_FAIL;
     }

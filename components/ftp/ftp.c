@@ -225,11 +225,13 @@ static int ftp_get_eplf_item(char *dest, uint32_t destsize, struct dirent *de) {
 		else addsize = snprintf(dest, destsize, "%srw-rw-rw-   1 root  root %9"PRIu32" %s %s\r\n", type, (uint32_t)buf.st_size, str_time, de->d_name);
 		if (addsize >= destsize) {
 			ESP_LOGW(TAG, "Buffer too small, reallocating [%d > %"PRIi32"]", ftp_buff_size, ftp_buff_size + (addsize - destsize) + 64);
-			char *new_dest = realloc(dest, ftp_buff_size + (addsize - destsize) + 65);
+			char *new_dest = realloc((char *)ftp_data.dBuffer, ftp_buff_size + (addsize - destsize) + 65);
 			if (new_dest) {
+				ftp_data.dBuffer = (uint8_t *)new_dest;
 				ftp_buff_size += (addsize - destsize) + 64;
-				destsize += (addsize - destsize) + 64;
-				dest = new_dest;
+				size_t offset = dest - (char *)ftp_data.dBuffer;
+				dest = (char *)ftp_data.dBuffer + offset;
+				destsize = ftp_buff_size - offset;
 				addsize = destsize + 64;
 			}
 			else {
@@ -278,6 +280,9 @@ static ftp_result_t ftp_list_dir(char *list, uint32_t maxlistsize, uint32_t *lis
 		// add the entry to the list
 		ESP_LOGD(TAG, "Add to dir list: %s", de->d_name);
 		next += ftp_get_eplf_item((list + next), (maxlistsize - next), de);
+		// re-sync pointers in case ftp_get_eplf_item reallocated ftp_data.dBuffer
+		list = (char *)ftp_data.dBuffer;
+		maxlistsize = ftp_buff_size;
 		listcount++;
 	}
 	if (result == E_FTP_RESULT_OK) ftp_close_files_dir();
