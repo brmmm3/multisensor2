@@ -119,6 +119,15 @@ typedef struct  __attribute__((__packed__)) {
     uint8_t status;
     uint8_t data_cnt;
     uint8_t error_cnt;
+    uint8_t txt_cnt;
+    uint8_t rmc_cnt;
+    uint8_t gll_cnt;
+    uint8_t gsa_cnt;
+    uint8_t gsv_cnt;
+    uint8_t gga_cnt;
+    uint8_t vtg_cnt;
+    uint8_t zda_cnt;
+    uint8_t unk_cnt;
 } gps_values_t;
 
 typedef struct  __attribute__((__packed__)) {

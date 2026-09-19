@@ -1,0 +1,11 @@
+menu "AS7262 I2C Peripheral Configuration"
+
+    menu "I2C Master"
+        config AS7262_I2C_CLK_SPEED_HZ
+            int "Master Frequency"
+            default 100000
+            help
+                I2C Speed of Master device.
+    endmenu
+
+endmenu

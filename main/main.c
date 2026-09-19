@@ -48,10 +48,12 @@ static const char *TAG = "MS2";
 
 // SPI      LCD + SD-Card
 // I2C Address assignment:
-//  (0x0D)  QMC5883L not used
-//  0x1F    TLV493D
+//  0x0D    QMC5883L
+//  (0x1F)  TLV493D not used
+//  0x39    AS7343
 //  (0x3C)  HMC5883L (write) not used
 //  (0x3D)  HMC5883L (read) not used
+//  (0x49)  AS7262 not used
 //  0x50    ?
 //  0x53    ADXL345
 //  (0x5E)  (TLV493D) not used
@@ -60,6 +62,7 @@ static const char *TAG = "MS2";
 //  0x63    SenseAir S11 (EEPROM-Register 0xA7 (I²C address, default 0x68) auf einen anderen Wert zwischen 0x01 und 0x7F)
 //  0x68    RTC Tiny
 //  0x69    SPS30
+//  0x74    AS7331
 //  0x76    BMx280 (BME280 beside SPS30)
 //  0x77    Second BMx280 (BME280 beside MHZ19)
 
@@ -374,6 +377,15 @@ static bool update_gps()
         gps_values.status = gps->status.status;
         gps_values.data_cnt = gps->status.data_cnt;
         gps_values.error_cnt = gps->status.error_cnt;
+        gps_values.txt_cnt = gps->status.txt_cnt;
+        gps_values.rmc_cnt = gps->status.rmc_cnt;
+        gps_values.gll_cnt = gps->status.gll_cnt;
+        gps_values.gsa_cnt = gps->status.gsa_cnt;
+        gps_values.gsv_cnt = gps->status.gsv_cnt;
+        gps_values.gga_cnt = gps->status.gga_cnt;
+        gps_values.vtg_cnt = gps->status.vtg_cnt;
+        gps_values.zda_cnt = gps->status.zda_cnt;
+        gps_values.unk_cnt = gps->status.unk_cnt;
         if (force_update || memcmp(&last_values.gps, &gps_values, sizeof(sensors_data_gps_t)) != 0) {
             memcpy(&last_values.gps, &gps_values, sizeof(sensors_data_gps_t));
             return true;
@@ -1042,7 +1054,7 @@ static void update_task(void *arg)
             data[status.record_pos++] = DATA_HEADER_ID0;
             uint32_t cksum = calculate_crc32(data, status.record_pos);
             data_add_uint32(cksum);
-
+            // Write DAT file
             for (int i = 0; i < 2; i++) {
                 if ((err = write_data_file()) == ESP_OK) {
                     status.save_time = now;

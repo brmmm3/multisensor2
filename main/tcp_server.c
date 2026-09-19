@@ -38,6 +38,7 @@ static bool opt_format = false;
 
 static const char *help =
     "val 0=off,1=send optimized,2=send optimized all,3=send json,4=send json all\n"
+    "fcnt Show file count in data dir\n"
     "lsr  Show root files\n"
     "ls   Show files in data\n"
     "cp *|filename  Copy data (all) file(s)\n"
@@ -263,7 +264,7 @@ static int get_qmc5883l_values(char *buf)
         values->status, values->mag_x, values->mag_y, values->mag_z, values->range);
 }
 
-static esp_err_t client_cmd_filecnt(int client_sock)
+static esp_err_t client_cmd_fcnt(int client_sock)
 {
     DIR *dir = sd_open_data_dir();
 
@@ -278,28 +279,12 @@ static esp_err_t client_cmd_filecnt(int client_sock)
     return ESP_OK;
 }
 
-static esp_err_t client_cmd_ls(int client_sock)
+static esp_err_t client_cmd_ls(int client_sock, bool data_dir)
 {
-    DIR *dir = sd_open_data_dir();
+    DIR *dir;
+    if (data_dir) dir = sd_open_data_dir();
+    else dir = sd_open_dir(MOUNT_POINT);
 
-    if (dir == NULL) {
-        ESP_LOGE(TAG, "Failed to open data dir");
-        return ESP_FAIL;
-    }
-    int file_cnt = sd_dir_file_cnt(dir);
-    ESP_LOGI(TAG, "%d files", file_cnt);
-    while (file_cnt > 0) {
-        int len = sd_read_dir(dir, rx_buffer, BUFFER_SIZE, 0, 0);
-        if (len == 0) break;
-        send_data_to_client(client_sock, (uint8_t *)rx_buffer,len);
-    }
-    sd_closedir(dir);
-    return ESP_OK;
-}
-
-static esp_err_t client_cmd_lsr(int client_sock)
-{
-    DIR *dir = sd_open_dir(MOUNT_POINT);
     if (dir == NULL) {
         ESP_LOGE(TAG, "Failed to open data dir");
         return ESP_FAIL;
@@ -565,17 +550,17 @@ static void tcp_server_task(void *pvParameters)
                     }
                 } else if (strcmp(rx_buffer, "lsr") == 0) {
                     // Show root files on SD-Card
-                    if ((err = client_cmd_lsr(client_sock)) != ESP_OK) {
+                    if ((err = client_cmd_ls(client_sock, false)) != ESP_OK) {
                         response = "ERR\n";
                     }
-                } else if (strcmp(rx_buffer, "filecnt") == 0) {
+                } else if (strcmp(rx_buffer, "fcnt") == 0) {
                     // Show file count in data folder
-                    if ((err = client_cmd_filecnt(client_sock)) != ESP_OK) {
+                    if ((err = client_cmd_fcnt(client_sock)) != ESP_OK) {
                         response = "ERR\n";
                     }
                 } else if (strcmp(rx_buffer, "ls") == 0) {
                     // Show data files on SD-Card
-                    if ((err = client_cmd_ls(client_sock)) != ESP_OK) {
+                    if ((err = client_cmd_ls(client_sock, true)) != ESP_OK) {
                         response = "ERR\n";
                     }
                 } else if (strncmp(rx_buffer, "cp ", 3) == 0) {

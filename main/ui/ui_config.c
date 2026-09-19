@@ -34,11 +34,8 @@ void ui_set_label_text(lv_obj_t *obj, const char *text)
 void ui_set_switch_state(lv_obj_t *obj, bool enabled)
 {
     if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return;
-    if (enabled) {
-        lv_obj_add_state(obj, LV_STATE_CHECKED);
-    } else {
-        lv_obj_remove_state(obj, LV_STATE_CHECKED);
-    }
+    if (enabled) lv_obj_add_state(obj, LV_STATE_CHECKED);
+    else lv_obj_remove_state(obj, LV_STATE_CHECKED);
     lvgl_port_unlock();
 }
 

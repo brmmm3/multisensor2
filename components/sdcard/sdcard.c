@@ -203,7 +203,10 @@ int sd_read_dir(DIR *dir, char *buf, int maxlen, int skip_cnt, int max_cnt)
     int pos = 0;
 
     maxlen -= 80;
-    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return 0;
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) {
+        ESP_LOGE(TAG, "sd_read_dir: lock failed");
+        return 0;
+    }
     while ((dp = readdir(dir)) != NULL) {
         if (skip_cnt > 0) {
             skip_cnt--;
@@ -314,14 +317,12 @@ esp_err_t sd_card_mount_fs()
         sdmmc_card_print_info(stdout, sd_card);
         sd_get_fat_info();
         lvgl_port_unlock();
+    } else if (err == ESP_FAIL) {
+        ESP_LOGE(TAG, "Failed to mount filesystem. "
+                    "If you want the card to be formatted, set the CONFIG_EXAMPLE_FORMAT_IF_MOUNT_FAILED menuconfig option.");
     } else {
-        if (err == ESP_FAIL) {
-            ESP_LOGE(TAG, "Failed to mount filesystem. "
-                     "If you want the card to be formatted, set the CONFIG_EXAMPLE_FORMAT_IF_MOUNT_FAILED menuconfig option.");
-        } else {
-            ESP_LOGE(TAG, "Failed to initialize the card (%s). "
-                     "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(err));
-        }
+        ESP_LOGE(TAG, "Failed to initialize the card (%s). "
+                    "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(err));
     }
     return err;
 }
