@@ -4,4 +4,4 @@ idf_component_register(
     SRCS ftp.c
     INCLUDE_DIRS "."
     PRIV_REQUIRES nvs_flash esp_wifi
-    REQUIRES driver)
+    REQUIRES esp_driver_i2c)

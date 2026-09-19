@@ -32,6 +32,8 @@ idf_component_register(
         mbedtls
         esp_wifi
         console
+        esp_driver_i2c
+        esp_hal_wdt
         rtc_tiny
     REQUIRES
         ftp

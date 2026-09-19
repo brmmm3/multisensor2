@@ -4,4 +4,4 @@ idf_component_register(
     SRCS lcd.c
     INCLUDE_DIRS "."
     PRIV_REQUIRES esp_timer
-    REQUIRES driver esp_lvgl_port)
+    REQUIRES esp_driver_gpio esp_lvgl_port)

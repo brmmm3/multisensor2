@@ -4,4 +4,4 @@ idf_component_register(
     SRCS adxl345.c
     INCLUDE_DIRS "."
     PRIV_REQUIRES esp_timer
-    REQUIRES driver)
+    REQUIRES esp_driver_i2c)

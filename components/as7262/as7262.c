@@ -76,7 +76,7 @@ void as7262_init(as7262_dev_t *device, as7262_read_fptr_t user_i2c_read, as7262_
     as7262_virtual_write(device, AS726X_CONTROL_SETUP, get_control_setup_hex(device->control_setup));
     device->control_setup.RST = 0;
 
-    vTaskDelay(1000 / portTICK_RATE_MS);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
 
     uint8_t version = as7262_virtual_read(device, AS726X_HW_VERSION);
     if (version != 0x40) {

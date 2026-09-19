@@ -4,4 +4,4 @@ idf_component_register(
     SRCS rtc_tiny.c
     INCLUDE_DIRS "."
     PRIV_REQUIRES esp_timer esp_netif
-    REQUIRES driver hal rtci2c esp_system)
+    REQUIRES esp_driver_i2c hal rtci2c esp_system)

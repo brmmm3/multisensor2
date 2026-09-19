@@ -1260,7 +1260,7 @@ void app_main(void)
     // Set system and startup time
     struct tm timeinfo;
     char buf[32];
-    esp_err_t err;
+    esp_err_t err = ESP_ERR_INVALID_ARG;
 
     if (rtc != NULL && (err = (rtc_get_datetime(rtc->rtc, &timeinfo))) == ESP_OK) {
         uint16_t year = 1900 + timeinfo.tm_year;
