@@ -329,27 +329,55 @@ void s11_setup()
 
 void sensors_init()
 {
+    esp_err_t err;
+
     ESP_LOGI(TAG, "Initialize Sensors");
     // This will never fail here
-    gps_init(&gps, GPS_UART_NUM, GPS_PIN_NUM_RX, GPS_PIN_NUM_TX);
-    gps_status = &gps->status;
-    ESP_ERROR_CHECK_WITHOUT_ABORT(bmx280_init(&bmx280lo, bus_handle, false));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(bmx280_init(&bmx280hi, bus_handle, true));
+    if ((err = gps_init(&gps, GPS_UART_NUM, GPS_PIN_NUM_RX, GPS_PIN_NUM_TX)) == ESP_OK) {
+        gps_status = &gps->status;
+    } else {
+        ESP_LOGE(TAG, "Failed to initialize GPS sensor.");
+    }
+    if ((err = bmx280_init(&bmx280lo, bus_handle, false)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize BMX280 sensor.");
+    }
+    if ((err = bmx280_init(&bmx280hi, bus_handle, true)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize BMX280 sensor.");
+    }
     // S11
-    ESP_ERROR_CHECK_WITHOUT_ABORT(s11_init(&s11_sensor, bus_handle));
-    s11_dump_dev_info(s11_sensor);
-    s11_setup();
-    ESP_ERROR_CHECK_WITHOUT_ABORT(scd30_init(&scd30_sensor, bus_handle));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(scd4x_init(&scd41_sensor, bus_handle));
+    if ((err = s11_init(&s11_sensor, bus_handle)) == ESP_OK) {
+        s11_dump_dev_info(s11_sensor);
+        s11_setup();
+    } else {
+        ESP_LOGE(TAG, "Failed to initialize S11 sensor.");
+    }
+    if ((err = scd30_init(&scd30_sensor, bus_handle)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize SCD30 sensor.");
+    }
+    if ((err = scd4x_init(&scd41_sensor, bus_handle)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize SCD41 sensor.");
+    }
     // This will never fail here
-    mhz19_init(&mhz19_sensor, MHZ19_UART_NUM, MHZ19_PIN_NUM_RX, MHZ19_PIN_NUM_TX);
+    if ((err = mhz19_init(&mhz19_sensor, MHZ19_UART_NUM, MHZ19_PIN_NUM_RX, MHZ19_PIN_NUM_TX)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize MHZ19 sensor.");
+    }
     // This will never fail here
-    yys_init(&yys_sensor, YYS_RX_CHANNEL, YYS_PIN_NUM_RX, YYS_PIN_NUM_TX);
+    if ((err = yys_init(&yys_sensor, YYS_RX_CHANNEL, YYS_PIN_NUM_RX, YYS_PIN_NUM_TX)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize YYS sensor.");
+    }
     // This will never fail here
-    ze08_init(&ze08_sensor, ZE08_RX_CHANNEL, ZE08_PIN_NUM_RX, ZE08_PIN_NUM_TX);
-    ESP_ERROR_CHECK_WITHOUT_ABORT(sps30_init(&sps30_sensor, bus_handle));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(adxl345_init(&adxl345, bus_handle));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(qmc5883l_init(&qmc5883l, bus_handle));
+    if ((err = ze08_init(&ze08_sensor, ZE08_RX_CHANNEL, ZE08_PIN_NUM_RX, ZE08_PIN_NUM_TX)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize ZE08 sensor.");
+    }
+    if ((err = sps30_init(&sps30_sensor, bus_handle)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize SPS30 sensor.");
+    }
+    if ((err = adxl345_init(&adxl345, bus_handle)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize ADXL345 sensor.");
+    }
+    if ((err = qmc5883l_init(&qmc5883l, bus_handle)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize QMC5883L sensor.");
+    }
     //s11_sensor->debug = 1;
     //scd30_sensor->debug = 1;
     //ze08_sensor->debug = 1;
