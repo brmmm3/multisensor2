@@ -228,8 +228,13 @@ void ensure_wifi_init(bool auto_connect)
 {
     ESP_LOGI(TAG, "ensure_wifi_init: auto_connect=%d", auto_connect);
     if (!wifi_connected) {
+        esp_err_t err;
+
         ui_set_switch_state(ui->sw_wifi_enable, true);
-        ESP_ERROR_CHECK_WITHOUT_ABORT(wifi_init(false));
+        if ((err = wifi_init(false)) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initialize WiFi");
+            return;
+        }
     }
     if (auto_connect) {
         ui_set_switch_state(ui->sw_wifi_auto, true);
