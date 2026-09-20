@@ -117,9 +117,9 @@ static esp_err_t execute_cmd(scd30_t *sensor, uint8_t *cmd, uint32_t timeout_ms,
 scd30_t *scd30_create_master(i2c_master_bus_handle_t bus_handle)
 {
     scd30_t *sensor = pvPortMalloc(sizeof(scd30_t));
-    memset(sensor, 0, sizeof(scd30_t));
 
     if (sensor != NULL) {
+        memset(sensor, 0, sizeof(scd30_t));
         sensor->bus_handle = bus_handle;
         sensor->dev_config.dev_addr_length = I2C_ADDR_BIT_LEN_7;
     } else {
@@ -173,11 +173,11 @@ esp_err_t scd30_init(scd30_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
         ESP_LOGE(TAG, "Could not create SCD30 driver.");
         return ESP_FAIL;
     }
-    *sensor_ptr = sensor;
     if ((err = scd30_device_create(sensor)) != ESP_OK) {
         vPortFree(sensor);
         return err;
     }
+    *sensor_ptr = sensor;
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(scd30_probe(sensor));
     ESP_ERROR_CHECK_WITHOUT_ABORT(scd30_soft_reset(sensor));

@@ -69,11 +69,11 @@ uint16_t scd30_get_forced_recalibration_value(scd30_t *sensor);
 
 esp_err_t scd30_set_forced_recalibration_value(scd30_t *sensor, uint16_t target_co2);
 
-uint16_t scd30_get_temperature_offset_int(scd30_t *senso);
+uint16_t scd30_get_temperature_offset_int(scd30_t *sensor);
 
 float scd30_get_temperature_offset(scd30_t *sensor);
 
-esp_err_t scd30_set_temperature_offset_int(scd30_t *sensor, uint16_t t_offset);
+esp_err_t scd30_set_temperature_offset_ticks(scd30_t *sensor, uint16_t t_offset);
 
 esp_err_t scd30_set_temperature_offset(scd30_t *sensor, float t_offset);
 
