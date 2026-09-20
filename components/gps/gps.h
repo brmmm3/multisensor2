@@ -119,7 +119,7 @@ typedef struct gps_vtg_s {
 typedef struct gps_zda_s {
     uint16_t cnt;
     float time;         // UTC time, typically 2 or 3 dp. Leading zeros are always included
-    uint8_t year;       // UTC year
+    uint16_t year;      // UTC year
     uint8_t month;      // UTC month of the year; 01-12. Leading zeros are always included
     uint8_t day;        // UTC day of the month; 01-31. Leading zeros are always included
     int8_t zone_hours;  // Local time zone (hours); -13 to +13 hours
