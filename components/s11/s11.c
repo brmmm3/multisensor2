@@ -205,6 +205,7 @@ esp_err_t s11_probe(s11_t *sensor)
 void s11_wakeup(s11_t *sensor)
 {
     i2c_master_probe(sensor->bus_handle, sensor->dev_config.device_address, CONFIG_S11_TIMEOUT);
+    vTaskDelay(pdMS_TO_TICKS(15));
 }
 
 esp_err_t s11_reset(s11_t *sensor)
@@ -527,9 +528,9 @@ esp_err_t s11_read_measurement(s11_t *sensor)
     if (sensor->dev_info.fw_version <= 14) len = S11_ADDR_MD_BUF_OLD_FW_LEN;
     else len = S11_ADDR_MD_BUF_LEN;
 
-    uint8_t buf[len];
+    uint8_t buf[S11_ADDR_MD_BUF_LEN];
 
-    sensor->last_error = execute_cmd(sensor, S11_ADDR_MD_BUF, NULL, 0, buf, S11_ADDR_MD_BUF_LEN);
+    sensor->last_error = execute_cmd(sensor, S11_ADDR_MD_BUF, NULL, 0, buf, len);
     //ESP_LOG_BUFFER_HEX_LEVEL(TAG, buf, sizeof(buf), ESP_LOG_INFO);
     if (sensor->last_error != ESP_OK) return sensor->last_error;
     sensor->dev_status.measurement_count = buf[S11_ADDR_MD_COUNT];
