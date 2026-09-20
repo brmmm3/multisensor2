@@ -36,7 +36,12 @@ esp_err_t write_text_file(const char *path, char *data)
         ESP_LOGE(TAG, "Failed to open file for writing: %s (errno=%u)", strerror(errno), errno);
         return ESP_FAIL;
     }
-    fwrite(data, strlen(data), 1, f);
+    if (fwrite(data, strlen(data), 1, f) != 1) {
+        ESP_LOGE(TAG, "Failed to write text file");
+        fclose(f);
+        lvgl_port_unlock();
+        return ESP_FAIL;
+    }
     fclose(f);
     lvgl_port_unlock();
     return ESP_OK;
@@ -68,7 +73,12 @@ esp_err_t write_bin_file(const char *path, void *data, uint32_t size)
         ESP_LOGE(TAG, "Failed to open file for writing: err(%u)=%s", errno, strerror(errno));
         return ESP_FAIL;
     }
-    fwrite(data, size, 1, f);
+    if (fwrite(data, size, 1, f) != 1) {
+        ESP_LOGE(TAG, "Failed to write binary file");
+        fclose(f);
+        lvgl_port_unlock();
+        return ESP_FAIL;
+    }
     fclose(f);
     lvgl_port_unlock();
     return ESP_OK;
@@ -77,7 +87,7 @@ esp_err_t write_bin_file(const char *path, void *data, uint32_t size)
 uint32_t read_bin_file(const char *path, void *buf, uint32_t size)
 {
     ESP_LOGI(TAG, "Read bin file %s", path);
-    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return ESP_FAIL;
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return 0;
     if (buf == NULL) {
         lvgl_port_unlock();
         return 0;
@@ -116,13 +126,16 @@ uint32_t write_bin_file_part(FILE *f, void *buf, uint32_t size)
     if (buf == NULL) return 0;
     if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return 0;
     uint32_t len = fwrite(buf, size, 1, f);
+    if (len != 1) {
+        ESP_LOGE(TAG, "Failed to write binary file part");
+    }
     lvgl_port_unlock();
     return len;
 }
 
 int close_bin_file(FILE *f)
 {
-    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return 0;
+    if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return EOF;
     int res = fclose(f);
     lvgl_port_unlock();
     return res;
@@ -130,9 +143,9 @@ int close_bin_file(FILE *f)
 
 char *get_data_file_path(const char *path)
 {
-    static char p[80];
+    static char p[256];
 
-    sprintf(p, "%s/data/%s", MOUNT_POINT, path);
+    snprintf(p, sizeof(p), "%s/data/%s", MOUNT_POINT, path);
     return p;
 }
 
@@ -172,7 +185,7 @@ esp_err_t remove_data_file(const char *path)
     return ESP_OK;
 }
 
-DIR *sd_open_dir(char *path)
+DIR *sd_open_dir(const char *path)
 {
     ESP_LOGD(TAG, "sd_open_dir %s", path);
     if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return NULL;
@@ -249,7 +262,7 @@ void list_dir(char *path)
     p[pos - 1] = '/';
 
     while ((dp = readdir(dir)) != NULL) {
-        struct stat st;
+        struct stat st = {0};
         strcpy(&p[pos], dp->d_name);
         if (stat(p, &st) == 0) {
             // TODO
