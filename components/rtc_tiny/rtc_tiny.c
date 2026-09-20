@@ -14,11 +14,15 @@ static const char *TAG = "RTC";
 
 esp_err_t rtc_set_datetime(rtci2c_context *rtc, struct tm *timeinfo)
 {
+    if (rtc == NULL || timeinfo == NULL) return ESP_ERR_INVALID_ARG;
     struct tm t;
 
-    rtci2c_set_datetime(rtc, timeinfo);
+    if (!rtci2c_set_datetime(rtc, timeinfo)) {
+        ESP_LOGE(TAG, "Failed to set date/time");
+        return ESP_FAIL;
+    }
     if (!rtci2c_get_datetime(rtc, &t)) {
-        ESP_LOGE(TAG, "Date/tate query failed");
+        ESP_LOGE(TAG, "Date/time query failed");
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "RTC Current: %02u/%02u/%u %u:%02u:%02u",
@@ -29,8 +33,9 @@ esp_err_t rtc_set_datetime(rtci2c_context *rtc, struct tm *timeinfo)
 
 esp_err_t rtc_get_datetime(rtci2c_context *rtc, struct tm *timeinfo)
 {
+    if (rtc == NULL || timeinfo == NULL) return ESP_ERR_INVALID_ARG;
     if (!rtci2c_get_datetime(rtc, timeinfo)) {
-        ESP_LOGE(TAG, "Date/tate query failed");
+        ESP_LOGE(TAG, "Date/time query failed");
         return ESP_FAIL;
     }
     return ESP_OK;
@@ -42,6 +47,10 @@ esp_err_t rtc_init(rtc_t **rtc_ptr, i2c_master_bus_handle_t *bus_handle)
     ESP_LOGI(TAG, "Initialize RTC");
 
     rtc_t *rtc = pvPortMalloc(sizeof(rtc_t));
+    if (rtc == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for RTC");
+        return ESP_ERR_NO_MEM;
+    }
     i2c_lowlevel_config config = {
         .bus = bus_handle
     };
@@ -55,7 +64,7 @@ esp_err_t rtc_init(rtc_t **rtc_ptr, i2c_master_bus_handle_t *bus_handle)
     }
     if (!rtci2c_get_datetime(rtc->rtc, &t)) {
         vPortFree(rtc);
-        ESP_LOGE(TAG, "Date/tate query failed");
+        ESP_LOGE(TAG, "Date/time query failed");
         return ESP_FAIL;
     }
     *rtc_ptr = rtc;
