@@ -42,6 +42,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #include "freertos/event_groups.h"
 
@@ -57,8 +58,6 @@ static const char *TAG = "FTP";
 
 #define FTP_TASK_PRIORITY 	3
 #define FTP_TASK_FINISH_BIT 1
-
-EventGroupHandle_t xEventTask;
 
 int ftp_buff_size = CONFIG_MICROPY_FTPSERVER_BUFFER_SIZE;
 int ftp_timeout = FTP_CMD_TIMEOUT_MS;
@@ -105,7 +104,7 @@ static void stoupper(char *str) {
 //--------------------------------------------------------------
 static bool ftp_open_file(const char *path, const char *mode) {
 	ESP_LOGD(TAG, "ftp_open_file: path=[%s]", path);
-	char fullname[128];
+	char fullname[FTP_MAX_PARAM_SIZE + 32];
 	strcpy(fullname, MOUNT_POINT);
 	strcat(fullname, path);
 	ESP_LOGD(TAG, "ftp_open_file: fullname=[%s]", fullname);
@@ -135,14 +134,6 @@ static void ftp_close_files_dir(void) {
 //------------------------------------------------
 static void ftp_close_filesystem_on_error(void) {
 	ftp_close_files_dir();
-	if (ftp_data.fp) {
-		fclose(ftp_data.fp);
-		ftp_data.fp = NULL;
-	}
-	if (ftp_data.dp) {
-		closedir(ftp_data.dp);
-		ftp_data.dp = NULL;
-	}
 }
 
 //---------------------------------------------------------------------------------------------
@@ -178,12 +169,15 @@ static ftp_result_t ftp_open_dir_for_listing(const char *path) {
 		closedir(ftp_data.dp);
 		ftp_data.dp = NULL;
 	}
-	char fullname[128];
+	char fullname[FTP_MAX_PARAM_SIZE + 32];
 	strcpy(fullname, MOUNT_POINT);
 	strcat(fullname, path);
 	ESP_LOGD(TAG, "ftp_open_dir_for_listing: %s", fullname);
 	ftp_data.dp = opendir(fullname);  // Open the directory
-	if (ftp_data.dp == NULL) return E_FTP_RESULT_FAILED;
+	if (ftp_data.dp == NULL) {
+		ftp_data.e_open = E_FTP_NOTHING_OPEN;
+		return E_FTP_RESULT_FAILED;
+	}
 	ftp_data.e_open = E_FTP_DIR_OPEN;
 	ftp_data.listroot = false;
 	return E_FTP_RESULT_CONTINUE;
@@ -193,7 +187,7 @@ static ftp_result_t ftp_open_dir_for_listing(const char *path) {
 static int ftp_get_eplf_item(char *dest, uint32_t destsize, struct dirent *de) {
 	char *type = (de->d_type & DT_DIR) ? "d" : "-";
 	// Get full file path needed for stat function
-	char fullname[128];
+	char fullname[FTP_MAX_PARAM_SIZE + 32];
 	strcpy(fullname, MOUNT_POINT);
 	strcat(fullname, ftp_path);
 	//strcpy(fullname, ftp_path);
@@ -236,7 +230,7 @@ static int ftp_get_eplf_item(char *dest, uint32_t destsize, struct dirent *de) {
 			}
 			else {
 				ESP_LOGE(TAG, "Buffer reallocation ERROR");
-				addsize = 0;
+				return -1;
 			}
 		}
 	}
@@ -279,7 +273,12 @@ static ftp_result_t ftp_list_dir(char *list, uint32_t maxlistsize, uint32_t *lis
 
 		// add the entry to the list
 		ESP_LOGD(TAG, "Add to dir list: %s", de->d_name);
-		next += ftp_get_eplf_item((list + next), (maxlistsize - next), de);
+		int item_len = ftp_get_eplf_item((list + next), (maxlistsize - next), de);
+		if (item_len < 0) {
+			result = E_FTP_RESULT_FAILED;
+			break;
+		}
+		next += item_len;
 		// re-sync pointers in case ftp_get_eplf_item reallocated ftp_data.dBuffer
 		list = (char *)ftp_data.dBuffer;
 		maxlistsize = ftp_buff_size;
@@ -705,8 +704,8 @@ static void ftp_process_cmd(void) {
 		else {
 			ESP_LOGD(TAG, "CMD: %u", cmd);
 		}
-		char fullname[128];
-		char fullname2[128];
+		char fullname[FTP_MAX_PARAM_SIZE + 32];
+		char fullname2[FTP_MAX_PARAM_SIZE + 32];
 		strcpy(fullname, MOUNT_POINT);
 		strcpy(fullname2, MOUNT_POINT);
 
@@ -764,7 +763,7 @@ static void ftp_process_cmd(void) {
 		case E_FTP_CMD_PWD:
 		case E_FTP_CMD_XPWD:
 			{
-				char lpath[128];
+				char lpath[FTP_MAX_PARAM_SIZE + 32];
 #if 0
 				if (strstr(ftp_path, VFS_NATIVE_MOUNT_POINT) == ftp_path) {
 					sprintf(lpath, "%s%s", VFS_NATIVE_INTERNAL_MP, ftp_path+strlen(VFS_NATIVE_MOUNT_POINT));
@@ -1362,7 +1361,6 @@ void ftp_task(void *arg)
 	// Initialize ftp, create rx buffer and mutex
 	if (!ftp_init()) {
 		ESP_LOGE(TAG, "Init Error");
-		xEventGroupSetBits(xEventTask, FTP_TASK_FINISH_BIT);
 		vTaskDelete(NULL);
 		return;
 	}
@@ -1388,7 +1386,6 @@ void ftp_task(void *arg)
 	} // end while
 
 	ESP_LOGW(TAG, "Task terminated!");
-	xEventGroupSetBits(xEventTask, FTP_TASK_FINISH_BIT);
 	vTaskDelete(NULL);
 }
 
