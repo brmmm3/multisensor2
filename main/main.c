@@ -1144,7 +1144,7 @@ void dump_values(bool force)
 
 uint32_t save_reset_reason(uint8_t reason)
 {
-    FILE *f = open_bin_file("resets.bin", "ab");
+    FILE *f = open_bin_file(MOUNT_POINT"/resets.bin", "ab");
     if (f == NULL) return 0;
     uint32_t len = write_bin_file_part(f, &reason, 1);
     close_bin_file(f);
