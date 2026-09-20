@@ -364,7 +364,10 @@ esp_err_t sps30_init(sps30_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
         if ((err = sps30_init_do(sensor)) == ESP_OK) break;
         vTaskDelay(pdMS_TO_TICKS(100));
     }
-    if (err != ESP_OK) return err;
+    if (err != ESP_OK) {
+        sps30_close(sensor);
+        return err;
+    }
     sps30_dump_info(sensor);
     *sensor_ptr = sensor;
     ESP_LOGI(TAG, "SPS30 initialized");
