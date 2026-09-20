@@ -112,7 +112,12 @@ esp_err_t sps30_device_init(sps30_t **sensor_ptr, i2c_master_bus_handle_t bus_ha
         ESP_LOGE(TAG, "Failed to create master on I2C bus");
         return ESP_FAIL;
     }
-    return sps30_device_create(*sensor_ptr);
+    esp_err_t err = sps30_device_create(*sensor_ptr);
+    if (err != ESP_OK) {
+        sps30_close(*sensor_ptr);
+        *sensor_ptr = NULL;
+    }
+    return err;
 }
 
 void sps30_close(sps30_t *sensor)
@@ -244,7 +249,8 @@ bool sps30_read_data_ready(sps30_t *sensor)
 {
     esp_err_t err = sps30_read(sensor, cmd_get_data_ready, buffer, 3);
     if (err != ESP_OK) return false;
-    return buffer[1] == 0x01;
+    /* Verify checksum and check data-ready flag */
+    return sps30_is_data_valid(buffer, 3) && (buffer[1] == 0x01);
 }
 
 esp_err_t sps30_read_measurement(sps30_t *sensor)
@@ -279,7 +285,7 @@ esp_err_t sps30_get_fan_auto_cleaning_interval(sps30_t *sensor)
 esp_err_t sps30_set_fan_auto_cleaning_interval(sps30_t *sensor, uint32_t autoclean_interval)
 {
     uint8_t *data = sps30_uint32_to_bytes(autoclean_interval);
-    esp_err_t err = sps30_write(sensor, cmd_stop_measurement, data, 6);
+    esp_err_t err = sps30_write(sensor, cmd_autoclean_interval, data, 6);
 
     vTaskDelay(pdMS_TO_TICKS(20));
     return err;
@@ -347,6 +353,7 @@ esp_err_t sps30_init_do(sps30_t *sensor)
     if ((err = sps30_get_firmware_version(sensor)) != ESP_OK) return err;
     if ((err = sps30_start_measurement(sensor)) != ESP_OK) return err;
     if ((err = sps30_reset(sensor)) != ESP_OK) return err;
+    vTaskDelay(pdMS_TO_TICKS(2000)); /* wait for sensor to reboot after reset */
     if ((err = sps30_start_measurement(sensor)) != ESP_OK) return err;
     ESP_LOGI(TAG, "SPS30 initialized");
     return ESP_OK;
@@ -361,7 +368,10 @@ esp_err_t sps30_init(sps30_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
     for (int i = 0; i < 5; i++) {
         /* Re-create device on each attempt to avoid stale handle after failure */
         if (sensor != NULL) sps30_close(sensor);
-        if ((err = sps30_device_init(&sensor, bus_handle)) != ESP_OK) return err;
+        if ((err = sps30_device_init(&sensor, bus_handle)) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to init device (attempt %d/5)", i + 1);
+            continue;
+        }
         if ((err = sps30_init_do(sensor)) == ESP_OK) break;
         vTaskDelay(pdMS_TO_TICKS(200));
     }
