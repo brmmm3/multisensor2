@@ -71,6 +71,7 @@ static const char *help =
 
 static bool send_message(const char *buf, int len)
 {
+    if (tx_queue == NULL) return false;
     msg_t *msg = &msg_array[msg_num++];
     if (msg_num > 15) msg_num = 0;
     msg->data = pvPortMalloc(len);
@@ -853,7 +854,9 @@ esp_err_t tcp_server_start()
     if (!wifi_connected) return ESP_FAIL;
     tcp_server_stop();
     xTaskCreate(tcp_server_task, "tcp_server", 4096, NULL, 5, &tcp_server_task_handle);
-    tx_queue = xQueueCreate(10, sizeof(msg_t));
+    if (tx_queue == NULL) {
+        tx_queue = xQueueCreate(10, sizeof(msg_t));
+    }
     return ESP_OK;
 }
 
@@ -868,7 +871,7 @@ esp_err_t tcp_server_stop()
         listen_sock = -1;
     }
     msg_t tx_data;
-    while (xQueueReceive(tx_queue, &tx_data, pdMS_TO_TICKS(10))) {
+    while (tx_queue != NULL && xQueueReceive(tx_queue, &tx_data, pdMS_TO_TICKS(10))) {
         vPortFree(tx_data.data);
     }
     if (tx_queue != NULL) {
@@ -885,6 +888,7 @@ void tcp_server_publish_values()
     static char buf[256];
 
     if (tcp_server_task_handle == NULL) return;
+    if (tx_queue == NULL) return;
     if (!wifi_connected || !tcp_server_running || tcp_client_cnt == 0) return;
     if (uxQueueMessagesWaiting(tx_queue) == 10) {
         ESP_LOGW(TAG, "TX queue full");
