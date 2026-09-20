@@ -59,13 +59,16 @@ static esp_err_t qmc5883l_write_byte(qmc5883l_t *sensor, uint8_t addr, uint8_t d
 
 esp_err_t qmc5883l_reset(qmc5883l_t *sensor)
 {
-    qmc5883l_write_byte(sensor, QMC5883L_CTL1_REG, 0x80);
+    if (sensor == NULL) return ESP_ERR_INVALID_ARG;
+    esp_err_t err = qmc5883l_write_byte(sensor, QMC5883L_CTL1_REG, 0x80);
+    if (err != ESP_OK) return err;
     vTaskDelay(pdMS_TO_TICKS(10));
     return ESP_OK;
 }
 
 esp_err_t qmc5883l_get_device_id(qmc5883l_t *sensor)
 {
+    if (sensor == NULL) return ESP_ERR_INVALID_ARG;
     uint8_t data[1];
     esp_err_t err;
 
@@ -91,6 +94,7 @@ bool qmc5883l_data_overflow(qmc5883l_t *sensor)
 
 esp_err_t qmc5883l_set_mode(qmc5883l_t *sensor, uint8_t mode, uint8_t odr, uint8_t rng, uint8_t osr)
 {
+    if (sensor == NULL) return ESP_ERR_INVALID_ARG;
     uint8_t data = mode | odr | rng | osr;
 
     return qmc5883l_write(sensor, QMC5883L_CTL0_REG, &data, 1);
@@ -98,10 +102,16 @@ esp_err_t qmc5883l_set_mode(qmc5883l_t *sensor, uint8_t mode, uint8_t odr, uint8
 
 esp_err_t qmc5883l_set_range(qmc5883l_t *sensor, uint8_t range)
 {
-    uint8_t data = 0x41;
+    if (sensor == NULL) return ESP_ERR_INVALID_ARG;
+    uint8_t data;
     esp_err_t err;
 
-    if (range == 1) data = 0x51;
+    // Read current CTRL0 to preserve OSR/ODR/mode settings
+    err = qmc5883l_read(sensor, QMC5883L_CTL0_REG, &data, 1);
+    if (err != ESP_OK) return err;
+    // Clear and set range bit (bit 4)
+    data &= ~0x10;
+    if (range != 0) data |= 0x10;
     if ((err = qmc5883l_write(sensor, QMC5883L_CTL0_REG, &data, 1)) != ESP_OK) return err;
     if (range == 0) sensor->values.range = 2.0 / 32768.0;
     else sensor->values.range = 8.0 / 32768.0;
@@ -110,6 +120,7 @@ esp_err_t qmc5883l_set_range(qmc5883l_t *sensor, uint8_t range)
 
 esp_err_t qmc5883l_read_data(qmc5883l_t *sensor)
 {
+    if (sensor == NULL) return ESP_ERR_INVALID_ARG;
     esp_err_t err;
     uint8_t data[9];
     qmc5883l_values_t *values = &sensor->values;
@@ -188,7 +199,10 @@ esp_err_t qmc5883l_device_init(qmc5883l_t *sensor)
     esp_err_t err;
 
     if (sensor == NULL) return ESP_ERR_INVALID_ARG;
-    if ((err = qmc5883l_reset(sensor)) != ESP_OK) return err;
+    if ((err = qmc5883l_reset(sensor)) != ESP_OK) {
+        qmc5883l_close(sensor);
+        return err;
+    }
     if ((err = qmc5883l_get_device_id(sensor)) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to get Device ID.");
         qmc5883l_close(sensor);
@@ -200,7 +214,10 @@ esp_err_t qmc5883l_device_init(qmc5883l_t *sensor)
     }
     // 0x40 (OSR=256) | 0x00 (Range +/- 2g) | 0x00 (ODR 10Hz) | 0x01 (Continuous)
     // 0x40 (OSR=256) | 0x01 (Range +/- 8g) | 0x00 (ODR 10Hz) | 0x01 (Continuous)
-    if ((err = qmc5883l_set_range(sensor, 1)) != ESP_OK) return err;
+    if ((err = qmc5883l_set_range(sensor, 1)) != ESP_OK) {
+        qmc5883l_close(sensor);
+        return err;
+    }
     return ESP_OK;
 }
 
@@ -217,9 +234,15 @@ esp_err_t qmc5883l_init(qmc5883l_t **sensor_ptr, i2c_master_bus_handle_t bus_han
     }
     // Probe and create device
     ESP_LOGI(TAG, "Probing for QMC5883L");
-    if ((err = i2c_master_probe(bus_handle, addr, CONFIG_QMC5883L_PROBE_TIMEOUT)) != ESP_OK) return err;
-    ESP_LOGI(TAG, "Found TLV493 on I2C address 0x%02X", addr);
-    if ((err = qmc5883l_device_create(sensor, addr)) != ESP_OK) return err;
+    if ((err = i2c_master_probe(bus_handle, addr, CONFIG_QMC5883L_PROBE_TIMEOUT)) != ESP_OK) {
+        qmc5883l_close(sensor);
+        return err;
+    }
+    ESP_LOGI(TAG, "Found QMC5883L on I2C address 0x%02X", addr);
+    if ((err = qmc5883l_device_create(sensor, addr)) != ESP_OK) {
+        qmc5883l_close(sensor);
+        return err;
+    }
     // Initialize device
     if ((err = qmc5883l_device_init(sensor)) != ESP_OK) return err;
     ESP_LOGI(TAG, "QMC5883L initialized");
@@ -229,6 +252,7 @@ esp_err_t qmc5883l_init(qmc5883l_t **sensor_ptr, i2c_master_bus_handle_t bus_han
 
 void qmc5883l_dump_values(qmc5883l_t *sensor, bool force)
 {
+    if (sensor == NULL) return;
     if (force || sensor->debug & 1) {
         qmc5883l_values_t *values = &sensor->values;
 
