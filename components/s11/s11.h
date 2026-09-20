@@ -37,6 +37,9 @@ extern "C" {
 #include "s11_defs.h"
 
 
+#define S11_FW_VERSION(major, minor) ((((uint16_t)(major)) << 8) | (uint16_t)(minor))
+
+
 typedef struct  __attribute__((__packed__)) {
 	/// 06-07: CO2 value filtered and pressure compensated [ppm] (R)
 	uint16_t co2_f;
@@ -57,7 +60,7 @@ typedef struct  __attribute__((__packed__)) {
 	uint16_t co2_f;
 	/// 14-15: CO2 value unfiltered [ppm] (R)
 	uint16_t co2;
-	/// 08-09: Chip temperature [0.1 deg C] (R)
+	/// 08-09: Chip temperature [0.01 deg C] (R)
   	int16_t temperature;
 	/// 00-01: Error status (R)
 	uint16_t error_status;
@@ -96,6 +99,8 @@ typedef struct {
 	uint16_t concentration_scale_factor_denominator;
 	uint16_t scaled_calibration_target;
 	uint16_t scaled_measured_concentration_override;
+	uint16_t co2_override;
+	uint16_t old_pressure_value;
 	uint16_t air_pressure_value;
 	/// Measurement Period [seconds] (EE) (R/W) 
 	uint16_t measurement_period;
@@ -129,6 +134,10 @@ typedef struct s11_s {
 	i2c_master_dev_handle_t dev_handle;
 	// I2C master configuration
 	i2c_device_config_t dev_config;
+	// I2C master configuration for wakeup
+	i2c_device_config_t wake_config;
+	// I2C master handle via port with configuration
+	i2c_master_dev_handle_t wake_handle;
 	// I2C master handle via port
 	i2c_master_bus_handle_t bus_handle;
 
@@ -153,7 +162,7 @@ void s11_close(s11_t *sensor);
 
 esp_err_t s11_probe(s11_t *sensor);
 
-void s11_wakeup(s11_t *sensor);
+esp_err_t s11_wakeup(s11_t *sensor);
 
 esp_err_t s11_reset(s11_t *sensor);
 
@@ -224,6 +233,10 @@ esp_err_t s11_set_scaled_abc_target(s11_t *sensor, uint16_t scaled_abc_target);
 esp_err_t s11_get_calibration_status(s11_t *sensor);
 
 esp_err_t s11_set_calibration_status(s11_t *sensor, uint8_t calibration_status);
+
+esp_err_t s11_get_co2_override(s11_t *sensor);
+
+esp_err_t s11_set_co2_override(s11_t *sensor, uint16_t co2_override);
 
 esp_err_t s11_get_abc_time(s11_t *sensor);
 

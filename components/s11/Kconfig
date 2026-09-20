@@ -1,4 +1,4 @@
-menu "SCD30 Options"
+menu "S11 Options"
     config S11_I2C_CLK_SPEED_HZ
         int "I2C Clock Speed (Hz)"
         default 100000

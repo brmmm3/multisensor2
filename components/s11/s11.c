@@ -50,16 +50,26 @@ static esp_err_t execute_cmd(s11_t *sensor, uint8_t cmd, uint8_t *out_data, size
 {
     uint8_t buf[16];
     uint8_t pos = 0;
+    esp_err_t err;
 
     buf[0] = cmd;
     while (pos++ < out_bytes) {
         buf[pos] = out_data[pos - 1];
     }
-    s11_wakeup(sensor);  // Wakeup is necessary before sending the command. 15ms time to send command after wakeup
-    if (in_bytes == 0) {
-        return i2c_master_transmit(sensor->dev_handle, buf, 1 + out_bytes, CONFIG_S11_TIMEOUT);
+    if ((err = s11_wakeup(sensor)) != ESP_OK) {
+        ESP_LOGE(TAG, "execute_cmd failed to wakeup sensor (err=%d)", err);
+        return err;
     }
-    return i2c_master_transmit_receive(sensor->dev_handle, buf, 1 + out_bytes, in_data, in_bytes, CONFIG_S11_TIMEOUT);
+    if (in_bytes == 0) {
+        err = i2c_master_transmit(sensor->dev_handle, buf, 1 + out_bytes, CONFIG_S11_TIMEOUT);
+    } else {
+        err = i2c_master_transmit_receive(sensor->dev_handle, buf, 1 + out_bytes, in_data, in_bytes, CONFIG_S11_TIMEOUT);
+    }
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "execute_cmd failed with err=%d, resetting I2C bus", err);
+        i2c_master_bus_reset(sensor->bus_handle);
+    }
+    return err;
 }
 
 static esp_err_t s11_read_u8(s11_t *sensor, uint8_t cmd, uint8_t *in_data)
@@ -73,7 +83,9 @@ static esp_err_t s11_read_u16(s11_t *sensor, uint8_t cmd, uint16_t *in_data)
     uint8_t buf[2];
 
     sensor->last_error = execute_cmd(sensor, cmd, NULL, 0, buf, 2);
-    *in_data = get_u16(buf);
+    if (sensor->last_error == ESP_OK) {
+        *in_data = get_u16(buf);
+    }
     return sensor->last_error;
 }
 
@@ -82,7 +94,9 @@ static esp_err_t s11_read_u32(s11_t *sensor, uint8_t cmd, uint32_t *in_data)
     uint8_t buf[4];
 
     sensor->last_error = execute_cmd(sensor, cmd, NULL, 0, buf, 4);
-    *in_data = get_u32(buf);
+    if (sensor->last_error == ESP_OK) {
+        *in_data = get_u32(buf);
+    }
     return sensor->last_error;
 }
 
@@ -105,6 +119,10 @@ static esp_err_t s11_write_u16(s11_t *sensor, uint8_t cmd, uint16_t out_data)
 static s11_t *s11_create_master(i2c_master_bus_handle_t bus_handle)
 {
     s11_t *sensor = pvPortMalloc(sizeof(s11_t));
+    if (sensor == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for S11");
+        return NULL;
+    }
     memset(sensor, 0, sizeof(s11_t));
 
     if (sensor != NULL) {
@@ -121,19 +139,32 @@ static s11_t *s11_create_master(i2c_master_bus_handle_t bus_handle)
 static esp_err_t s11_device_create(s11_t *sensor)
 {
     ESP_LOGI(TAG, "device_create for S11 sensors on ADDR %X", S11_SENSOR_ADDR);
+    sensor->dev_config.dev_addr_length = I2C_ADDR_BIT_LEN_7;
     sensor->dev_config.device_address = S11_SENSOR_ADDR;
     sensor->dev_config.scl_speed_hz = CONFIG_S11_I2C_CLK_SPEED_HZ;
     sensor->dev_config.scl_wait_us = 20000; // 20ms wait time for S11 sensor to handle stretch/disturbance properly
     //sensor->dev_config.flags.enable_internal_pullup = false;
-    //sensor->dev_config.flags.disable_ack_check = true;
+    sensor->dev_config.flags.disable_ack_check = true;
     // Add device to the I2C bus
     esp_err_t err = i2c_master_bus_add_device(sensor->bus_handle, &sensor->dev_config, &sensor->dev_handle);
-    if (err == ESP_OK) {
-        ESP_LOGI(TAG, "device_create SUCCESS on %02X", S11_SENSOR_ADDR);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "device_create FAILED on %02X", S11_SENSOR_ADDR);
         return err;
     }
-    ESP_LOGE(TAG, "device_create FAILED on %02X", S11_SENSOR_ADDR);
-    return err;
+    // Wakeup config
+    sensor->wake_config.dev_addr_length = I2C_ADDR_BIT_LEN_7;
+    sensor->wake_config.device_address = I2C_DEVICE_ADDRESS_NOT_USED;
+    sensor->wake_config.scl_speed_hz = CONFIG_S11_I2C_CLK_SPEED_HZ;
+    sensor->wake_config.scl_wait_us = 20000; // 20ms wait time for S11 sensor to handle stretch/disturbance properly
+    // Add device to the I2C bus
+    err = i2c_master_bus_add_device(sensor->bus_handle, &sensor->dev_config, &sensor->wake_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "device_create FAILED on %02X", S11_SENSOR_ADDR);
+        return err;
+    }
+
+    ESP_LOGI(TAG, "device_create SUCCESS on %02X", S11_SENSOR_ADDR);
+    return ESP_OK;
 }
 
 esp_err_t s11_init(s11_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
@@ -197,8 +228,8 @@ esp_err_t s11_probe(s11_t *sensor)
     ESP_LOGI(TAG, "Probing for S11 sensor on I2C %X", sensor->dev_config.device_address);
     for (i = 0; i < 10; i++) {
         err = i2c_master_probe(sensor->bus_handle, sensor->dev_config.device_address, CONFIG_S11_TIMEOUT);
-        vTaskDelay(pdMS_TO_TICKS(15));
         if (err == ESP_OK) break;
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Probing for S11 SUCCESS after %u retries", i);
@@ -208,10 +239,24 @@ esp_err_t s11_probe(s11_t *sensor)
     return err;
 }
 
-void s11_wakeup(s11_t *sensor)
+esp_err_t s11_wakeup(s11_t *sensor)
 {
-    i2c_master_probe(sensor->bus_handle, sensor->dev_config.device_address, CONFIG_S11_TIMEOUT);
-    vTaskDelay(pdMS_TO_TICKS(15));
+    i2c_operation_job_t ops[] = {
+        { .command = I2C_MASTER_CMD_START },
+        {
+            .command = I2C_MASTER_CMD_WRITE,
+            .write = {
+                .ack_check = false,       // Ignore expected NACK
+                .data = NULL,
+                .total_bytes = 0,
+            },
+        },
+        { .command = I2C_MASTER_CMD_STOP },
+    };
+
+    // The address must be supplied by the device handle.
+    // Better: send one address byte manually if your ESP-IDF API permits it.
+    return i2c_master_execute_defined_operations(sensor->wake_handle, ops, sizeof(ops) / sizeof(ops[0]), 100);
 }
 
 esp_err_t s11_reset(s11_t *sensor)
@@ -222,29 +267,28 @@ esp_err_t s11_reset(s11_t *sensor)
 
 esp_err_t s11_get_error_status(s11_t *sensor)
 {
-    uint16_t value;
+    uint8_t value;
 
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_ERRSTAT_MSB, &value);
-    sensor->values.error_status = value;
+    sensor->last_error = s11_read_u8(sensor, S11_ADDR_ERRSTAT_LSB, &value);
+    if (sensor->last_error == ESP_OK) {
+        sensor->values.error_status = value;
+    }
     return sensor->last_error;
 }
 
 esp_err_t s11_get_firmware_rev(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_FW_REV_MSB, &sensor->dev_info.fw_version);
-    return sensor->last_error;
+    return s11_read_u16(sensor, S11_ADDR_FW_REV_MSB, &sensor->dev_info.fw_version);
 }
 
 esp_err_t s11_get_firmware_type(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u8(sensor, S11_ADDR_FW_TYPE, &sensor->dev_info.fw_type);
-    return sensor->last_error;
+    return s11_read_u8(sensor, S11_ADDR_FW_TYPE, &sensor->dev_info.fw_type);
 }
 
 esp_err_t s11_get_sensor_id(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u32(sensor, S11_ADDR_SID_MMSB, &sensor->dev_info.sensor_id);
-    return sensor->last_error;
+    return s11_read_u32(sensor, S11_ADDR_SID_MMSB, &sensor->dev_info.sensor_id);
 }
 
 esp_err_t s11_get_product_code(s11_t *sensor)
@@ -266,178 +310,157 @@ esp_err_t s11_get_dev_info(s11_t *sensor)
 
 esp_err_t s11_get_measurement_mode(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u8(sensor, S11_ADDR_DEV_MEAS_MODE, &sensor->dev_settings.meas_mode);
-    return sensor->last_error;
+    return s11_read_u8(sensor, S11_ADDR_DEV_MEAS_MODE, &sensor->dev_settings.meas_mode);
 }
 
 esp_err_t s11_set_measurement_mode(s11_t *sensor, uint8_t meas_mode)
 {
-    sensor->last_error = s11_write_u8(sensor, S11_ADDR_DEV_MEAS_MODE, meas_mode);
-    return sensor->last_error;
+    return s11_write_u8(sensor, S11_ADDR_DEV_MEAS_MODE, meas_mode);
 }
 
 esp_err_t s11_get_measurement_period(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_DEV_MEAS_PER_MSB, &sensor->dev_settings.measurement_period);
-    return sensor->last_error;
+    return s11_read_u16(sensor, S11_ADDR_DEV_MEAS_PER_MSB, &sensor->dev_settings.measurement_period);
 }
 
 esp_err_t s11_set_measurement_period(s11_t *sensor, uint16_t meas_period)
 {
-    sensor->last_error = s11_write_u16(sensor, S11_ADDR_DEV_MEAS_PER_MSB, meas_period);
-    return sensor->last_error;
+    return s11_write_u16(sensor, S11_ADDR_DEV_MEAS_PER_MSB, meas_period);
 }
 
 esp_err_t s11_get_number_samples(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_DEV_NB_SAMP_MSB, &sensor->dev_settings.meas_nb_samples);
-    return sensor->last_error;
+    return s11_read_u16(sensor, S11_ADDR_DEV_NB_SAMP_MSB, &sensor->dev_settings.meas_nb_samples);
 }
 
 esp_err_t s11_set_number_samples(s11_t *sensor, uint16_t meas_nb_samples)
 {
-    sensor->last_error = s11_write_u16(sensor, S11_ADDR_DEV_NB_SAMP_MSB, meas_nb_samples);
-    return sensor->last_error;
+    return s11_write_u16(sensor, S11_ADDR_DEV_NB_SAMP_MSB, meas_nb_samples);
 }
 
 esp_err_t s11_get_abc_period(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_ABC_PER_MSB, &sensor->dev_settings.abc_period);
-    return sensor->last_error;
+    return s11_read_u16(sensor, S11_ADDR_ABC_PER_MSB, &sensor->dev_settings.abc_period);
 }
 
 esp_err_t s11_set_abc_period(s11_t *sensor, uint16_t abc_period)
 {
-    sensor->last_error = s11_write_u16(sensor, S11_ADDR_ABC_PER_MSB, abc_period);
-    return sensor->last_error;
+    return s11_write_u16(sensor, S11_ADDR_ABC_PER_MSB, abc_period);
 }
 
 esp_err_t s11_get_abc_target(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_ABC_TARGET_MSB, &sensor->dev_settings.abc_target);
-    return sensor->last_error;
+    return s11_read_u16(sensor, S11_ADDR_ABC_TARGET_MSB, &sensor->dev_settings.abc_target);
 }
 
 esp_err_t s11_set_abc_target(s11_t *sensor, uint16_t abc_target)
 {
-    sensor->last_error = s11_write_u16(sensor, S11_ADDR_ABC_TARGET_MSB, abc_target);
-    return sensor->last_error;
+    return s11_write_u16(sensor, S11_ADDR_ABC_TARGET_MSB, abc_target);
 }
 
 esp_err_t s11_get_iir_filter_par(s11_t *sensor)
 {
-    ESP_LOGI(TAG, "s11_get_iir_filter_par");
-    sensor->last_error = s11_read_u8(sensor, S11_ADDR_IIR_FILTER_PAR, &sensor->dev_settings.iir_filter_par);
-    return sensor->last_error;
+    return s11_read_u8(sensor, S11_ADDR_IIR_FILTER_PAR, &sensor->dev_settings.iir_filter_par);
 }
 
 esp_err_t s11_set_iir_filter_par(s11_t *sensor, uint8_t iir_filter_par)
 {
-    sensor->last_error = s11_write_u8(sensor, S11_ADDR_IIR_FILTER_PAR, iir_filter_par);
-    return sensor->last_error;
+    return s11_write_u8(sensor, S11_ADDR_IIR_FILTER_PAR, iir_filter_par);
 }
 
 esp_err_t s11_get_dev_meter_ctl(s11_t *sensor)
 {
-    ESP_LOGI(TAG, "s11_get_dev_meter_ctl");
-    sensor->last_error = s11_read_u8(sensor, S11_ADDR_DEV_METER_CTL, &sensor->dev_settings.dev_meter_ctl);
-    return sensor->last_error;
+    return s11_read_u8(sensor, S11_ADDR_DEV_METER_CTL, &sensor->dev_settings.dev_meter_ctl);
 }
 
 esp_err_t s11_set_dev_meter_ctl(s11_t *sensor, uint8_t dev_meter_ctl)
 {
-    sensor->last_error = s11_write_u8(sensor, S11_ADDR_DEV_METER_CTL, dev_meter_ctl);
-    return sensor->last_error;
+    return s11_write_u8(sensor, S11_ADDR_DEV_METER_CTL, dev_meter_ctl);
 }
 
 esp_err_t s11_get_address(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u8(sensor, S11_ADDR_DEV_ADDR, &sensor->dev_settings.address);
-    return sensor->last_error;
+    return s11_read_u8(sensor, S11_ADDR_DEV_ADDR, &sensor->dev_settings.address);
 }
 
 esp_err_t s11_set_address(s11_t *sensor, uint8_t address)
 {
-    sensor->last_error = s11_write_u8(sensor, S11_ADDR_DEV_ADDR, address);
-    return sensor->last_error;
+    return s11_write_u8(sensor, S11_ADDR_DEV_ADDR, address);
 }
 
 esp_err_t s11_get_concentration_scale_factor_nominator(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_CONC_SCL_FAC_NOM, &sensor->dev_settings.concentration_scale_factor_nominator);
-    return sensor->last_error;
+    return s11_read_u16(sensor, S11_ADDR_CONC_SCL_FAC_NOM, &sensor->dev_settings.concentration_scale_factor_nominator);
 }
 
 esp_err_t s11_set_concentration_scale_factor_nominator(s11_t *sensor, uint16_t concentration_scale_factor_nominator)
 {
-    sensor->last_error = s11_write_u16(sensor, S11_ADDR_CONC_SCL_FAC_NOM, concentration_scale_factor_nominator);
-    return sensor->last_error;
+    return s11_write_u16(sensor, S11_ADDR_CONC_SCL_FAC_NOM, concentration_scale_factor_nominator);
 }
 
 esp_err_t s11_get_concentration_scale_factor_denominator(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_CONC_SCL_FAC_DEN, &sensor->dev_settings.concentration_scale_factor_denominator);
-    return sensor->last_error;
+    return s11_read_u16(sensor, S11_ADDR_CONC_SCL_FAC_DEN, &sensor->dev_settings.concentration_scale_factor_denominator);
 }
 
 esp_err_t s11_set_concentration_scale_factor_denominator(s11_t *sensor, uint16_t concentration_scale_factor_denominator)
 {
-    sensor->last_error = s11_write_u16(sensor, S11_ADDR_CONC_SCL_FAC_DEN, concentration_scale_factor_denominator);
-    return sensor->last_error;
+    return s11_write_u16(sensor, S11_ADDR_CONC_SCL_FAC_DEN, concentration_scale_factor_denominator);
 }
 
 esp_err_t s11_get_scaled_calibration_target(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_SCLD_CAL_TARGET, &sensor->dev_settings.scaled_calibration_target);
-    return sensor->last_error;
+    return s11_read_u16(sensor, S11_ADDR_SCLD_CAL_TARGET, &sensor->dev_settings.scaled_calibration_target);
 }
 
 esp_err_t s11_set_scaled_calibration_target(s11_t *sensor, uint16_t scaled_calibration_target)
 {
-    sensor->last_error = s11_write_u16(sensor, S11_ADDR_SCLD_CAL_TARGET, scaled_calibration_target);
-    return sensor->last_error;
+    return s11_write_u16(sensor, S11_ADDR_SCLD_CAL_TARGET, scaled_calibration_target);
 }
 
 esp_err_t s11_get_scaled_measured_concentration_override(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_SCLD_MEAS_CONC_OVR, &sensor->dev_settings.scaled_measured_concentration_override);
-    return sensor->last_error;
+    return s11_read_u16(sensor, S11_ADDR_SCLD_MEAS_CONC_OVR, &sensor->dev_settings.scaled_measured_concentration_override);
 }
 
 esp_err_t s11_set_scaled_measured_concentration_override(s11_t *sensor, uint16_t scaled_measured_concentration_override)
 {
-    sensor->last_error = s11_write_u16(sensor, S11_ADDR_SCLD_MEAS_CONC_OVR, scaled_measured_concentration_override);
-    return sensor->last_error;
+    return s11_write_u16(sensor, S11_ADDR_SCLD_MEAS_CONC_OVR, scaled_measured_concentration_override);
 }
 
 esp_err_t s11_get_scaled_abc_target(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_SCLD_ABC_TARGET, &sensor->dev_settings.scaled_abc_target);
-    return sensor->last_error;
+    return s11_read_u16(sensor, S11_ADDR_SCLD_ABC_TARGET, &sensor->dev_settings.scaled_abc_target);
 }
 
 esp_err_t s11_set_scaled_abc_target(s11_t *sensor, uint16_t scaled_abc_target)
 {
-    sensor->last_error = s11_write_u16(sensor, S11_ADDR_SCLD_ABC_TARGET, scaled_abc_target);
-    return sensor->last_error;
+    return s11_write_u16(sensor, S11_ADDR_SCLD_ABC_TARGET, scaled_abc_target);
 }
 
 esp_err_t s11_get_calibration_status(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u8(sensor, S11_ADDR_CALIBRATION_STATUS, &sensor->dev_settings.calibration_status);
-    return sensor->last_error;
+    return s11_read_u8(sensor, S11_ADDR_CALIBRATION_STATUS, &sensor->dev_settings.calibration_status);
 }
 
 esp_err_t s11_set_calibration_status(s11_t *sensor, uint8_t calibration_status)
 {
-    sensor->last_error = s11_write_u8(sensor, S11_ADDR_CALIBRATION_STATUS, calibration_status);
-    return sensor->last_error;
+    return s11_write_u8(sensor, S11_ADDR_CALIBRATION_STATUS, calibration_status);
+}
+
+esp_err_t s11_get_co2_override(s11_t *sensor)
+{
+    return s11_read_u16(sensor, S11_ADDR_CO2_OVERRIDE, &sensor->dev_settings.co2_override);
+}
+
+esp_err_t s11_set_co2_override(s11_t *sensor, uint16_t co2_override)
+{
+    return s11_write_u16(sensor, S11_ADDR_CO2_OVERRIDE, co2_override);
 }
 
 esp_err_t s11_get_abc_time(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_ABC_TIME, &sensor->dev_settings.abc_time);
-    return sensor->last_error;
+    return s11_read_u16(sensor, S11_ADDR_ABC_TIME, &sensor->dev_settings.abc_time);
 }
 
 esp_err_t s11_get_abc_par(s11_t *sensor)
@@ -466,26 +489,25 @@ esp_err_t s11_set_filter_par(s11_t *sensor)
 
 esp_err_t s11_get_air_pressure_value(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_AIR_PRESS_VALUE, &sensor->dev_settings.air_pressure_value);
-    return sensor->last_error;
+    return s11_read_u16(sensor, S11_ADDR_AIR_PRESS_VALUE, &sensor->dev_settings.air_pressure_value);
 }
 
 esp_err_t s11_set_air_pressure_value(s11_t *sensor, uint16_t air_pressure_value)
 {
+    sensor->dev_settings.old_pressure_value = sensor->dev_settings.air_pressure_value;
     sensor->last_error = s11_write_u16(sensor, S11_ADDR_AIR_PRESS_VALUE, air_pressure_value);
+    if (sensor->last_error == ESP_OK) sensor->dev_settings.air_pressure_value = air_pressure_value;
     return sensor->last_error;
 }
 
 esp_err_t s11_get_abc_pressure_value(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_ABC_PRESS_VALUE, &sensor->dev_settings.abc_pressure_value);
-    return sensor->last_error;
+    return s11_read_u16(sensor, S11_ADDR_ABC_PRESS_VALUE, &sensor->dev_settings.abc_pressure_value);
 }
 
 esp_err_t s11_set_abc_pressure_value(s11_t *sensor, uint16_t abc_pressure_value)
 {
-    sensor->last_error = s11_write_u16(sensor, S11_ADDR_ABC_PRESS_VALUE, abc_pressure_value);
-    return sensor->last_error;
+    return s11_write_u16(sensor, S11_ADDR_ABC_PRESS_VALUE, abc_pressure_value);
 }
 
 esp_err_t s11_get_sensor_temperature(s11_t *sensor)
@@ -498,21 +520,19 @@ esp_err_t s11_get_sensor_temperature(s11_t *sensor)
 
 esp_err_t s11_get_measurement_count(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u8(sensor, S11_ADDR_MEAS_CNT, &sensor->dev_status.measurement_count);
-    return sensor->last_error;
+    return s11_read_u8(sensor, S11_ADDR_MEAS_CNT, &sensor->dev_status.measurement_count);
 }
 
 esp_err_t s11_get_measurement_cycle(s11_t *sensor)
 {
-    sensor->last_error = s11_read_u16(sensor, S11_ADDR_MEAS_CYCLE_TIME, &sensor->dev_status.measurement_cycle_time);
-    return sensor->last_error;
+    return s11_read_u16(sensor, S11_ADDR_MEAS_CYCLE_TIME, &sensor->dev_status.measurement_cycle_time);
 }
 
 esp_err_t s11_get_co2(s11_t *sensor)
 {
     uint16_t value;
 
-    if (sensor->dev_info.fw_version <= 14) {
+    if (sensor->dev_info.fw_version <= S11_FW_VERSION(4, 15)) {
         if ((sensor->last_error = s11_read_u16(sensor, S11_ADDR_CO2_FP, &value)) != ESP_OK) return sensor->last_error;
         sensor->values.co2_f = value;
         if ((sensor->last_error = s11_read_u16(sensor, S11_ADDR_CO2_P, &value)) != ESP_OK) return sensor->last_error;
@@ -534,7 +554,7 @@ esp_err_t s11_read_measurement(s11_t *sensor)
 {
     uint8_t len;
 
-    if (sensor->dev_info.fw_version <= 14) len = S11_ADDR_MD_BUF_OLD_FW_LEN;
+    if (sensor->dev_info.fw_version <= S11_FW_VERSION(4, 15)) len = S11_ADDR_MD_BUF_OLD_FW_LEN;
     else len = S11_ADDR_MD_BUF_LEN;
 
     uint8_t buf[S11_ADDR_MD_BUF_LEN];
@@ -544,9 +564,9 @@ esp_err_t s11_read_measurement(s11_t *sensor)
     if (sensor->last_error != ESP_OK) return sensor->last_error;
     sensor->dev_status.measurement_count = buf[S11_ADDR_MD_COUNT];
     sensor->dev_status.measurement_cycle_time = get_u16(&buf[S11_ADDR_MD_CYCLE_TIME_MSB]);
-    sensor->values.temperature = (int16_t)get_u16(&buf[S11_ADDR_MD_TEMP_MSB]) / 10;
-    if (sensor->dev_info.fw_version <= 14) {
-        // Old firmware <= 14 only deliver co2_f and co2. Pressure compensation is not available.
+    sensor->values.temperature = (int16_t)get_u16(&buf[S11_ADDR_MD_TEMP_MSB]);
+    if (sensor->dev_info.fw_version <= S11_FW_VERSION(4, 15)) {
+        // Old firmware <= 4.15 only deliver co2_f and co2. Pressure compensation is not available.
         sensor->values.co2_f = get_u16(&buf[S11_ADDR_MD_CO2_FP_MSB]);
         sensor->values.co2 = get_u16(&buf[S11_ADDR_MD_CO2_P_MSB]);
     } else {
@@ -567,12 +587,20 @@ void s11_get_measurement_old_fw(s11_values_t *values, s11_values_old_fw_t *value
 
 esp_err_t s11_get_cal_data(s11_t *sensor)
 {
-    ESP_LOGI(TAG, "s11_get_dev_info");
-    sensor->last_error = execute_cmd(sensor, S11_ADDR_CAL_BUF, NULL, 0, (uint8_t *)&sensor->cal_data, S11_ADDR_CAL_BUF_LEN);
-    ESP_LOGI(TAG, "cal_status=%02X", sensor->cal_data.cal_status);
-    ESP_LOGI(TAG, "cal_cmd=%02X", sensor->cal_data.cal_cmd);
-    ESP_LOGI(TAG, "cal_target=%02X", sensor->cal_data.cal_target);
-    return sensor->last_error;
+    ESP_LOGI(TAG, "s11_get_cal_data");
+    uint8_t buf[S11_ADDR_CAL_BUF_LEN];
+
+    sensor->last_error = execute_cmd(sensor, S11_ADDR_CAL_BUF, NULL, 0, buf, sizeof(buf));
+    if (sensor->last_error != ESP_OK) return sensor->last_error;
+
+    sensor->cal_data.cal_status = buf[S11_ADDR_CAL_STATUS];
+    sensor->cal_data.cal_cmd = get_u16(&buf[S11_ADDR_CAL_CMD_MSB]);
+    sensor->cal_data.cal_target = get_u16(&buf[S11_ADDR_CAL_TGT_MSB]);
+
+    ESP_LOGI(TAG, "cal_status=0x%02X", sensor->cal_data.cal_status);
+    ESP_LOGI(TAG, "cal_cmd=0x%04X", sensor->cal_data.cal_cmd);
+    ESP_LOGI(TAG, "cal_target=%u ppm", sensor->cal_data.cal_target);
+    return ESP_OK;
 }
 
 esp_err_t s11_clear_error_status(s11_t *sensor)
@@ -624,7 +652,7 @@ void s11_dump_values(s11_t *sensor, bool force)
         s11_values_t *values = &sensor->values;
 
         ESP_LOGI(TAG, "co2_fp=%u ppm  co2_p=%u ppm  co2_f=%u ppm  co2=%u ppm  temp=%.1f °C",
-                 values->co2_fp, values->co2_p, values->co2_f, values->co2, 0.1 * (float)values->temperature);
+                 values->co2_fp, values->co2_p, values->co2_f, values->co2, 0.01 * (float)values->temperature);
         s11_dump_error_status(sensor);
     }
 }

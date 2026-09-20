@@ -18,7 +18,7 @@ extern "C" {
 #include <stdbool.h>
 
 // Default
-#define S11_DEF_I2C_ADDR           (0x68) ///< Default I2C address
+#define S11_DEF_I2C_ADDR           (0x68) ///< Default 7 bit I2C address
 
 // Error Status register (ERRSTAT)
 #define S11_ADDR_ERRSTAT_MSB       (0x00) ///< Register address
@@ -175,11 +175,11 @@ extern "C" {
 #define S11_ERRSTAT_MSK_SCL_FAC     (0x8000)  ///< Scale factor error
 
 // Calibration Status Register (CAL_STAT) - Bitmask
-#define S11_CAL_STAT_MSK_FACT_CAL   (0x02) ///< Factory calibration completed
-#define S11_CAL_STAT_MSK_ABC_CAL    (0x04) ///< ABC calibration completed
-#define S11_CAL_STAT_MSK_TARGET_CAL (0x08) ///< Target calibration completed
-#define S11_CAL_STAT_MSK_BKG_CAL    (0x10) ///< Background calibration completed
-#define S11_CAL_STAT_MSK_ZERO_CAL   (0x20) ///< Calibration status - Zero calibration completed
+#define S11_CAL_STAT_MSK_FACT_CAL   (0x04) ///< bit 2: Factory calibration completed
+#define S11_CAL_STAT_MSK_ABC_CAL    (0x08) ///< bit 3: ABC calibration completed
+#define S11_CAL_STAT_MSK_TARGET_CAL (0x10) ///< bit 4: Target calibration completed
+#define S11_CAL_STAT_MSK_BKG_CAL    (0x20) ///< bit 5: Background calibration completed
+#define S11_CAL_STAT_MSK_ZERO_CAL   (0x40) ///< bit 6: Calibration status - Zero calibration completed
 
 // Calibration Command Register (CAL_CMD) - Calibration types
 #define S11_CAL_CMD_FACT_CAL       (0x7C02) ///< Restore factory calibration
