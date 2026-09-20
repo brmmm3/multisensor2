@@ -143,7 +143,6 @@ static void print_cipher_type(int pairwise_cipher, int group_cipher)
 static void wifi_selected_cb(lv_event_t *e)
 {
     lv_obj_t *btn = lv_event_get_target(e);
-    lv_obj_t *list = lv_obj_get_parent(btn);
     if (selected_btn && selected_btn != btn) {
         ui_remove_style(selected_btn, &style_selected);
     }
@@ -165,7 +164,7 @@ static void wifi_selected_cb(lv_event_t *e)
         lv_obj_add_style(btn, &style_selected, 0);
         lvgl_port_unlock();
         selected_btn = btn;
-        selected_ssid = lv_list_get_button_text(list, btn);
+        selected_ssid = lv_label_get_text(lv_obj_get_child(btn, 0));
         config->wifi_auto_connect_idx = 0;
         while (config->wifi_auto_connect_idx < 4) {
             ESP_LOGI(TAG,"Try %i %s", config->wifi_auto_connect_idx, config_nvs->wifi.ssid[config->wifi_auto_connect_idx]);

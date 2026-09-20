@@ -9,7 +9,7 @@
 #include "freertos/idf_additions.h"
 #include "include/wifi_sntp.h"
 #include "config.h"
-#include "misc/lv_palette.h"
+#include "lvgl.h"
 #include "tcp_server.h"
 #include "ui/include/ui_config.h"
 #include "include/wifi.h"

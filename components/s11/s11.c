@@ -155,18 +155,22 @@ esp_err_t s11_init(s11_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
         return err;
     }
     if ((err = s11_get_dev_info(sensor)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get device info (err=%d)", err);
         s11_close(sensor);
         return err;
     }
     if ((err = s11_get_cal_data(sensor)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get calibration data (err=%d)", err);
         s11_close(sensor);
         return err;
     }
     if ((err = s11_get_dev_meter_ctl(sensor)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get device meter control (err=%d)", err);
         s11_close(sensor);
         return err;
     }
     if ((err = s11_get_iir_filter_par(sensor)) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get IIR filter parameter (err=%d)", err);
         s11_close(sensor);
         return err;
     }
@@ -251,6 +255,7 @@ esp_err_t s11_get_product_code(s11_t *sensor)
 
 esp_err_t s11_get_dev_info(s11_t *sensor)
 {
+    ESP_LOGI(TAG, "s11_get_dev_info");
     if (s11_get_firmware_rev(sensor) != ESP_OK) return sensor->last_error;
     if (s11_get_firmware_type(sensor) != ESP_OK) return sensor->last_error;
     if (s11_get_sensor_id(sensor) != ESP_OK) return sensor->last_error;
@@ -321,6 +326,7 @@ esp_err_t s11_set_abc_target(s11_t *sensor, uint16_t abc_target)
 
 esp_err_t s11_get_iir_filter_par(s11_t *sensor)
 {
+    ESP_LOGI(TAG, "s11_get_iir_filter_par");
     sensor->last_error = s11_read_u8(sensor, S11_ADDR_IIR_FILTER_PAR, &sensor->dev_settings.iir_filter_par);
     return sensor->last_error;
 }
@@ -333,6 +339,7 @@ esp_err_t s11_set_iir_filter_par(s11_t *sensor, uint8_t iir_filter_par)
 
 esp_err_t s11_get_dev_meter_ctl(s11_t *sensor)
 {
+    ESP_LOGI(TAG, "s11_get_dev_meter_ctl");
     sensor->last_error = s11_read_u8(sensor, S11_ADDR_DEV_METER_CTL, &sensor->dev_settings.dev_meter_ctl);
     return sensor->last_error;
 }
@@ -560,6 +567,7 @@ void s11_get_measurement_old_fw(s11_values_t *values, s11_values_old_fw_t *value
 
 esp_err_t s11_get_cal_data(s11_t *sensor)
 {
+    ESP_LOGI(TAG, "s11_get_dev_info");
     sensor->last_error = execute_cmd(sensor, S11_ADDR_CAL_BUF, NULL, 0, (uint8_t *)&sensor->cal_data, S11_ADDR_CAL_BUF_LEN);
     ESP_LOGI(TAG, "cal_status=%02X", sensor->cal_data.cal_status);
     ESP_LOGI(TAG, "cal_cmd=%02X", sensor->cal_data.cal_cmd);

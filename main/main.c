@@ -28,7 +28,7 @@
 #include <sys/time.h>
 #include "nvs_flash.h"
 #include "main.h"
-#include "misc/lv_palette.h"
+#include "lvgl.h"
 //#include "mqtt.h"
 #include "s11.h"
 #include "sdcard.h"
@@ -445,6 +445,16 @@ static bool update_bmx280(int num, bmx280_t **sensor, sensors_data_bmx280_t *las
 
 static bool update_s11()
 {
+    if (s11_sensor == NULL && (debug_main & 0x2000) == 0) {
+        esp_err_t err;
+
+        if ((err = s11_init(&s11_sensor, bus_handle)) != ESP_OK) {
+            ESP_LOGE(TAG, "S11 init error %u", err);
+            return false;
+        }
+        if (s11_sensor == NULL) return false;
+    }
+
     bool force_update = force_update_all || (debug_main & 1) != 0;
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(s11_get_measurement_count(s11_sensor));

@@ -9,9 +9,8 @@
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <esp_err.h>
-#include <misc/lv_types.h>
+#include <lvgl.h>
 #include <esp_lvgl_port.h>
-#include "core/lv_obj_style_gen.h"
 #include "freertos/projdefs.h"
 #include "main.h"
 #include "tcp_server.h"
@@ -106,9 +105,17 @@ void ui_list_clear(lv_obj_t *obj)
 lv_obj_t *ui_list_add(lv_obj_t *obj, const char *symbol, const char *text)
 {
     if (!lvgl_port_lock(pdMS_TO_TICKS(1000))) return NULL;
-    obj = lv_list_add_button(obj, symbol, text);
+    lv_obj_t *btn = lv_button_create(obj);
+    lv_obj_set_width(btn, lv_pct(100));
+    lv_obj_t *label = lv_label_create(btn);
+    if (symbol) {
+        lv_label_set_text_fmt(label, "%s %s", symbol, text);
+    } else {
+        lv_label_set_text(label, text);
+    }
+    lv_obj_center(label);
     lvgl_port_unlock();
-    return obj;
+    return btn;
 }
 
 esp_err_t ui_lcd_set_pwr_mode(uint8_t mode)

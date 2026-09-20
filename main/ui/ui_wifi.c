@@ -178,7 +178,7 @@ static void btn_event_cb(lv_event_t *e) {
           networkStatus = NETWORK_SEARCHING;
           networkScanner();
           timer = lv_timer_create(timerForNetwork, 1000, wfList);
-          lv_list_add_text(wfList, "WiFi: Looking for Networks...");
+          wf_list_add_text(wfList, "WiFi: Looking for Networks...");
         }
 
       } else {
@@ -231,15 +231,34 @@ static void timerForNetwork(lv_timer_t *timer) {
   }
 }
 
+static void wf_list_add_text(lv_obj_t *list, const char *text) {
+  lv_obj_t *label = lv_label_create(list);
+  lv_label_set_text(label, text);
+  lv_obj_set_width(label, lv_pct(100));
+}
+
+static lv_obj_t *wf_list_add_btn(lv_obj_t *list, const char *symbol, const char *text) {
+  lv_obj_t *btn = lv_button_create(list);
+  lv_obj_set_width(btn, lv_pct(100));
+  lv_obj_t *label = lv_label_create(btn);
+  if (symbol) {
+    lv_label_set_text_fmt(label, "%s %s", symbol, text);
+  } else {
+    lv_label_set_text(label, text);
+  }
+  lv_obj_center(label);
+  return btn;
+}
+
 static void showingFoundWiFiList() {
   if (foundWifiList.size() == 0 || foundNetworks == foundWifiList.size())
     return;
 
   lv_obj_clean(wfList);
-  lv_list_add_text(wfList, foundWifiList.size() > 1 ? "WiFi: Found Networks" : "WiFi: Not Found!");
+  wf_list_add_text(wfList, foundWifiList.size() > 1 ? "WiFi: Found Networks" : "WiFi: Not Found!");
 
   for (std::vector<String>::iterator item = foundWifiList.begin(); item != foundWifiList.end(); ++item) {
-    lv_obj_t *btn = lv_list_add_btn(wfList, LV_SYMBOL_WIFI, (*item).c_str());
+    lv_obj_t *btn = wf_list_add_btn(wfList, LV_SYMBOL_WIFI, (*item).c_str());
     lv_obj_add_event_cb(btn, list_event_handler, LV_EVENT_CLICKED, NULL);
     delay(1);
   }
@@ -282,7 +301,9 @@ static void buildSettings() {
   lv_obj_align_to(settingWiFiSwitch, settinglabel, LV_ALIGN_TOP_RIGHT, 60, -10);
   lv_obj_add_flag(settings, LV_OBJ_FLAG_HIDDEN);
 
-  wfList = lv_list_create(settings);
+  wfList = lv_obj_create(settings);
+  lv_obj_set_flex_flow(wfList, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_row(wfList, 2, 0);
   lv_obj_set_size(wfList, tft.width() - 140, 210);
   lv_obj_align_to(wfList, settinglabel, LV_ALIGN_TOP_LEFT, 0, 30);
 }
@@ -294,7 +315,7 @@ static void list_event_handler(lv_event_t *e) {
 
   if (code == LV_EVENT_CLICKED) {
 
-    String selectedItem = String(lv_list_get_btn_text(wfList, obj));
+    String selectedItem = String(lv_label_get_text(lv_obj_get_child(obj, 0)));
     for (int i = 0; i < selectedItem.length() - 1; i++) {
       if (selectedItem.substring(i, i + 2) == " (") {
         ssidName = selectedItem.substring(0, i);

@@ -14,7 +14,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-#include "misc/lv_types.h"
+#include "lvgl.h"
 
 typedef struct ui_s {
     lv_obj_t *tbv_main;

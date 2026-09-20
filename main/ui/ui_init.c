@@ -6,13 +6,9 @@
 
 // This demo UI is adapted from LVGL official example: https://docs.lvgl.io/master/examples.html#loader-with-arc
 
-#include "core/lv_obj_style.h"
 #include <esp_log.h>
 
-#include "misc/lv_area.h"
-#include "misc/lv_color.h"
-#include "misc/lv_palette.h"
-#include "widgets/label/lv_label.h"
+#include "lvgl.h"
 
 #include "include/ui.h"
 
@@ -107,7 +103,7 @@ void create_animated_arc(lv_obj_t *scr)
     lv_arc_set_rotation(arc, 270);
     lv_arc_set_bg_angles(arc, 0, 360);
     lv_obj_remove_style(arc, NULL, LV_PART_KNOB);   /*Be sure the knob is not displayed*/
-    lv_obj_remove_flag(arc, LV_OBJ_FLAG_CLICKABLE);  /*To not allow adjusting by click*/
+    lv_obj_set_clickable(arc, false);  /*To not allow adjusting by click*/
     lv_obj_center(arc);
 
     lv_anim_t a;
@@ -224,7 +220,7 @@ lv_obj_t *add_tabiew(lv_obj_t *scr, int32_t x, int32_t y)
     tab_buttons = lv_tabview_get_tab_bar(obj);
     lv_obj_set_style_bg_color(tab_buttons, lv_palette_darken(LV_PALETTE_GREY, 3), 0);
     lv_obj_set_style_text_color(tab_buttons, lv_palette_lighten(LV_PALETTE_GREY, 5), 0);
-    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
+    lv_obj_set_scroll_chain_hor(obj, false);
     return obj;
 }
 
@@ -233,7 +229,7 @@ lv_obj_t *add_tab(lv_obj_t *tab, const char *title)
     lv_obj_t *obj = lv_tabview_add_tab(tab, title);
 
     lv_obj_set_style_pad_all(obj, 0, LV_PART_MAIN);
-    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
+    lv_obj_set_scroll_chain_hor(obj, false);
     return obj;
 }
 
@@ -325,7 +321,10 @@ lv_obj_t *add_page_wifi(ui_t *ui)
     ui->lbl_ftp_status = add_section_label(tab, 148, 26, 64, "FTP");
     ui->lbl_mqtt_status = add_section_label(tab, 172, 26, 64, "MQTT");
     ui->btn_wifi_scan = add_button(tab, 0, 200, 200, 0, "WiFi Scan");
-    ui->lst_wifi = lv_list_create(tab);
+    ui->lst_wifi = lv_obj_create(tab);
+    lv_obj_set_flex_flow(ui->lst_wifi, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(ui->lst_wifi, 2, 0);
+    lv_obj_set_scrollbar_mode(ui->lst_wifi, LV_SCROLLBAR_MODE_AUTO);
     lv_obj_set_pos(ui->lst_wifi, 0, 240);
     lv_obj_set_size(ui->lst_wifi, 320, 120);
     return tab;
