@@ -133,10 +133,7 @@ void sps30_close(sps30_t *sensor)
  */
 static esp_err_t sps30_read(sps30_t *sensor, uint8_t *addr, uint8_t *dout, size_t size)
 {
-    esp_err_t err = i2c_master_transmit(sensor->dev_handle, addr, SPS30_ADDR_SIZE, CONFIG_SPS30_TIMEOUT);
-
-    if (err != ESP_OK) return err;
-    return i2c_master_receive(sensor->dev_handle, dout, size, CONFIG_SPS30_TIMEOUT);
+    return i2c_master_transmit_receive(sensor->dev_handle, addr, SPS30_ADDR_SIZE, dout, size, CONFIG_SPS30_TIMEOUT);
 }
 
 static esp_err_t sps30_write(sps30_t *sensor, uint8_t *addr, uint8_t *din, size_t size)
@@ -163,6 +160,7 @@ esp_err_t sps30_probe(sps30_t *sensor)
 
     // Try to wake up, but ignore failure if it is not in sleep mode
     sps30_wake_up(sensor);
+    vTaskDelay(pdMS_TO_TICKS(20));  /* wait for sensor to wake up */
     if ((err = sps30_get_serial(sensor)) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to probe sensor");
         return err;
@@ -200,7 +198,7 @@ esp_err_t sps30_get_serial(sps30_t *sensor)
     cnt = sps30_bytes_to_data(buffer, 48, (uint8_t *)sensor->serial);
     sensor->serial[cnt] = '\0';
     if (cnt < SPS30_SERIAL_MAX_LEN) {
-        ESP_LOGE(TAG, "Failed to read complete serial number");
+        ESP_LOGE(TAG, "Failed to read complete serial number (only %d of %d bytes)", cnt, SPS30_SERIAL_MAX_LEN);
         return ESP_FAIL;
     }
     return ESP_OK;
@@ -244,7 +242,8 @@ esp_err_t sps30_stop_measurement(sps30_t *sensor)
 
 bool sps30_read_data_ready(sps30_t *sensor)
 {
-    ESP_ERROR_CHECK(sps30_read(sensor, cmd_get_data_ready, buffer, 3));
+    esp_err_t err = sps30_read(sensor, cmd_get_data_ready, buffer, 3);
+    if (err != ESP_OK) return false;
     return buffer[1] == 0x01;
 }
 
@@ -359,10 +358,12 @@ esp_err_t sps30_init(sps30_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
     esp_err_t err;
 
     ESP_LOGI(TAG, "Initialize SPS30");
-    if ((err = sps30_device_init(&sensor, bus_handle)) != ESP_OK) return err;
     for (int i = 0; i < 5; i++) {
+        /* Re-create device on each attempt to avoid stale handle after failure */
+        if (sensor != NULL) sps30_close(sensor);
+        if ((err = sps30_device_init(&sensor, bus_handle)) != ESP_OK) return err;
         if ((err = sps30_init_do(sensor)) == ESP_OK) break;
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(200));
     }
     if (err != ESP_OK) {
         sps30_close(sensor);
