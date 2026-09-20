@@ -96,42 +96,38 @@ esp_err_t adxl345_read_data(adxl345_t *sensor)
 {
     esp_err_t err;
     uint8_t data[6];
-    float accel_range = 2.0 / 16384.0;
 
     if ((err = adxl345_read(sensor, DATAX0_REG, data, sizeof(data))) != ESP_OK) return err;
-    if (sensor->accel_range == 1) accel_range = 4.0 / 16384.0;
-    else if (sensor->accel_range == 2) accel_range = 8.0 / 16384.0;
-    else if (sensor->accel_range == 3) accel_range = 16.0 / 16384.0;
     adxl345_values_t *values = &sensor->values;
-    values->accel_x = (float)(((int16_t)data[0] << 8) | (int16_t)data[1]) * accel_range - values->accel_offset_x;
-    values->accel_y = (float)(((int16_t)data[2] << 8) | (int16_t)data[3]) * accel_range - values->accel_offset_y;
-    values->accel_z = (float)(((int16_t)data[4] << 8) | (int16_t)data[5]) * accel_range - values->accel_offset_z;
+    /* Full_Res ±16g: constant scale factor 4 mg/LSB = 0.004 g/LSB */
+    values->accel_x = (float)((int16_t)(data[0] | (data[1] << 8))) * 0.004f - values->accel_offset_x;
+    values->accel_y = (float)((int16_t)(data[2] | (data[3] << 8))) * 0.004f - values->accel_offset_y;
+    values->accel_z = (float)((int16_t)(data[4] | (data[5] << 8))) * 0.004f - values->accel_offset_z;
     values->accel_abs = sqrt(values->accel_x * values->accel_x + values->accel_y * values->accel_y + values->accel_z * values->accel_z);
     if (values->accel_abs > 1.0) {
         if (sensor->moving_cnt++ > 9) {
             sensor->moving_cnt = 0;
-            err = adxl345_calibrate_offset(sensor);
         }
     } else {
         sensor->moving_cnt = 0;
     }
     //ESP_LOG_BUFFER_HEXDUMP(TAG, data, sizeof(data), ESP_LOG_INFO);
-    return err;
+    return ESP_OK;
 }
 
 esp_err_t adxl345_calibrate_offset(adxl345_t *sensor)
 {
     esp_err_t err;
+    uint8_t data[6];
 
     ESP_LOGI(TAG, "Calibrating");
+    /* Read raw values using direct I2C (no recursion) */
+    if ((err = adxl345_read(sensor, DATAX0_REG, data, sizeof(data))) != ESP_OK) return err;
+    /* Full_Res ±16g: 4 mg/LSB = 0.004 g/LSB */
     adxl345_values_t *values = &sensor->values;
-    values->accel_offset_x = 0;
-    values->accel_offset_y = 0;
-    values->accel_offset_z = 0;
-    if ((err = adxl345_read_data(sensor)) != ESP_OK) return err;
-    values->accel_offset_x = values->accel_x;
-    values->accel_offset_y = values->accel_y;
-    values->accel_offset_z = values->accel_z;
+    values->accel_offset_x = (float)((int16_t)(data[0] | (data[1] << 8))) * 0.004f;
+    values->accel_offset_y = (float)((int16_t)(data[2] | (data[3] << 8))) * 0.004f;
+    values->accel_offset_z = (float)((int16_t)(data[4] | (data[5] << 8))) * 0.004f;
     return ESP_OK;
 }
 
@@ -234,13 +230,25 @@ esp_err_t adxl345_init(adxl345_t **sensor_ptr, i2c_master_bus_handle_t bus_handl
     }
     // Probe and create device
     ESP_LOGI(TAG, "Probing for ADXL345");
-    if ((err = i2c_master_probe(bus_handle, addr, CONFIG_ADXL345_PROBE_TIMEOUT)) != ESP_OK) return err;
+    if ((err = i2c_master_probe(bus_handle, addr, CONFIG_ADXL345_PROBE_TIMEOUT)) != ESP_OK) {
+        adxl345_close(sensor);
+        return err;
+    }
     ESP_LOGI(TAG, "Found ADXL345 on I2C address 0x%02X", addr);
-    if ((err = adxl345_device_create(sensor, addr)) != ESP_OK) return err;
+    if ((err = adxl345_device_create(sensor, addr)) != ESP_OK) {
+        adxl345_close(sensor);
+        return err;
+    }
     // Initialize device
-    if ((err = adxl345_device_init(sensor)) != ESP_OK) return err;
+    if ((err = adxl345_device_init(sensor)) != ESP_OK) {
+        adxl345_close(sensor);
+        return err;
+    }
     ESP_LOGI(TAG, "ADXL345 initialized");
-    if ((err = adxl345_calibrate_offset(sensor)) != ESP_OK) return err;
+    if ((err = adxl345_calibrate_offset(sensor)) != ESP_OK) {
+        adxl345_close(sensor);
+        return err;
+    }
     ESP_LOGI(TAG, "ADXL345 offsets calibrated");
     *sensor_ptr = sensor;
     return ESP_OK;
