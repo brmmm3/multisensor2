@@ -123,7 +123,9 @@ static esp_err_t s11_device_create(s11_t *sensor)
     ESP_LOGI(TAG, "device_create for S11 sensors on ADDR %X", S11_SENSOR_ADDR);
     sensor->dev_config.device_address = S11_SENSOR_ADDR;
     sensor->dev_config.scl_speed_hz = CONFIG_S11_I2C_CLK_SPEED_HZ;
-    sensor->dev_config.flags.disable_ack_check = true;
+    sensor->dev_config.scl_wait_us = 20000; // 20ms wait time for S11 sensor to handle stretch/disturbance properly
+    //sensor->dev_config.flags.enable_internal_pullup = false;
+    //sensor->dev_config.flags.disable_ack_check = true;
     // Add device to the I2C bus
     esp_err_t err = i2c_master_bus_add_device(sensor->bus_handle, &sensor->dev_config, &sensor->dev_handle);
     if (err == ESP_OK) {
@@ -191,8 +193,8 @@ esp_err_t s11_probe(s11_t *sensor)
     ESP_LOGI(TAG, "Probing for S11 sensor on I2C %X", sensor->dev_config.device_address);
     for (i = 0; i < 10; i++) {
         err = i2c_master_probe(sensor->bus_handle, sensor->dev_config.device_address, CONFIG_S11_TIMEOUT);
+        vTaskDelay(pdMS_TO_TICKS(15));
         if (err == ESP_OK) break;
-        vTaskDelay(pdMS_TO_TICKS(10));
     }
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Probing for S11 SUCCESS after %u retries", i);
