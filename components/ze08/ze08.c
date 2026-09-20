@@ -42,7 +42,7 @@ static void rx_task_ze08_sensor(void *args)
 
     uint8_t rx_pin = sensor->rx_pin;
     uint8_t *buf = sensor->buffer;
-    static uint8_t last_byte = 0;
+    uint8_t last_byte = 0;
 
     rmt_uart_config_t uart_config = {
         .baud_rate = 9600,                  // Your baud rate
@@ -71,7 +71,7 @@ static void rx_task_ze08_sensor(void *args)
     ESP_ERROR_CHECK(esp_timer_create(&oneshot_timer_args, &ze08_message_end_timer));
 
     while (true) {
-        length = rmt_uart_read(0, rx_buf, sizeof(rx_buf), portMAX_DELAY);
+        length = rmt_uart_read(sensor->rx_channel, rx_buf, sizeof(rx_buf), portMAX_DELAY);
         uint8_t i = 0;
         while (length-- > 0) {
             uint8_t rx_byte = rx_buf[i++];
@@ -84,23 +84,26 @@ static void rx_task_ze08_sensor(void *args)
             } else if (last_byte == 0x3c && rx_byte == 0x04) {
                 // START sequence received
                 sensor->cnt = 0;
-                ESP_ERROR_CHECK(esp_timer_start_once(ze08_message_end_timer, 100000));
+                ESP_ERROR_CHECK_WITHOUT_ABORT(esp_timer_start_once(ze08_message_end_timer, 100000));
             }
             last_byte = rx_byte;
         }
         if (sensor->cnt == 10) {
             esp_timer_stop(ze08_message_end_timer);
-            //esp_timer_delete(ze08_message_end_timer);
+            esp_timer_delete(ze08_message_end_timer);
             ze08_check_and_save_data(sensor);
             last_byte = 0xff;
         }
-        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
 
 esp_err_t ze08_init(ze08_t **sensor, uint8_t rx_channel, uint8_t rx_pin, uint8_t tx_pin)
 {
     ze08_t *ze08_sensor = calloc(1, sizeof(ze08_t));
+    if (ze08_sensor == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory");
+        return ESP_ERR_NO_MEM;
+    }
 
     ESP_LOGI(TAG, "Initialize ZE08-C2HO");
     ze08_sensor->name = "ZE08-C2HO";
@@ -108,6 +111,11 @@ esp_err_t ze08_init(ze08_t **sensor, uint8_t rx_channel, uint8_t rx_pin, uint8_t
     ze08_sensor->rx_channel = rx_channel;
     ze08_sensor->rx_pin = rx_pin;
     ze08_sensor->buffer = malloc(12);
+    if (ze08_sensor->buffer == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate buffer");
+        free(ze08_sensor);
+        return ESP_ERR_NO_MEM;
+    }
     ze08_sensor->cnt = 0xff;
     *sensor = ze08_sensor;
     xTaskCreate(rx_task_ze08_sensor, "rx_task_ze08_sensor", 4096, (void *)ze08_sensor, configMAX_PRIORITIES - 1, NULL);
@@ -127,16 +135,19 @@ bool ze08_data_ready(ze08_t *sensor)
 
 uint16_t ze08_get_ch2o_raw(ze08_t *sensor)
 {
+    if (sensor == NULL) return 0;
     return sensor->values.ch2o;
 }
 
 float ze08_get_ch2o_ppm(ze08_t *sensor)
 {
+    if (sensor == NULL) return 0;
     return (float)sensor->values.ch2o * 0.001;  // e.g. 6 ppb = 0.006 ppm
 }
 
 float ze08_get_ch2o_mg(ze08_t *sensor)
 {
+    if (sensor == NULL) return 0;
     return (float)sensor->values.ch2o * 0.00125;  // e.g. 6 ppb = 0.0075 mg/m³
 }
 
