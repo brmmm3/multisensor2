@@ -59,8 +59,6 @@ static uint8_t cmd_get_device_status[]    = {0xd2, 0x06};
 static uint8_t cmd_clear_device_status[]  = {0xd2, 0x10};
 static uint8_t cmd_reset[]                = {0xd3, 0x04};
 
-static uint8_t buffer[60];
-
 #define SPS_CMD_START_STOP_DELAY_USEC 20000
 #define SPS_CMD_DELAY_USEC 5000
 #define SPS_CMD_DELAY_WRITE_FLASH_USEC 20000
@@ -71,12 +69,10 @@ static uint8_t buffer[60];
 sps30_t *sps30_create_master(i2c_master_bus_handle_t bus_handle)
 {
     sps30_t *sensor = pvPortMalloc(sizeof(sps30_t));
-    memset(sensor, 0, sizeof(sps30_t));
-
     if (sensor == NULL) {
-        sps30_close(sensor);
         return NULL;
     }
+    memset(sensor, 0, sizeof(sps30_t));
     sensor->bus_handle = bus_handle;
     sensor->dev_config.dev_addr_length = I2C_ADDR_BIT_LEN_7;
     sensor->dev_config.device_address = SPS30_I2C_ADDRESS;
@@ -175,7 +171,8 @@ esp_err_t sps30_probe(sps30_t *sensor)
 
 esp_err_t sps30_get_device_info(sps30_t *sensor)
 {
-    uint8_t cnt;
+    size_t cnt;
+    uint8_t buffer[60];
     esp_err_t err = sps30_read(sensor, cmd_get_product, buffer, 12);
 
     if (err != ESP_OK) {
@@ -193,7 +190,8 @@ esp_err_t sps30_get_device_info(sps30_t *sensor)
 
 esp_err_t sps30_get_serial(sps30_t *sensor)
 {
-    uint8_t cnt;
+    size_t cnt;
+    uint8_t buffer[60];
     esp_err_t err = sps30_read(sensor, cmd_get_serial_number, buffer, 48);
 
     if (err != ESP_OK) {
@@ -211,6 +209,7 @@ esp_err_t sps30_get_serial(sps30_t *sensor)
 
 esp_err_t sps30_get_firmware_version(sps30_t *sensor)
 {
+    uint8_t buffer[60];
     esp_err_t err = sps30_read(sensor, cmd_get_firmware_version, buffer, 3);
 
     if (err != ESP_OK) {
@@ -247,6 +246,7 @@ esp_err_t sps30_stop_measurement(sps30_t *sensor)
 
 bool sps30_read_data_ready(sps30_t *sensor)
 {
+    uint8_t buffer[60];
     esp_err_t err = sps30_read(sensor, cmd_get_data_ready, buffer, 3);
     if (err != ESP_OK) return false;
     /* Verify checksum and check data-ready flag */
@@ -255,6 +255,7 @@ bool sps30_read_data_ready(sps30_t *sensor)
 
 esp_err_t sps30_read_measurement(sps30_t *sensor)
 {
+    uint8_t buffer[60];
     esp_err_t err = sps30_read(sensor, cmd_read_measurement, buffer, 60);
 
     if (err != ESP_OK) return err;
@@ -274,6 +275,7 @@ esp_err_t sps30_read_measurement(sps30_t *sensor)
 
 esp_err_t sps30_get_fan_auto_cleaning_interval(sps30_t *sensor)
 {
+    uint8_t buffer[60];
     esp_err_t err = sps30_read(sensor, cmd_autoclean_interval, buffer, 6);
 
     if (err != ESP_OK) return err;
@@ -328,6 +330,7 @@ esp_err_t sps30_wake_up(sps30_t *sensor)
 
 esp_err_t sps30_read_device_status_register(sps30_t *sensor)
 {
+    uint8_t buffer[60];
     esp_err_t err = sps30_read(sensor, cmd_get_device_status, buffer, 6);
 
     if (err != ESP_OK) return err;
@@ -351,7 +354,6 @@ esp_err_t sps30_init_do(sps30_t *sensor)
     if ((err = sps30_probe(sensor)) != ESP_OK) return err;
     if ((err = sps30_get_device_info(sensor)) != ESP_OK) return err;
     if ((err = sps30_get_firmware_version(sensor)) != ESP_OK) return err;
-    if ((err = sps30_start_measurement(sensor)) != ESP_OK) return err;
     if ((err = sps30_reset(sensor)) != ESP_OK) return err;
     vTaskDelay(pdMS_TO_TICKS(2000)); /* wait for sensor to reboot after reset */
     if ((err = sps30_start_measurement(sensor)) != ESP_OK) return err;
