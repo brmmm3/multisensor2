@@ -149,9 +149,9 @@ enum as7262_colors {
 };
 
 /*** Function Pointers ***/
-typedef int8_t (*as7262_read_fptr_t)(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr);
+typedef esp_err_t (*as7262_read_fptr_t)(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr);
 
-typedef int8_t (*as7262_write_fptr_t)(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr);
+typedef esp_err_t (*as7262_write_fptr_t)(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr);
 
 
 
@@ -242,7 +242,7 @@ typedef struct as7262_dev {
  * @param user_i2c_write    I2C Driver write function
  * 
  */
-void as7262_init(as7262_dev_t *device, as7262_read_fptr_t user_i2c_read, as7262_write_fptr_t user_i2c_write);
+esp_err_t as7262_init(as7262_dev_t *device, as7262_read_fptr_t user_i2c_read, as7262_write_fptr_t user_i2c_write);
 
 
 

@@ -64,7 +64,11 @@ static uint8_t get_led_control_hex(as7262_led_control_t led);
  *******************************************/
 
 
-void as7262_init(as7262_dev_t *device, as7262_read_fptr_t user_i2c_read, as7262_write_fptr_t user_i2c_write) {
+esp_err_t as7262_init(as7262_dev_t *device, as7262_read_fptr_t user_i2c_read, as7262_write_fptr_t user_i2c_write) {
+
+    if (device == NULL || user_i2c_read == NULL || user_i2c_write == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
 
     ESP_LOGI(TAG, "Hello!");
     device->intf_ptr = &dev_addr; //??
@@ -81,15 +85,18 @@ void as7262_init(as7262_dev_t *device, as7262_read_fptr_t user_i2c_read, as7262_
     uint8_t version = as7262_virtual_read(device, AS726X_HW_VERSION);
     if (version != 0x40) {
         ESP_LOGW(TAG, "%s -- Wrong Hardware Version: %02x", __FUNCTION__, version);
+        return ESP_FAIL;
     } else {
         ESP_LOGI(TAG, "%s -- Hardware Version: %02x", __FUNCTION__, version);
         ESP_LOGI(TAG, "%s -- AS7262 Sensor Initialized", __FUNCTION__);
         as7262_set_indicator_led_on(device, true);
     }
+    return ESP_OK;
 }
 
 void as7262_set_indicator_led_current(as7262_dev_t *device, uint8_t current) {
-    device->led_control.ICL_IND = current;
+    if (device == NULL) return;
+    device->led_control.ICL_IND = current & 0x03;
     as7262_virtual_write(device, AS726X_LED_CONTROL, get_led_control_hex(device->led_control));
 }
 
@@ -101,7 +108,8 @@ void as7262_set_indicator_led_on(as7262_dev_t *device, bool on) {
 }
 
 void as7262_set_led_drv_current(as7262_dev_t *device, uint8_t current) {
-    device->led_control.LED_IND = current;
+    if (device == NULL) return;
+    device->led_control.ICL_DRV = current & 0x03;
     as7262_virtual_write(device, AS726X_LED_CONTROL, get_led_control_hex(device->led_control));
 }
 
@@ -151,6 +159,8 @@ uint16_t as7262_read_channel(as7262_dev_t *device, uint8_t channel) {
 }
 
 void as7262_read_raw_values(as7262_dev_t *device, uint8_t num) {
+    if (device == NULL) return;
+    if (num > AS7262_NUM_CHANNELS) num = AS7262_NUM_CHANNELS;
     for (int i = 0; i < num; i++) {
         switch (i) {
             case AS726x_VIOLET:
@@ -196,6 +206,8 @@ float as7262_read_calibrated_value(as7262_dev_t *device, uint8_t channel) {
 }
 
 void as7262_read_calibrated_values(as7262_dev_t *device, uint8_t num) {
+    if (device == NULL) return;
+    if (num > AS7262_NUM_CHANNELS) num = AS7262_NUM_CHANNELS;
     for (int i = 0; i < num; i++) {
         switch (i) {
             case AS726x_VIOLET:
@@ -237,12 +249,15 @@ void as7262_read_calibrated_values(as7262_dev_t *device, uint8_t num) {
 static uint8_t as7262_virtual_read(as7262_dev_t *device, uint8_t virtual_addr) {
     //TODO: checar se teve erro nas chamadas de read e write 
 
-    uint8_t status, read_data;
+    if (device == NULL) return 0;
+
+    uint8_t status, read_data = 0;
     esp_err_t err;
+    int timeout;
 
     // Fica preso nisso até que o STATUS_REG esteja com o TX_VALID
-    //! Adicionar um timeout????
-    while (1) {
+    timeout = 100;
+    while (timeout--) {
         // Read slave I²C status to see if the read buffer is ready.
         err = device->i2c_read(AS726X_SLAVE_STATUS_REG, &status, 1, device->intf_ptr);
         
@@ -255,6 +270,10 @@ static uint8_t as7262_virtual_read(as7262_dev_t *device, uint8_t virtual_addr) {
             break;  // No inbound TX pending at slave. Okay to write now.
         }
     }
+    if (timeout < 0) {
+        ESP_LOGE(TAG, "Timeout waiting for TX_VALID clear");
+        return 0;
+    }
 
     // Escreve o virtual_addr normal* no registrador WRITE_REG (0x01) para indicar que queremos lê-lo
     err = device->i2c_write(AS726X_SLAVE_WRITE_REG, &virtual_addr, 1, device->intf_ptr);
@@ -264,7 +283,8 @@ static uint8_t as7262_virtual_read(as7262_dev_t *device, uint8_t virtual_addr) {
     else
         ESP_LOGD(TAG, "Could not write");
 
-    while (1) {
+    timeout = 100;
+    while (timeout--) {
         // Read the slave I²C status to see if our read data is available.
         err = device->i2c_read(AS726X_SLAVE_STATUS_REG, &status, 1, device->intf_ptr);
 
@@ -272,8 +292,16 @@ static uint8_t as7262_virtual_read(as7262_dev_t *device, uint8_t virtual_addr) {
             break;  // Read data is ready
         }
     }
+    if (timeout < 0) {
+        ESP_LOGE(TAG, "Timeout waiting for RX_VALID");
+        return 0;
+    }
     
     err = device->i2c_read(AS726X_SLAVE_READ_REG, &read_data, 1, device->intf_ptr);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read data register");
+        return 0;
+    }
 
     return read_data;
 }
@@ -282,12 +310,15 @@ static uint8_t as7262_virtual_read(as7262_dev_t *device, uint8_t virtual_addr) {
 static void as7262_virtual_write(as7262_dev_t *device, uint8_t virtual_addr, uint8_t value) {
     //TODO: checar se teve erro nas chamadas de read e write
 
+    if (device == NULL) return;
+
     uint8_t status;
     esp_err_t err;
+    int timeout;
 
     // Fica preso nisso até que o STATUS_REG esteja com o TX_VALID
-    //! Adicionar um timeout????
-    while (1) {
+    timeout = 100;
+    while (timeout--) {
         // Read slave I²C status to see if the write buffer is ready.
         err = device->i2c_read(AS726X_SLAVE_STATUS_REG, &status, 1, device->intf_ptr);
         
@@ -295,20 +326,28 @@ static void as7262_virtual_write(as7262_dev_t *device, uint8_t virtual_addr, uin
             break;  // No inbound TX pending at slave. Okay to write now.
         }
     }
+    if (timeout < 0) {
+        ESP_LOGE(TAG, "Timeout waiting for TX_VALID (write)");
+        return;
+    }
 
     // Writes (virtual_addr | 0x80) WRITE_REG (0x01) register to indicate write attempt on this virtual addr
     uint8_t _addr[1] = { virtual_addr | 0x80 };
     
     err = device->i2c_write(AS726X_SLAVE_WRITE_REG, _addr, 1, device->intf_ptr);
 
-    while (1) {
+    timeout = 100;
+    while (timeout--) {
         // Read the slave I²C status to see if the write buffer is ready.
         err = device->i2c_read(AS726X_SLAVE_STATUS_REG, &status, 1, device->intf_ptr);
         
-        // ESP_LOGI(TAG, "%s Second status reg: %02x", __FUNCTION__ ,status);
         if ((status & AS726X_SLAVE_TX_VALID) == 0) {
             break;  // No inbound TX pending at slave. Okay to write now.
         }
+    }
+    if (timeout < 0) {
+        ESP_LOGE(TAG, "Timeout waiting for TX_VALID (write data)");
+        return;
     }
 
     err = device->i2c_write(AS726X_SLAVE_WRITE_REG, &value, 1, device->intf_ptr);
