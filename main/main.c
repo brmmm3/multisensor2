@@ -553,7 +553,9 @@ static bool update_sps30()
             sps30_init_failed = true;
             return false;
         }
-        if (sps30_sensor == NULL) return false;
+    }
+    if (sps30_sensor == NULL) {
+        return false;
     }
     if (!sps30_sensor->enabled) {
         return false;
