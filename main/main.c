@@ -544,8 +544,15 @@ static bool update_ze08()
 
 static bool update_sps30()
 {
-    if (sps30_sensor == NULL && (debug_main & 0x2000) == 0) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(sps30_init(&sps30_sensor, bus_handle));
+    static bool sps30_init_failed = false;
+
+    if (sps30_sensor == NULL && !sps30_init_failed && (debug_main & 0x2000) == 0) {
+        esp_err_t err = sps30_init(&sps30_sensor, bus_handle);
+        if (err != ESP_OK) {
+            ESP_LOGE("SPS30", "Init failed (sensor not present). Giving up.");
+            sps30_init_failed = true;
+            return false;
+        }
         if (sps30_sensor == NULL) return false;
     }
     if (!sps30_sensor->enabled) {
@@ -1276,6 +1283,6 @@ void app_main(void)
     }
     status.start_time = time(NULL);
 
-    xTaskCreate(update_task, "update_task", 4096, NULL, UPDATE_TASK_PRIORITY, NULL);
+    xTaskCreate(update_task, "update_task", 8192, NULL, UPDATE_TASK_PRIORITY, NULL);
     //update_task(NULL);
 }
