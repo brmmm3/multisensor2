@@ -108,11 +108,17 @@ static void rx_task_mhz19_sensor(void *arg)
                 memcpy(&buf[2], &cmd_get_values, CMD_SIZE);
             }
             cmd_byte = buf[2];
-            mhz19_write_command(serial, buf, REQUEST_SIZE, buf, &response_cnt);
-            if (buf[0] == 0xff && buf[1] == cmd_byte && mhz19_checksum(buf, RESPONSE_SIZE - 1) == buf[RESPONSE_SIZE - 1]) {
+            esp_err_t write_err = mhz19_write_command(serial, buf, REQUEST_SIZE, buf, &response_cnt);
+            if (write_err == ESP_OK && response_cnt >= RESPONSE_SIZE
+                && buf[0] == 0xff && buf[1] == cmd_byte && mhz19_checksum(buf, RESPONSE_SIZE - 1) == buf[RESPONSE_SIZE - 1]) {
                 switch (cmd_byte) {
                     case MHZ19_SET_ABC:
+                    sensor->auto_calib = buf[2] != 0;
                     ESP_LOGI(TAG, "MHZ19 SET ABC=%u", buf[2]);
+                    break;
+                    case MHZ19_GET_ABC:
+                    sensor->auto_calib = buf[2] != 0;
+                    ESP_LOGI(TAG, "MHZ19 GET ABC=%u", buf[2]);
                     break;
                     case MHZ19_GET_TEMP_INT:
                     sensor->values.co2_raw = buf[2] * 256 + buf[3];
@@ -228,6 +234,7 @@ esp_err_t mhz19_set_range(mhz19_t *sensor, enum MHZ19_RANGE range)
 
 esp_err_t mhz19_reset(mhz19_t *sensor)
 {
+    if (sensor == NULL) return ESP_FAIL;
     sensor->pending++;
     if (xQueueSend(sensor->queue, &cmd_reset, 1)) return ESP_OK;
     return ESP_FAIL;
@@ -235,8 +242,19 @@ esp_err_t mhz19_reset(mhz19_t *sensor)
 
 esp_err_t mhz19_init(mhz19_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin)
 {
-    hw_serial_t *mhz19_serial = pvPortMalloc(sizeof(hw_serial_t));
-    mhz19_t *sensor = pvPortMalloc(sizeof(mhz19_t));
+    hw_serial_t *mhz19_serial = NULL;
+    mhz19_t *sensor = NULL;
+
+    mhz19_serial = pvPortMalloc(sizeof(hw_serial_t));
+    if (mhz19_serial == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    sensor = pvPortMalloc(sizeof(mhz19_t));
+    if (sensor == NULL) {
+        vPortFree(mhz19_serial);
+        return ESP_ERR_NO_MEM;
+    }
 
     ESP_LOGI(TAG, "Initialize MHZ19");
     // Serial
@@ -248,6 +266,11 @@ esp_err_t mhz19_init(mhz19_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, uin
     // Sensor
     sensor->name = "CO2";
     sensor->queue = xQueueCreate(6, 6);
+    if (sensor->queue == NULL) {
+        vPortFree(mhz19_serial);
+        vPortFree(sensor);
+        return ESP_ERR_NO_MEM;
+    }
     sensor->pending = 0;
     sensor->hw_serial = mhz19_serial;
     sensor->values.co2 = 0xffff;
@@ -259,10 +282,9 @@ esp_err_t mhz19_init(mhz19_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, uin
     sensor->fw_version[0] = 0;
     sensor->pressure = 1013; // Default is 1013 hPa
     sensor->debug = 0;
-    *sensor_ptr = sensor;
 
     uart_init(mhz19_serial->uart_num, mhz19_serial->rx_pin, mhz19_serial->tx_pin,
-               mhz19_serial->baudrate);
+              mhz19_serial->baudrate);
 
     // Send initialization sequence
     mhz19_set_auto_calibration(sensor, false);
@@ -270,7 +292,14 @@ esp_err_t mhz19_init(mhz19_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, uin
     mhz19_set_range(sensor, MHZ19_RANGE_5000);
     xQueueSend(sensor->queue, &cmd_get_range, 1);
 
-    xTaskCreate(rx_task_mhz19_sensor, "rx_task_mhz19_sensor", 4096, (void *)sensor, configMAX_PRIORITIES - 1, NULL);
+    if (xTaskCreate(rx_task_mhz19_sensor, "rx_task_mhz19_sensor", 4096, (void *)sensor, configMAX_PRIORITIES - 1, NULL) != pdPASS) {
+        vQueueDelete(sensor->queue);
+        vPortFree(mhz19_serial);
+        vPortFree(sensor);
+        return ESP_FAIL;
+    }
+
+    *sensor_ptr = sensor;
 
     ESP_LOGI(TAG, "MHZ19 initialized");
     return ESP_OK;
