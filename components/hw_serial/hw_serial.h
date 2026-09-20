@@ -23,10 +23,9 @@ typedef struct hw_serial_s {
     uint8_t uart_num;
     uint8_t rx_pin;
     uint8_t tx_pin;
-    QueueHandle_t queue;
 } hw_serial_t;
 
-void uart_init(uint8_t uart_num, int rx_pin, int tx_pin);
+void uart_init(uint8_t uart_num, int rx_pin, int tx_pin, uint32_t baudrate);
 
 #ifdef __cplusplus
 };

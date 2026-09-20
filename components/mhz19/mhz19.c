@@ -244,7 +244,7 @@ esp_err_t mhz19_init(mhz19_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, uin
     mhz19_serial->rx_pin = rx_pin;
     mhz19_serial->tx_pin = tx_pin;
     mhz19_serial->baudrate = 9600;
-    mhz19_serial->queue = NULL;
+
     // Sensor
     sensor->name = "CO2";
     sensor->queue = xQueueCreate(6, 6);
@@ -261,7 +261,8 @@ esp_err_t mhz19_init(mhz19_t **sensor_ptr, uint8_t uart_num, uint8_t rx_pin, uin
     sensor->debug = 0;
     *sensor_ptr = sensor;
 
-    uart_init(mhz19_serial->uart_num, mhz19_serial->rx_pin, mhz19_serial->tx_pin);
+    uart_init(mhz19_serial->uart_num, mhz19_serial->rx_pin, mhz19_serial->tx_pin,
+               mhz19_serial->baudrate);
 
     // Send initialization sequence
     mhz19_set_auto_calibration(sensor, false);

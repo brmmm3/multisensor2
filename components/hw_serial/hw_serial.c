@@ -12,9 +12,9 @@
 static const char *TAG = "HWS";
 
 
-void uart_init(uint8_t uart_num, int rx_pin, int tx_pin)
+void uart_init(uint8_t uart_num, int rx_pin, int tx_pin, uint32_t baudrate)
 {
-    ESP_LOGI(TAG, "Initialize UART %u on rx=%u tx=%u", uart_num, rx_pin, tx_pin);
+    ESP_LOGI(TAG, "Initialize UART %u on rx=%u tx=%u baud=%lu", uart_num, rx_pin, tx_pin, baudrate);
 
     uint8_t source_clk = UART_SCLK_DEFAULT;
     if (uart_num == LP_UART_NUM_0)
@@ -22,7 +22,7 @@ void uart_init(uint8_t uart_num, int rx_pin, int tx_pin)
         source_clk = LP_UART_SCLK_DEFAULT;
     }
     uart_config_t uart_config = {
-        .baud_rate = 9600,
+        .baud_rate = baudrate,
         .data_bits = UART_DATA_8_BITS,
         .parity    = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,

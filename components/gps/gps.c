@@ -497,9 +497,9 @@ esp_err_t gps_init_serial(uint8_t uart_num, uint8_t rx_pin, uint8_t tx_pin)
     gps_serial->rx_pin = rx_pin;
     gps_serial->tx_pin = tx_pin;
     gps_serial->baudrate = 9600;
-    gps_serial->queue = xQueueCreate(128, 1);
 
-    uart_init(gps_serial->uart_num, gps_serial->rx_pin, gps_serial->tx_pin);
+    uart_init(gps_serial->uart_num, gps_serial->rx_pin, gps_serial->tx_pin,
+               gps_serial->baudrate);
     return ESP_OK;
 }
 
@@ -554,7 +554,6 @@ void gps_stop_sensor(gps_sensor_t **sensor_ptr)
     vPortFree(*sensor_ptr);
     *sensor_ptr = NULL;
     if (gps_serial != NULL) {
-        vQueueDelete(gps_serial->queue);
         vPortFree(gps_serial);
         gps_serial = NULL;
     }
