@@ -34,14 +34,14 @@ static const char *TAG = "LCD";
 #define LVGL_TASK_STACK_SIZE    8192
 #define LVGL_TASK_PRIORITY      2
 
-gpio_config_t bk_gpio_config = {
+static gpio_config_t bk_gpio_config = {
     .pin_bit_mask = 0,
     .mode = GPIO_MODE_OUTPUT,
     .pull_up_en = GPIO_PULLUP_DISABLE,
     .pull_down_en = GPIO_PULLDOWN_DISABLE,
     .intr_type = GPIO_INTR_DISABLE,
 };
-uint8_t bk_led_pin = 0;
+static uint8_t bk_led_pin = 0;
 
 typedef struct {
     esp_lcd_touch_handle_t  handle;     /* LCD touch IO handle */
@@ -101,7 +101,7 @@ esp_err_t lcd_set_bk_pwr(uint8_t mode)
     return gpio_set_level(bk_led_pin, mode == 0);
 }
 
-esp_err_t lcd_lvgl_port_init()
+esp_err_t lcd_lvgl_port_init(void)
 {
     /* Initialize LVGL port first (handles lv_init(), tick timer, task lock, etc.) */
     ESP_LOGI(TAG, "Initialize LVGL port");
@@ -176,6 +176,10 @@ lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t 
 
     ESP_LOGI(TAG, "Add display to LVGL");
     lv_display_t *display = lvgl_port_add_disp(&disp_cfg);
+    if (display == NULL) {
+        ESP_LOGE(TAG, "Failed to add display to LVGL");
+        return NULL;
+    }
 
     /* Rotate to 270° (common for many 320x240 modules in portrait) - adjust as needed */
     ESP_LOGI(TAG, "lv_display_set_rotation=%d", LV_DISPLAY_ROTATION_270);

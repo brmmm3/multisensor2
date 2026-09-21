@@ -20,7 +20,7 @@ extern "C" {
 
 extern time_t lcd_touch_time;
 
-esp_err_t lcd_lvgl_port_init();
+esp_err_t lcd_lvgl_port_init(void);
 
 lv_display_t *lcd_init(int spi_host_id, uint8_t cs_pin, uint8_t dc_pin, uint8_t reset_pin, uint8_t led_pin, uint8_t t_cs_pin);
 
