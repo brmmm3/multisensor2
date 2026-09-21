@@ -163,7 +163,7 @@ esp_err_t sps30_probe(sps30_t *sensor)
     sps30_wake_up(sensor);
     vTaskDelay(pdMS_TO_TICKS(20));  /* wait for sensor to wake up */
     if ((err = sps30_get_serial(sensor)) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to probe sensor");
+        ESP_LOGE(TAG, "Failed to probe sensor (err=%d).", err);
         return err;
     }
     return ESP_OK;
@@ -191,7 +191,7 @@ esp_err_t sps30_get_device_info(sps30_t *sensor)
 esp_err_t sps30_get_serial(sps30_t *sensor)
 {
     size_t cnt;
-    uint8_t buffer[60];
+    uint8_t buffer[50];
     esp_err_t err = sps30_read(sensor, cmd_get_serial_number, buffer, 48);
 
     if (err != ESP_OK) {
@@ -324,6 +324,7 @@ esp_err_t sps30_wake_up(sps30_t *sensor)
     /* wake-up must be sent twice within 100ms, ignore first return value */
     sps30_write(sensor, cmd_wake_up, NULL, 0);
     err = sps30_write(sensor, cmd_wake_up, NULL, 0);
+    ESP_LOGI(TAG, "Wake-up command sent to SPS30 sensor (err=%d).", err);
     vTaskDelay(pdMS_TO_TICKS(5));
     return err;
 }
@@ -389,6 +390,7 @@ esp_err_t sps30_init(sps30_t **sensor_ptr, i2c_master_bus_handle_t bus_handle)
 
 void sps30_dump_info(sps30_t *sensor)
 {
+    if (sensor == NULL) return;
     ESP_LOGI(TAG, "DevInfo=%s  Serial=%s  FW=%u.%u",
         sensor->device_info, sensor->serial,
         sensor->fw_version >> 8, sensor->fw_version & 0xff);
@@ -399,6 +401,7 @@ void sps30_dump_info(sps30_t *sensor)
 
 void sps30_dump_values(sps30_t *sensor, bool force)
 {
+    if (sensor == NULL) return;
     if (force || sensor->debug & 1) {
         sps30_values_t *values = &sensor->values;
 
