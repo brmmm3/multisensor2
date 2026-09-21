@@ -19,9 +19,19 @@ int process_sps30_cmd(int argc, char **argv)
     if (sps30_cmd_args.cmd->count == 1) {
         const char *cmd = sps30_cmd_args.cmd->sval[0];
         if (strcmp(cmd, "st") == 0) {
+            if (sps30_sensor == NULL) {
+                ESP_LOGE(TAG, "SPS30 not initialized");
+                return 1;
+            }
             // Get sensor info and status
             sps30_dump_info(sps30_sensor);
             sps30_dump_values(sps30_sensor, true);
+        } else if (strcmp(cmd, "init") == 0) {
+            esp_err_t err;
+
+            if ((err = sps30_init(&sps30_sensor, bus_handle)) != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to initialize SPS30 sensor (err=%d).", err);
+            }
         } else {
             ESP_LOGE(TAG, "no valid arguments");
             return 1;

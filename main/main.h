@@ -189,6 +189,8 @@ typedef struct {
     int8_t rssi;
 } status_t;
 
+extern i2c_master_bus_handle_t bus_handle;
+
 extern rtc_t *rtc;
 extern gps_sensor_t *gps;
 extern gps_values_t gps_values;
