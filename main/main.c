@@ -336,47 +336,47 @@ void sensors_init()
     if ((err = gps_init(&gps, GPS_UART_NUM, GPS_PIN_NUM_RX, GPS_PIN_NUM_TX)) == ESP_OK) {
         gps_status = &gps->status;
     } else {
-        ESP_LOGE(TAG, "Failed to initialize GPS sensor.");
+        ESP_LOGE(TAG, "Failed to initialize GPS sensor (err=%d).", err);
     }
     if ((err = bmx280_init(&bmx280lo, bus_handle, false)) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize BMX280 sensor.");
+        ESP_LOGE(TAG, "Failed to initialize BMX280 sensor (err=%d).", err);
     }
     if ((err = bmx280_init(&bmx280hi, bus_handle, true)) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize BMX280 sensor.");
+        ESP_LOGE(TAG, "Failed to initialize BMX280 sensor (err=%d).", err);
     }
     // S11
     if ((err = s11_init(&s11_sensor, bus_handle)) == ESP_OK) {
         s11_dump_dev_info(s11_sensor);
         s11_setup();
     } else {
-        ESP_LOGE(TAG, "Failed to initialize S11 sensor.");
+        ESP_LOGE(TAG, "Failed to initialize S11 sensor (err=%d).", err);
     }
     if ((err = scd30_init(&scd30_sensor, bus_handle)) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize SCD30 sensor.");
+        ESP_LOGE(TAG, "Failed to initialize SCD30 sensor (err=%d).", err);
     }
     if ((err = scd4x_init(&scd41_sensor, bus_handle)) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize SCD41 sensor.");
+        ESP_LOGE(TAG, "Failed to initialize SCD41 sensor (err=%d).", err);
     }
     // This will never fail here
     if ((err = mhz19_init(&mhz19_sensor, MHZ19_UART_NUM, MHZ19_PIN_NUM_RX, MHZ19_PIN_NUM_TX)) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize MHZ19 sensor.");
+        ESP_LOGE(TAG, "Failed to initialize MHZ19 sensor (err=%d).", err);
     }
     // This will never fail here
     if ((err = yys_init(&yys_sensor, YYS_RX_CHANNEL, YYS_PIN_NUM_RX, YYS_PIN_NUM_TX)) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize YYS sensor.");
+        ESP_LOGE(TAG, "Failed to initialize YYS sensor (err=%d).", err);
     }
     // This will never fail here
     if ((err = ze08_init(&ze08_sensor, ZE08_RX_CHANNEL, ZE08_PIN_NUM_RX, ZE08_PIN_NUM_TX)) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize ZE08 sensor.");
+        ESP_LOGE(TAG, "Failed to initialize ZE08 sensor (err=%d).", err);
     }
     if ((err = sps30_init(&sps30_sensor, bus_handle)) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize SPS30 sensor.");
+        ESP_LOGE(TAG, "Failed to initialize SPS30 sensor (err=%d).", err);
     }
     if ((err = adxl345_init(&adxl345, bus_handle)) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize ADXL345 sensor.");
+        ESP_LOGE(TAG, "Failed to initialize ADXL345 sensor (err=%d).", err);
     }
     if ((err = qmc5883l_init(&qmc5883l, bus_handle)) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize QMC5883L sensor.");
+        ESP_LOGE(TAG, "Failed to initialize QMC5883L sensor (err=%d).", err);
     }
     //s11_sensor->debug = 1;
     //scd30_sensor->debug = 1;
@@ -1135,7 +1135,7 @@ static void update_task(void *arg)
             size_t total_free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
             size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
             int frag = 100 - (largest_block * 100 / (total_free + 1));
-            if (total_free < 10000 || frag > 60 || (debug_main & 0x100) != 0) {
+            if (total_free < 10000 || frag > 70 || (debug_main & 0x100) != 0) {
                 ESP_LOGW(TAG, "Heap: free=%u largest_block=%u frag=%d%%",
                     total_free, largest_block, frag);
             }
