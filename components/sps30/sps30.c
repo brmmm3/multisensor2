@@ -134,7 +134,13 @@ void sps30_close(sps30_t *sensor)
  */
 static esp_err_t sps30_read(sps30_t *sensor, uint8_t *addr, uint8_t *dout, size_t size)
 {
-    return i2c_master_transmit_receive(sensor->dev_handle, addr, SPS30_ADDR_SIZE, dout, size, CONFIG_SPS30_TIMEOUT);
+    // Write command wir with STOP – SPS30 braucht getrenntes Read
+    esp_err_t err = i2c_master_transmit(sensor->dev_handle, addr, SPS30_ADDR_SIZE, CONFIG_SPS30_TIMEOUT);
+    if (err != ESP_OK) return err;
+    // Wait for sensor to prepare data
+    vTaskDelay(pdMS_TO_TICKS(2));
+    // Read with separate START
+    return i2c_master_receive(sensor->dev_handle, dout, size, CONFIG_SPS30_TIMEOUT);
 }
 
 static esp_err_t sps30_write(sps30_t *sensor, uint8_t *addr, uint8_t *din, size_t size)
@@ -161,7 +167,7 @@ esp_err_t sps30_probe(sps30_t *sensor)
 
     // Try to wake up, but ignore failure if it is not in sleep mode
     sps30_wake_up(sensor);
-    vTaskDelay(pdMS_TO_TICKS(20));  /* wait for sensor to wake up */
+    vTaskDelay(pdMS_TO_TICKS(35));  /* wait for sensor to wake up (>30ms per datasheet) */
     if ((err = sps30_get_serial(sensor)) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to probe sensor (err=%d).", err);
         return err;
@@ -198,6 +204,7 @@ esp_err_t sps30_get_serial(sps30_t *sensor)
         ESP_LOGE(TAG, "Failed to read I2C data for serial number");
         return err;
     }
+    ESP_LOG_BUFFER_HEXDUMP(TAG, buffer, 48, ESP_LOG_INFO);
     cnt = sps30_bytes_to_data(buffer, 48, (uint8_t *)sensor->serial);
     sensor->serial[cnt] = '\0';
     if (cnt < SPS30_SERIAL_MAX_LEN) {
